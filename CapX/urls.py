@@ -22,7 +22,7 @@ from django.conf.urls.static import static
 from rest_framework.routers import DefaultRouter
 from skills.views import SkillViewSet, SkillByTypeViewSet
 from users.views import (
-    ProfileViewSet, UsersViewSet,
+    ProfileViewSet, UsersViewSet, QuickListViewSet,
     UsersBySkillViewSet, UsersByTagViewSet, TerritoryViewSet,
 )
 from bugs.views import BugViewSet, AttachmentViewSet
@@ -45,7 +45,7 @@ router.register('skills_by_type', SkillByTypeViewSet, basename='skills_by_type')
 router.register('events', EventViewSet)
 router.register('events_participants', EventParticipantViewSet)
 router.register('events_organizations', EventOrganizationsViewSet)
-
+router.register('list', QuickListViewSet, basename='list')
 
 urlpatterns = [
     path('admin/', admin.site.urls),
