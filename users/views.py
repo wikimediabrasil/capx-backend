@@ -202,9 +202,11 @@ class QuickListViewSet(viewsets.ReadOnlyModelViewSet):
         elif list_type == 'skills':
             return Skill.objects.all()
         else:
+            # Dummy empty queryset to avoid errors in the schema generation
             return Profile.objects.none()
     
-    def get_serializer_class(self):
+    def get_serializer_class(self): # pragma: no cover
+        # Dummy method to avoid errors in the schema generation
         return ProfileSerializer
 
     @extend_schema(
@@ -235,8 +237,6 @@ class QuickListViewSet(viewsets.ReadOnlyModelViewSet):
     )
     def retrieve(self, request, *args, **kwargs):
         queryset = self.get_queryset()
-        if queryset is None:
-            return Response({'message': 'Please provide a valid list type.'}, status=status.HTTP_400_BAD_REQUEST)
         data = {item.id: str(item) for item in queryset}
         return Response(data)
 
