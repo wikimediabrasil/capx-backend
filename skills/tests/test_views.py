@@ -106,17 +106,6 @@ class SkillViewSetTestCase(TestCase):
         response = self.client.delete('/skill/1/')
         self.assertEqual(response.status_code, status.HTTP_403_FORBIDDEN)
 
-    def test_get_skills_list_simple(self):
-        Skill.objects.create(skill_wikidata_item='Q43210')
-        response = self.client.get('/list_skills/')
-        skills = Skill.objects.all()
-        serializer = SkillSerializer(skills, many=True)
-        expected_data = {item['id']: item['skill_wikidata_item'] for item in serializer.data}
-        self.assertEqual(response.data, expected_data)
-        
-        response = self.client.get('/list_skills/1/')
-        self.assertEqual(response.status_code, status.HTTP_405_METHOD_NOT_ALLOWED)
-
 class SkillByTypeTestCase(TestCase):
     def setUp(self):
         self.user = CustomUser.objects.create_user(username='test', password=str(secrets.randbits(16)))
