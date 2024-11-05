@@ -1,5 +1,5 @@
 from .models import Skill
-from .serializers import SkillSerializer, ListSkillSerializer
+from .serializers import SkillSerializer
 from rest_framework import status, viewsets, filters
 from rest_framework.response import Response
 from drf_spectacular.utils import extend_schema, extend_schema_view, OpenApiParameter, OpenApiTypes, OpenApiExample, OpenApiResponse
