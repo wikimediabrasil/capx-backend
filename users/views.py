@@ -157,62 +157,6 @@ class TerritoryViewSet(viewsets.ReadOnlyModelViewSet):
     serializer_class = TerritorySerializer
 
 
-class ListTerritoryViewSet(viewsets.ReadOnlyModelViewSet):
-    queryset = Territory.objects.all()
-    serializer_class = TerritorySerializer
-
-    @extend_schema(
-        summary='List all territories.',
-        description='Deprecated. This endpoint lists all territories. Please use the /tags/ endpoint instead.',
-        deprecated=True
-    )
-    def list(self, request, *args, **kwargs):
-        queryset = self.get_queryset()
-        data = {territory.id: str(territory) for territory in queryset}
-        return Response(data)
-
-    @extend_schema(exclude=True)
-    def retrieve(self, request, *args, **kwargs):
-        return Response({'message': 'Method not allowed.'}, status=status.HTTP_405_METHOD_NOT_ALLOWED)
-
-class ListLanguageViewSet(viewsets.ReadOnlyModelViewSet):
-    queryset = Language.objects.all()
-    serializer_class = LanguageSerializer
-
-    @extend_schema(
-        summary='List all languages.',
-        description='Deprecated. This endpoint lists all languages. Please use the /tags/ endpoint instead.',
-        deprecated=True
-    )
-    def list(self, request, *args, **kwargs):
-        queryset = self.get_queryset()
-        data = {language.id: str(language) for language in queryset}
-        return Response(data)
-
-    @extend_schema(exclude=True)
-    def retrieve(self, request, *args, **kwargs):
-        return Response({'message': 'Method not allowed.'}, status=status.HTTP_405_METHOD_NOT_ALLOWED)
-
-
-class ListWikimediaProjectViewSet(viewsets.ReadOnlyModelViewSet):
-    queryset = WikimediaProject.objects.all()
-    serializer_class = WikimediaProjectSerializer
-
-    @extend_schema(
-        summary='List all Wikimedia projects.',
-        description='Deprecated. This endpoint lists all Wikimedia projects. Please use the /tags/ endpoint instead.',
-        deprecated=True
-    )
-    def list(self, request, *args, **kwargs):
-        queryset = self.get_queryset()
-        data = {project.id: str(project) for project in queryset}
-        return Response(data)
-
-    @extend_schema(exclude=True)
-    def retrieve(self, request, *args, **kwargs):
-        return Response({'message': 'Method not allowed.'}, status=status.HTTP_405_METHOD_NOT_ALLOWED)
-
-
 class UsersBySkillViewSet(viewsets.ReadOnlyModelViewSet):
     queryset = Profile.objects.all()
     serializer_class = UsersBySkillSerializer

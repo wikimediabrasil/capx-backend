@@ -20,14 +20,13 @@ from django.urls import path, include
 from django.contrib.staticfiles.urls import staticfiles_urlpatterns
 from django.conf.urls.static import static
 from rest_framework.routers import DefaultRouter
-from skills.views import SkillViewSet, ListSkillViewSet, SkillByTypeViewSet
+from skills.views import SkillViewSet, SkillByTypeViewSet
 from users.views import (
-    ProfileViewSet, UsersViewSet, ListTerritoryViewSet, 
-    ListLanguageViewSet, ListWikimediaProjectViewSet, 
-    UsersBySkillViewSet, UsersByTagViewSet, TerritoryViewSet
+    ProfileViewSet, UsersViewSet,
+    UsersBySkillViewSet, UsersByTagViewSet, TerritoryViewSet,
 )
 from bugs.views import BugViewSet, AttachmentViewSet
-from orgs.views import OrganizationViewSet, ListOrganizationViewSet, OrganizationTypeViewSet
+from orgs.views import OrganizationViewSet, OrganizationTypeViewSet
 from events.views import EventViewSet, EventParticipantViewSet, EventOrganizationsViewSet
 from drf_spectacular.views import SpectacularAPIView, SpectacularSwaggerView
 
@@ -46,13 +45,6 @@ router.register('skills_by_type', SkillByTypeViewSet, basename='skills_by_type')
 router.register('events', EventViewSet)
 router.register('events_participants', EventParticipantViewSet)
 router.register('events_organizations', EventOrganizationsViewSet)
-
-# Alternative version of views, read-only and only returns the __str__ with the id as the key
-router.register('list_language', ListLanguageViewSet, basename='list_language')
-router.register('list_affiliation', ListOrganizationViewSet, basename='list_affiliation')
-router.register('list_skills', ListSkillViewSet, basename='list_skills')
-router.register('list_territory', ListTerritoryViewSet, basename='list_territory')
-router.register('list_wikimedia_project', ListWikimediaProjectViewSet, basename='list_wikimedia_project')
 
 
 urlpatterns = [

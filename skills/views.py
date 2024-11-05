@@ -80,30 +80,6 @@ class SkillViewSet(viewsets.ModelViewSet):
         return Response(status=status.HTTP_204_NO_CONTENT)
 
 
-class ListSkillViewSet (viewsets.ReadOnlyModelViewSet):
-    queryset = Skill.objects.all()
-    serializer_class = ListSkillSerializer
-
-    @extend_schema(
-        summary='List all skills.',
-        deprecated=True,
-        description='Depracated. This endpoint lists all skills. Use the /skills/ endpoint instead.',
-    )
-    def list(self, request, *args, **kwargs):
-        queryset = self.get_queryset()
-        serializer = self.get_serializer(queryset, many=True)
-
-        aggregated_data = {}
-        for item in serializer.data:
-            aggregated_data.update(item)
-
-        return Response(aggregated_data)
-
-    @extend_schema(exclude=True)
-    def retrieve(self, request, *args, **kwargs):
-        return Response({'message': 'Method not allowed.'}, status=status.HTTP_405_METHOD_NOT_ALLOWED)
-
-
 class SkillByTypeViewSet(viewsets.ReadOnlyModelViewSet):
     queryset = Skill.objects.all()
     serializer_class = SkillSerializer  
