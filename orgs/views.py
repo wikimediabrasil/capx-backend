@@ -76,24 +76,6 @@ class OrganizationViewSet(viewsets.ModelViewSet):
         return Response("You do not have permission to delete this organization.", status=status.HTTP_403_FORBIDDEN)
 
 
-class ListOrganizationViewSet(viewsets.ReadOnlyModelViewSet):
-    queryset = Organization.objects.all()
-    serializer_class = OrganizationSerializer
-
-    @extend_schema(
-        summary='List all organizations.',
-        deprecated=True,
-        description='Depracated. This endpoint lists all organizations. Use the /organizations/ endpoint instead.',
-    )
-    def list(self, request, *args, **kwargs):
-        queryset = self.get_queryset()
-        data = {org.id: str(org) for org in queryset}
-        return Response(data)
-
-    @extend_schema(exclude=True)
-    def retrieve(self, request, *args, **kwargs):
-        return Response("Method not allowed", status=status.HTTP_405_METHOD_NOT_ALLOWED)
-
 @extend_schema_view(
     list=extend_schema(
         summary='List all organization types.',
