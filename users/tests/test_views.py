@@ -8,7 +8,7 @@ from users.models import Profile, CustomUser
 from users.submodels import Territory, Language, WikimediaProject
 from users.serializers import ProfileSerializer, TerritorySerializer, LanguageSerializer, WikimediaProjectSerializer
 from skills.models import Skill
-from orgs.models import Organization
+from orgs.models import Organization, OrganizationType
 
 class ProfileViewSetTestCase(TestCase):
     def setUp(self):
@@ -109,47 +109,88 @@ class ProfileViewSetTestCase(TestCase):
         serializer = ProfileSerializer(profiles, many=True)
         self.assertEqual(response.data, serializer.data)
 
-class ListyViewSetTestCase(TestCase):
+class QuickListViewSetTestCase(TestCase):
     def setUp(self):
         self.user = CustomUser.objects.create_user(username='test', password=str(secrets.randbits(16)))
         self.client = APIClient()
+
+    def test_list_unauthenticated(self):
+        response = self.client.get('/list/')
+        self.assertEqual(response.status_code, status.HTTP_401_UNAUTHORIZED)
+
+    def test_list_authenticated_unespecific(self):
+        self.client.force_authenticate(self.user)
+        response = self.client.get('/list/')
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+
+    def test_list_invalid(self):
+        self.client.force_authenticate(self.user)
+        response = self.client.get('/list/invalid/')
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(response.data, {})
+        
+    def test_list_orgs(self):
+        OrganizationType.objects.create(type_name='Type 1', type_code='TYPE1')
+        Territory.objects.create(territory_name='Territory 1')
         self.client.force_authenticate(self.user)
 
-    def test_get_territories_list(self):
+        organization = Organization.objects.create(
+            display_name='New Organization',
+            acronym='NO',
+            type=OrganizationType.objects.get(pk=1),
+        )
+        organization.territory.set([Territory.objects.get(pk=1)])
+        Organization.objects.create(
+            display_name='New Organization 2',
+            acronym='NO2', 
+            type=OrganizationType.objects.get(pk=1),
+        )
+        organization.territory.set([Territory.objects.get(pk=1)])
+        organizations = Organization.objects.all()
+        expected_data = {organization.pk: organization.display_name + ' (' + organization.acronym + ')' for organization in organizations}
+        response = self.client.get('/list/affiliation/')
+        self.assertEqual(response.data, expected_data)
+
+    def test_list_languages(self):
         Territory.objects.create(territory_name='test')
         Territory.objects.create(territory_name='test2')
+        self.client.force_authenticate(self.user)
 
-        response = self.client.get('/list_territory/')
+        response = self.client.get('/list/territory/')
         territories = Territory.objects.all()
         expected_data = {territory.pk: territory.territory_name for territory in territories}
         self.assertEqual(response.data, expected_data)
 
-        response = self.client.get('/list_territory/1/')
-        self.assertEqual(response.status_code, status.HTTP_405_METHOD_NOT_ALLOWED)
-
-    def test_get_languages_list(self):
+    def test_list_territories(self):
         Language.objects.create(language_name='test', language_code='test')
         Language.objects.create(language_name='test2', language_code='test2')
+        self.client.force_authenticate(self.user)
 
-        response = self.client.get('/list_language/')
+        response = self.client.get('/list/language/')
         languages = Language.objects.all()
         expected_data = {language.pk: language.language_name for language in languages}
         self.assertEqual(response.data, expected_data)
 
-        response = self.client.get('/list_language/1/')
-        self.assertEqual(response.status_code, status.HTTP_405_METHOD_NOT_ALLOWED)
-
-    def test_get_wikimedia_projects_list(self):
+    def test_list_wikimedia_projects(self):
         WikimediaProject.objects.create(wikimedia_project_name='test', wikimedia_project_code='test')
         WikimediaProject.objects.create(wikimedia_project_name='test2', wikimedia_project_code='test2')
+        self.client.force_authenticate(self.user)
 
-        response = self.client.get('/list_wikimedia_project/')
+        response = self.client.get('/list/wikimedia_project/')
         wikimedia_projects = WikimediaProject.objects.all()
         expected_data = {wikimedia_project.pk: wikimedia_project.wikimedia_project_name for wikimedia_project in wikimedia_projects}
         self.assertEqual(response.data, expected_data)
 
-        response = self.client.get('/list_wikimedia_project/1/')
-        self.assertEqual(response.status_code, status.HTTP_405_METHOD_NOT_ALLOWED)
+    def test_list_skills(self):
+        Skill.objects.create(skill_wikidata_item='Q123')
+        Skill.objects.create(skill_wikidata_item='Q321')
+        self.client.force_authenticate(self.user)
+
+        response = self.client.get('/list/skills/')
+        skills = Skill.objects.all()
+        expected_data = {skill.pk: skill.skill_wikidata_item for skill in skills}
+        self.assertEqual(response.data, expected_data)
+
 
 class UsersBySkillTestCase(TestCase):
     def setUp(self):

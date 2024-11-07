@@ -157,62 +157,6 @@ class TerritoryViewSet(viewsets.ReadOnlyModelViewSet):
     serializer_class = TerritorySerializer
 
 
-class ListTerritoryViewSet(viewsets.ReadOnlyModelViewSet):
-    queryset = Territory.objects.all()
-    serializer_class = TerritorySerializer
-
-    @extend_schema(
-        summary='List all territories.',
-        description='Deprecated. This endpoint lists all territories. Please use the /tags/ endpoint instead.',
-        deprecated=True
-    )
-    def list(self, request, *args, **kwargs):
-        queryset = self.get_queryset()
-        data = {territory.id: str(territory) for territory in queryset}
-        return Response(data)
-
-    @extend_schema(exclude=True)
-    def retrieve(self, request, *args, **kwargs):
-        return Response({'message': 'Method not allowed.'}, status=status.HTTP_405_METHOD_NOT_ALLOWED)
-
-class ListLanguageViewSet(viewsets.ReadOnlyModelViewSet):
-    queryset = Language.objects.all()
-    serializer_class = LanguageSerializer
-
-    @extend_schema(
-        summary='List all languages.',
-        description='Deprecated. This endpoint lists all languages. Please use the /tags/ endpoint instead.',
-        deprecated=True
-    )
-    def list(self, request, *args, **kwargs):
-        queryset = self.get_queryset()
-        data = {language.id: str(language) for language in queryset}
-        return Response(data)
-
-    @extend_schema(exclude=True)
-    def retrieve(self, request, *args, **kwargs):
-        return Response({'message': 'Method not allowed.'}, status=status.HTTP_405_METHOD_NOT_ALLOWED)
-
-
-class ListWikimediaProjectViewSet(viewsets.ReadOnlyModelViewSet):
-    queryset = WikimediaProject.objects.all()
-    serializer_class = WikimediaProjectSerializer
-
-    @extend_schema(
-        summary='List all Wikimedia projects.',
-        description='Deprecated. This endpoint lists all Wikimedia projects. Please use the /tags/ endpoint instead.',
-        deprecated=True
-    )
-    def list(self, request, *args, **kwargs):
-        queryset = self.get_queryset()
-        data = {project.id: str(project) for project in queryset}
-        return Response(data)
-
-    @extend_schema(exclude=True)
-    def retrieve(self, request, *args, **kwargs):
-        return Response({'message': 'Method not allowed.'}, status=status.HTTP_405_METHOD_NOT_ALLOWED)
-
-
 class UsersBySkillViewSet(viewsets.ReadOnlyModelViewSet):
     queryset = Profile.objects.all()
     serializer_class = UsersBySkillSerializer
@@ -240,6 +184,67 @@ class UsersBySkillViewSet(viewsets.ReadOnlyModelViewSet):
     def list(self, request, *args, **kwargs):
         response = {'message': 'Please provide a skill id.'}
         return Response(response, status=status.HTTP_400_BAD_REQUEST)
+
+
+class QuickListViewSet(viewsets.ReadOnlyModelViewSet):
+    lookup_url_kwarg = 'list_type'
+
+    def get_queryset(self):
+        list_type = self.kwargs.get('list_type')
+        if list_type == 'language':
+            return Language.objects.all()
+        elif list_type == 'wikimedia_project':
+            return WikimediaProject.objects.all()
+        elif list_type == 'affiliation':
+            return Organization.objects.all()
+        elif list_type == 'territory':
+            return Territory.objects.all()
+        elif list_type == 'skills':
+            return Skill.objects.all()
+        else:
+            # Dummy empty queryset to avoid errors in the schema generation
+            return Profile.objects.none()
+    
+    def get_serializer_class(self): # pragma: no cover
+        # Dummy method to avoid errors in the schema generation
+        return ProfileSerializer
+
+    @extend_schema(
+        summary='List all items in a simplified way.',
+        description='This endpoint lists all items of a given type in a simplified way.',
+        parameters=[
+            OpenApiParameter(
+                "list_type",
+                OpenApiTypes.STR,
+                OpenApiParameter.PATH,
+                required=True,
+                description='The type of list to retrieve.',
+                enum=['language', 'wikimedia_project', 'affiliation', 'territory', 'skills'],
+            ),
+        ],
+        responses={(200, 'application/json'): {
+            'description': 'A mapping of item IDs to item names.',
+            'type': 'object',
+            'additionalProperties': {
+                'type': 'string',
+            },
+            'example': {
+                '1': 'Label 1',
+                '2': 'Label 2',
+                '3': 'Label 3',
+            },
+        }},
+    )
+    def retrieve(self, request, *args, **kwargs):
+        queryset = self.get_queryset()
+        data = {item.id: str(item) for item in queryset}
+        return Response(data)
+
+    @extend_schema(
+        exclude=True
+    )
+    def list(self, request, *args, **kwargs):
+        return Response({'message': 'Please provide a valid list type.'}, status=status.HTTP_400_BAD_REQUEST)
 
 
 class UsersByTagViewSet(viewsets.ReadOnlyModelViewSet):
