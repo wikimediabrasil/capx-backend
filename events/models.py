@@ -3,6 +3,8 @@ from users.models import Profile, CustomUser
 from django.conf import settings
 from orgs.models import Organization
 from django.core.validators import RegexValidator
+from django.core.exceptions import ValidationError
+import requests
 
 
 class Events(models.Model):
@@ -36,6 +38,12 @@ class Events(models.Model):
         verbose_name="Event URL",
         help_text="URL of the event."
     )
+    wikilearn_id = models.CharField(
+        max_length=100,
+        blank=True,
+        verbose_name="Wikilearn ID",
+        help_text="Wikilearn ID of the event.",
+    )
     wikidata_qid = models.CharField(
         max_length=10,
         blank=True,
@@ -61,7 +69,8 @@ class Events(models.Model):
     )
     time_end = models.DateTimeField(
         verbose_name="End Time",
-        help_text="End time of the event."
+        help_text="End time of the event.",
+        blank=True
     )
     creator = models.ForeignKey(
         settings.AUTH_USER_MODEL,
@@ -103,6 +112,30 @@ class Events(models.Model):
 
     def __str__(self):
         return self.name
+
+    def clean(self):
+        super().clean()
+
+        if self.wikilearn_id:
+            api_url = f"https://learn.wiki/api/courses/v1/courses/{self.wikilearn_id}"
+            response = requests.get(api_url)
+            if response.status_code != 200:
+                raise ConnectionError("Wikilearn service is not available.")
+
+            data = response.json()
+            
+            if not data.get("id"):
+                raise ValueError("Invalid Wikilearn ID.")
+
+            self.name = data.get("name")
+            self.time_begin = data.get("start")
+            self.time_end = data.get("end") if data.get("end") else ""
+            self.url = f"https://learn.wiki/courses/{self.wikilearn_id}/about"
+
+    def save(self, *args, **kwargs):
+        self.clean()
+        super().save(*args, **kwargs)
+
     
 class EventParticipant(models.Model):
     ROLE_TYPES = [
