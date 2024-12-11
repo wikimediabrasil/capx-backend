@@ -30,19 +30,47 @@ class MessageManager(models.Manager):
             instance.save()
             return
 
-        # Send the message
-        params_send = {
-            'action': 'emailuser',
-            'target': instance.receiver,
-            'subject': instance.message[:50],  # Assuming the first 50 chars as the subject
-            'text': instance.message,
-            'ccme': '1',
+        params_emailable = {
+            'action': 'query',
             'format': 'json',
-            'token': token,
+            'list': 'users',
+            'formatversion': '2',
+            'usprop': 'emailable',
+            'ususers': instance.receiver,
         }
-        reply = oauth.post(url, data=params_send, timeout=60)
-        instance.status = 'sent' if reply.status_code == 200 else 'failed'
-        instance.save()
+        reply = oauth.get(url, params=params_emailable, timeout=60)
+        if reply.json().get('query', {}).get('users', [{}])[0].get('emailable', False):
+            params_send = {
+                'action': 'emailuser',
+                'target': instance.receiver,
+                'subject': instance.message[:50],  # Assuming the first 50 chars as the subject
+                'text': instance.message,
+                'ccme': '1',
+                'format': 'json',
+                'token': token,
+            }
+            reply = oauth.post(url, data=params_send, timeout=60)
+            if reply.json().get('emailuser', {}).get('result') == 'Success':
+                instance.status = 'sent'
+            else:
+                instance.status = 'failed'
+            instance.save()
+        else:
+            params_send = {
+                'action': 'edit',
+                'title': f'User talk:{instance.receiver}',
+                'section': 'new',
+                'sectiontitle': instance.message[:50],  # Assuming the first 50 chars as the section title
+                'text': instance.message,
+                'format': 'json',
+                'token': token,
+            }
+            reply = oauth.post(url, data=params_send, timeout=60)
+            if reply.json().get('edit', {}).get('result') == 'Success':
+                instance.status = 'sent'
+            else:
+                instance.status = 'failed'
+            instance.save()
 
 class Message(models.Model):
     MESSAGE_METHOD = (
