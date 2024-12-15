@@ -90,3 +90,29 @@ class UserAuthViewTestCase(TestCase):
         }
         response = self.client.post('/api/login/social/knox_user/', data, format='json')
         self.assertNotIn('extra', response.data)
+
+
+class CheckViewTestCase(TestCase):
+    def setUp(self):
+        self.client = APIClient()
+        self.user = CustomUser.objects.create_user(username='testuser', password=str(secrets.randbits(16)))
+        self.client.force_authenticate(self.user)
+        self.auth_extra_info = AuthExtraInfo.objects.create(token='testtoken', extra='some_extra_info')
+
+    def test_post_with_existing_token(self):
+        data = {
+            'oauth_token': 'testtoken'
+        }
+        response = self.client.post('/api/login/social/check/', data, format='json')
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertTrue(response.data['exists'])
+        self.assertEqual(response.data['extra'], 'some_extra_info')
+
+    def test_post_with_non_existing_token(self):
+        data = {
+            'oauth_token': 'nonexistingtoken'
+        }
+        response = self.client.post('/api/login/social/check/', data, format='json')
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertFalse(response.data['exists'])
+        self.assertIsNone(response.data['extra'])

@@ -73,3 +73,37 @@ class UserAuthView(SocialKnoxUserAuthView):
             if isinstance(response.data, dict):
                 response.data['extra'] = AuthExtraInfo.objects.get(token=token).extra
         return response
+
+class CheckView(SocialKnoxOnlyAuthView):
+    request = {
+        'type': 'object',
+        'properties': {
+            'oauth_token': {
+                'type': 'string',
+                'required': True,
+                'description': 'The OAuth token to check'
+            }
+        },
+    }
+    @extend_schema(
+        summary='Check if the OAuth token exists and has extra information',
+        description='This endpoint is used to check if the OAuth token exists and has extra information stored with it.',
+        request={
+            ('application/json'): request,
+            ('application/x-www-form-urlencoded'): request,
+            ('multipart/form-data'): request,
+        },
+        responses={(200, 'application/json'): {
+            'description': 'OAuth token checked successfully',
+            'type': 'object',
+            'properties': {
+                'exists': {'type': 'boolean', 'description': 'Whether the OAuth token exists or not'},
+                'extra': {'type': 'string', 'description': 'The extra information stored with the token'}
+            }
+        }}
+    )
+    def post(self, request, *args, **kwargs):
+        token = request.data['oauth_token']
+        exists = AuthExtraInfo.objects.filter(token=token).exists()
+        extra = AuthExtraInfo.objects.get(token=token).extra if exists else None
+        return Response({'exists': exists, 'extra': extra})

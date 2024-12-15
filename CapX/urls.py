@@ -29,7 +29,7 @@ from bugs.views import BugViewSet, AttachmentViewSet
 from orgs.views import OrganizationViewSet, OrganizationTypeViewSet
 from events.views import EventViewSet, EventParticipantViewSet, EventOrganizationsViewSet
 from drf_spectacular.views import SpectacularAPIView, SpectacularSwaggerView
-from users.oauth import UserAuthView, AuthView
+from users.oauth import UserAuthView, AuthView, CheckView
 
 
 router = DefaultRouter()
@@ -57,6 +57,7 @@ urlpatterns = [
     path("", SpectacularSwaggerView.as_view(url_name="schema"),name="swagger-ui",),
     re_path(r'^api/login/social/knox_user/(?:(?P<provider>[a-zA-Z0-9_-]+)/?)?$', UserAuthView.as_view(), name='login_social_knox_user'),
     re_path(r'^api/login/social/knox/(?:(?P<provider>[a-zA-Z0-9_-]+)/?)?$', AuthView.as_view(), name='login_social_knox'),
+    path('api/login/social/check/', CheckView.as_view(), name='login_social_check'),
     path('', include(router.urls)),
 ]
 
