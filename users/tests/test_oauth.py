@@ -13,7 +13,8 @@ class AuthViewTestCase(TestCase):
         self.user = CustomUser.objects.create_user(username='testuser', password=str(secrets.randbits(16)))
         self.client.force_authenticate(self.user)
 
-    def test_post_with_extra_info(self):
+    @patch('social_core.backends.mediawiki.MediaWiki.unauthorized_token', return_value="oauth_token=testtoken&oauth_token_secret=testsecret&oauth_callback_confirmed=true")
+    def test_post_with_extra_info(self, mock_unauthorized_token):
         data = {
             'provider': 'mediawiki',
             'extra': 'some_extra_info'
@@ -23,7 +24,8 @@ class AuthViewTestCase(TestCase):
         self.assertTrue(AuthExtraInfo.objects.filter(token=response.data['oauth_token']).exists())
         self.assertEqual(AuthExtraInfo.objects.get(token=response.data['oauth_token']).extra, 'some_extra_info')
 
-    def test_post_without_extra_info(self):
+    @patch('social_core.backends.mediawiki.MediaWiki.unauthorized_token', return_value="oauth_token=testtoken&oauth_token_secret=testsecret&oauth_callback_confirmed=true")
+    def test_post_without_extra_info(self, mock_unauthorized_token):
         data = {
             'provider': 'mediawiki'
         }
