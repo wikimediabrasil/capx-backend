@@ -16,7 +16,7 @@ Including another URLconf
 """
 from django.contrib import admin
 from django.conf import settings
-from django.urls import path, include
+from django.urls import path, include, re_path
 from django.contrib.staticfiles.urls import staticfiles_urlpatterns
 from django.conf.urls.static import static
 from rest_framework.routers import DefaultRouter
@@ -29,6 +29,7 @@ from bugs.views import BugViewSet, AttachmentViewSet
 from orgs.views import OrganizationViewSet, OrganizationTypeViewSet
 from events.views import EventViewSet, EventParticipantViewSet, EventOrganizationsViewSet
 from drf_spectacular.views import SpectacularAPIView, SpectacularSwaggerView
+from users.oauth import UserAuthView, AuthView
 
 
 router = DefaultRouter()
@@ -51,10 +52,11 @@ urlpatterns = [
     path('admin/', admin.site.urls),
     path('api-auth/', include("rest_framework.urls", namespace="rest_framework")),
     path('', include('social_django.urls')),
-    path('api/login/', include('rest_social_auth.urls_knox')),
     path('tags/<str:tag_type>/<int:tag_id>/', UsersByTagViewSet.as_view({'get': 'list'}), name='tags'),
     path("schema/", SpectacularAPIView.as_view(), name="schema"),
     path("", SpectacularSwaggerView.as_view(url_name="schema"),name="swagger-ui",),
+    re_path(r'^api/login/social/knox_user/(?:(?P<provider>[a-zA-Z0-9_-]+)/?)?$', UserAuthView.as_view(), name='login_social_knox_user'),
+    re_path(r'^api/login/social/knox/(?:(?P<provider>[a-zA-Z0-9_-]+)/?)?$', AuthView.as_view(), name='login_social_knox'),
     path('', include(router.urls)),
 ]
 
