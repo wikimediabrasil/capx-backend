@@ -68,10 +68,8 @@ class UserAuthView(SocialKnoxUserAuthView):
     )
     def post(self, request, *args, **kwargs):
         response = super().post(request, *args, **kwargs)
-        if not isinstance(response, Response):
-            return response
-
         token = request.data['oauth_token']
         if AuthExtraInfo.objects.filter(token=token).exists():
-            response.data['extra'] = AuthExtraInfo.objects.get(token=token).extra
+            if isinstance(response.data, dict):
+                response.data['extra'] = AuthExtraInfo.objects.get(token=token).extra
         return response

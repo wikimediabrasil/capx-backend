@@ -1,0 +1,90 @@
+import secrets
+from django.test import TestCase
+from rest_framework import status
+from rest_framework.test import APIClient
+from ..oauth import AuthView, UserAuthView
+from ..submodels import AuthExtraInfo
+from users.models import CustomUser
+from unittest.mock import patch
+
+class AuthViewTestCase(TestCase):
+    def setUp(self):
+        self.client = APIClient()
+        self.user = CustomUser.objects.create_user(username='testuser', password=str(secrets.randbits(16)))
+        self.client.force_authenticate(self.user)
+
+    def test_post_with_extra_info(self):
+        data = {
+            'provider': 'mediawiki',
+            'extra': 'some_extra_info'
+        }
+        response = self.client.post('/api/login/social/knox/', data, format='json')
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertTrue(AuthExtraInfo.objects.filter(token=response.data['oauth_token']).exists())
+        self.assertEqual(AuthExtraInfo.objects.get(token=response.data['oauth_token']).extra, 'some_extra_info')
+
+    def test_post_without_extra_info(self):
+        data = {
+            'provider': 'mediawiki'
+        }
+        response = self.client.post('/api/login/social/knox/', data, format='json')
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertFalse(AuthExtraInfo.objects.filter(token=response.data['oauth_token']).exists())
+
+class UserAuthViewTestCase(TestCase):
+    def setUp(self):
+        self.client = APIClient()
+        self.user = CustomUser.objects.create_user(username='testuser', password=str(secrets.randbits(16)))
+        self.client.force_authenticate(self.user)
+        self.auth_extra_info = AuthExtraInfo.objects.create(token='testtoken', extra='some_extra_info')
+
+    @patch('social_core.backends.mediawiki.MediaWiki.access_token', return_value={
+        "oauth_token": "oauth_token_key",
+        "oauth_token_secret": "oauth_token_secret",
+    })
+    @patch('social_core.backends.mediawiki.MediaWiki.get_user_details', return_value={
+        "username": "testuser",
+        "userID": "12345",
+        "email": "testuser@example.com",
+        "confirmed_email": True,
+        "editcount": 100,
+        "rights": ["read", "write"],
+        "groups": ["user", "editor"],
+        "registered": "2020-01-01T00:00:00Z",
+        "blocked": False,
+    })
+    def test_post_with_valid_token(self, mock_access_token, mock_get_user_details):
+        data = {
+            'provider': 'mediawiki',
+            'oauth_token': 'testtoken',
+            'oauth_secret': 'testsecret',
+            'oauth_verifier': 'testverifier'
+        }
+        response = self.client.post('/api/login/social/knox_user/', data, format='json')
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(response.data['extra'], 'some_extra_info')
+
+    @patch('social_core.backends.mediawiki.MediaWiki.access_token', return_value={
+        "oauth_token": "oauth_token_key",
+        "oauth_token_secret": "oauth_token_secret",
+    })
+    @patch('social_core.backends.mediawiki.MediaWiki.get_user_details', return_value={
+        "username": "testuser",
+        "userID": "12345",
+        "email": "testuser@example.com",
+        "confirmed_email": True,
+        "editcount": 100,
+        "rights": ["read", "write"],
+        "groups": ["user", "editor"],
+        "registered": "2020-01-01T00:00:00Z",
+        "blocked": False,
+    })
+    def test_post_with_invalid_token(self, mock_access_token, mock_get_user_details):
+        data = {
+            'provider': 'mediawiki',
+            'oauth_token': 'invalidtoken',
+            'oauth_secret': 'testsecret',
+            'oauth_verifier': 'testverifier'
+        }
+        response = self.client.post('/api/login/social/knox_user/', data, format='json')
+        self.assertNotIn('extra', response.data)
