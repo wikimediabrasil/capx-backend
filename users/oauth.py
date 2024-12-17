@@ -103,7 +103,10 @@ class CheckView(SocialKnoxOnlyAuthView):
         }}
     )
     def post(self, request, *args, **kwargs):
-        token = request.data['oauth_token']
+        token = request.data.get('oauth_token')
+        if not token:
+            return Response({'error': 'oauth_token is required'}, status=status.HTTP_400_BAD_REQUEST)
+        
         exists = AuthExtraInfo.objects.filter(token=token).exists()
         extra = AuthExtraInfo.objects.get(token=token).extra if exists else None
         return Response({'exists': exists, 'extra': extra})
