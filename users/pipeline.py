@@ -12,9 +12,6 @@ def get_username(strategy, details, user=None, *args, **kwargs):
 
     Returns:
     - dict: A dictionary containing the username. If a user is provided, it returns {'username': user.username}. 
-            Otherwise, it returns {'username': details['username']}.
     """
     if user:
         return {"username": user.username}
-    else:
-        return {"username": details['username']}
