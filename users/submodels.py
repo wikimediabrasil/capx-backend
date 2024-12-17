@@ -58,3 +58,18 @@ class WikimediaProject(models.Model):
 
     def __str__(self):
         return self.wikimedia_project_name
+
+
+class AuthExtraInfo(models.Model):
+    token = models.CharField(
+        verbose_name="Oauth token",
+        max_length=255,
+    )
+    extra = models.CharField(
+        verbose_name="Extra info",
+        max_length=255,
+    )
+    created_at = models.DateTimeField(
+        verbose_name="Created at",
+        auto_now_add=True
+    )
