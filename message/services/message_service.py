@@ -1,10 +1,6 @@
-# services/message_service.py
 from requests_oauthlib import OAuth1Session
 from django.conf import settings
 from social_django.models import UserSocialAuth
-import logging
-
-logger = logging.getLogger(__name__)
 
 class MessageService:
     @staticmethod
@@ -42,12 +38,7 @@ class MessageService:
             instance.status = 'sent' if success else 'failed'
             instance.save()
 
-        except UserSocialAuth.DoesNotExist:
-            logger.error(f"User {instance.sender} does not have Social Auth configured.")
-            instance.status = 'failed'
-            instance.save()
-        except Exception as e:
-            logger.exception(f"Error while sending message: {e}")
+        except Exception:
             instance.status = 'failed'
             instance.save()
 
