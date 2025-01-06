@@ -4,6 +4,7 @@ from .models import Organization, OrganizationType
 from .serializers import OrganizationSerializer, OrganizationTypeSerializer
 from users.models import CustomUser as User, Territory
 from drf_spectacular.utils import extend_schema, extend_schema_view, OpenApiParameter
+from rest_framework.decorators import action
 
 @extend_schema_view(
     list=extend_schema(
@@ -74,6 +75,21 @@ class OrganizationViewSet(viewsets.ModelViewSet):
         if request.user.is_staff:
             return super().destroy(request, *args, **kwargs)
         return Response("You do not have permission to delete this organization.", status=status.HTTP_403_FORBIDDEN)
+
+    @extend_schema(
+        summary='Check if user is manager.',
+        description='Debug endpoint to check if current user is manager of any organization.',
+    )
+    @action(detail=False, methods=['get'])
+    def check_manager(self, request):
+        user_orgs = Organization.objects.filter(managers=request.user)
+        return Response({
+            "is_manager": user_orgs.exists(),
+            "organizations": [
+                {"id": org.id, "name": org.display_name}
+                for org in user_orgs
+            ]
+        })
 
 
 @extend_schema_view(
