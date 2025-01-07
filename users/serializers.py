@@ -2,6 +2,8 @@ from rest_framework import serializers
 from .models import Profile, CustomUser
 from .submodels import Territory, Language, WikimediaProject
 from orgs.models import Organization
+from drf_spectacular.utils import extend_schema_field
+from drf_spectacular.types import OpenApiTypes
 
    
 class UserSerializer(serializers.ModelSerializer):
@@ -53,6 +55,7 @@ class OrganizationSerializer(serializers.ModelSerializer):
 
 class ProfileSerializer(serializers.ModelSerializer):
     user = UserSerializer()
+    is_manager = serializers.SerializerMethodField()
     
     class Meta:
         model = Profile
@@ -74,7 +77,19 @@ class ProfileSerializer(serializers.ModelSerializer):
             'skills_wanted',
             'contact',
             'social',
+            'is_manager',
         ]
+        read_only_fields = [
+            'is_manager',
+        ]
+
+    @extend_schema_field({
+        'type': 'array',
+        'description': 'List of organization IDs where the user is a manager',
+        'items': {'type': 'integer'}
+    })
+    def get_is_manager(self, obj):
+        return list(Organization.objects.filter(managers=obj.user).values_list('id', flat=True))
 
     # Override the update method to allow write access to the nested user object
     def update(self, instance, validated_data):
