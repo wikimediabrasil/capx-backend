@@ -49,6 +49,10 @@ class Organization(models.Model):
             message='Invalid URL format. The format should be https://meta.wikimedia.org/wiki/PageName'
         )]
     )
+    mastodon = models.URLField(
+        blank=True, null=True,
+        help_text='The URL of the organization Mastodon account.',
+    )
     home_project = models.URLField(
         blank=True, null=True, 
         help_text='The URL of the home project of the organization on Wikimedia (e.g. https://xx.wikimedia.org/).',
