@@ -81,7 +81,9 @@ class ProjectMemberViewSet(viewsets.ModelViewSet):
     )
     def create(self, request, *args, **kwargs):
         project = Project.objects.get(pk=request.data['project'])
-        if request.user.is_staff or request.user.is_manager and project.organizations.filter(organization__manager=request.user).exists():
+        orgs = project.organizations.values_list('organization', flat=True)
+        is_manager = Organization.objects.filter(managers=request.user, pk__in=orgs).exists()
+        if request.user.is_staff or is_manager:
             return super().create(request, *args, **kwargs)
         else:
             return Response(status=status.HTTP_403_FORBIDDEN)
@@ -127,7 +129,7 @@ class ProjectMemberAcceptanceViewSet(viewsets.ModelViewSet):
             return Response(status=status.HTTP_400_BAD_REQUEST)
 
         # Only mananger of invited organization can accept project members
-        if Organization.objects.filter(managers=request.user, pk=request.data['organization']).exists():
+        if Organization.objects.filter(managers=request.user, pk=project_member.organization.id).exists():
             return super().create(request, *args, **kwargs)
         else:
             return Response(status=status.HTTP_403_FORBIDDEN)
