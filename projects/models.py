@@ -38,7 +38,7 @@ class Project(models.Model):
 
 class ProjectMember(models.Model):
     project = models.ForeignKey(
-        'projects.Project', on_delete=models.CASCADE,
+        'projects.Project', on_delete=models.CASCADE, related_name='organizations',
         help_text='The ID of the project.'
     )
     organization = models.ForeignKey(
