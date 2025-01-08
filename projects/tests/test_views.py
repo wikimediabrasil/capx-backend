@@ -9,8 +9,7 @@ from rest_framework.test import APIClient
 import secrets
 
 
-class ProjectViewSetTests(APITestCase):
-
+class BaseTestCase(APITestCase):
     def setUp(self):
         self.user = CustomUser.objects.create_user(username='testuser', password=str(secrets.randbits(16)))
         self.skill = Skill.objects.create(skill_wikidata_item="Q123456789")
@@ -26,6 +25,10 @@ class ProjectViewSetTests(APITestCase):
         self.organization.managers.add(self.user)
         self.client = APIClient()
         self.client.force_authenticate(self.user)
+
+class ProjectViewSetTests(BaseTestCase):
+    def setUp(self):
+        super().setUp()
 
     def test_list_projects(self):
         response = self.client.get('/projects/')
@@ -175,20 +178,9 @@ class ProjectViewSetTests(APITestCase):
         self.assertEqual(response.status_code, status.HTTP_405_METHOD_NOT_ALLOWED)
 
 
-class ProjectMemberViewSetTests(APITestCase):
+class ProjectMemberViewSetTests(BaseTestCase):
     def setUp(self):
-        self.user = CustomUser.objects.create_user(username='testuser', password=str(secrets.randbits(16)))
-        self.skill = Skill.objects.create(skill_wikidata_item="Q123456789")
-        self.organization_type = OrganizationType.objects.create(
-            type_code='org',
-            type_name='Organization'
-        )
-        self.organization = Organization.objects.create(
-            display_name='Test Organization',
-            acronym='TO',
-            type=self.organization_type
-        )
-        self.organization.managers.add(self.user)
+        super().setUp()
         self.project = Project.objects.create(
             display_name='Test project',
             profile_image='https://commons.wikimedia.org/wiki/File:test.jpg',
@@ -197,8 +189,6 @@ class ProjectMemberViewSetTests(APITestCase):
             creator=self.user
         )
         self.project.related_skills.add(self.skill)
-        self.client = APIClient()
-        self.client.force_authenticate(self.user)
 
     def test_list_project_members(self):
         response = self.client.get('/project_members/')
@@ -259,20 +249,9 @@ class ProjectMemberViewSetTests(APITestCase):
         self.assertEqual(response.status_code, status.HTTP_405_METHOD_NOT_ALLOWED)
 
 
-class ProjectMemberAcceptanceViewSetTests(APITestCase):
+class ProjectMemberAcceptanceViewSetTests(BaseTestCase):
     def setUp(self):
-        self.user = CustomUser.objects.create_user(username='testuser', password=str(secrets.randbits(16)))
-        self.skill = Skill.objects.create(skill_wikidata_item="Q123456789")
-        self.organization_type = OrganizationType.objects.create(
-            type_code='org',
-            type_name='Organization'
-        )
-        self.organization = Organization.objects.create(
-            display_name='Test Organization',
-            acronym='TO',
-            type=self.organization_type
-        )
-        self.organization.managers.add(self.user)
+        super().setUp()
         self.project = Project.objects.create(
             display_name='Test project',
             profile_image='https://commons.wikimedia.org/wiki/File:test.jpg',
@@ -282,8 +261,6 @@ class ProjectMemberAcceptanceViewSetTests(APITestCase):
         )
         self.project.related_skills.add(self.skill)
         self.project_member = ProjectMember.objects.create(project=self.project, organization=self.organization)
-        self.client = APIClient()
-        self.client.force_authenticate(self.user)
 
     def test_list_project_member_acceptances(self):
         response = self.client.get('/project_member_acceptance/')
