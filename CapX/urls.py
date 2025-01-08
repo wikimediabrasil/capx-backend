@@ -29,7 +29,7 @@ from bugs.views import BugViewSet, AttachmentViewSet
 from orgs.views import OrganizationViewSet, OrganizationTypeViewSet
 from events.views import EventViewSet, EventParticipantViewSet, EventOrganizationsViewSet
 from message.views import MessageViewSet
-from projects.views import ProjectViewSet
+from projects.views import ProjectViewSet, ProjectMemberViewSet, ProjectMemberAcceptanceViewSet
 from drf_spectacular.views import SpectacularAPIView, SpectacularSwaggerView
 from users.oauth import UserAuthView, AuthView, CheckView
 
@@ -50,6 +50,8 @@ router.register('events_participants', EventParticipantViewSet)
 router.register('events_organizations', EventOrganizationsViewSet)
 router.register('messages', MessageViewSet, basename='messages')
 router.register('projects', ProjectViewSet, basename='projects')
+router.register('project_members', ProjectMemberViewSet, basename='project_members')
+router.register('project_member_acceptance', ProjectMemberAcceptanceViewSet, basename='project_member_acceptance')
 router.register('list', QuickListViewSet, basename='list')
 
 urlpatterns = [
