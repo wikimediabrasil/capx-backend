@@ -11,15 +11,15 @@ import secrets
 class ProjectModelTest(TestCase):
 
     def setUp(self):
-        self.user = CustomUser.objects.create_user(username='testuser', password=str(secrets.randbits(16)))
-        self.skill = Skill.objects.create(skill_wikidata_item="Q123456789")
+        self.user = CustomUser.objects.create_user(username='usertest', password=str(secrets.randbits(16)))
+        self.skill = Skill.objects.create(skill_wikidata_item="Q987654321")
         self.organization_type = OrganizationType.objects.create(
             type_code='org',
-            type_name='Organization'
+            type_name='Orgs'
         )
         self.organization = Organization.objects.create(
-            display_name='Test Organization',
-            acronym='TO',
+            display_name='Organization for Testing',
+            acronym='OT',
             type=self.organization_type
         )
         self.organization.managers.add(self.user)
