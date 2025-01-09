@@ -187,12 +187,12 @@ class Profile(models.Model):
 class LanguageProficiency(models.Model):
     PROFICIENCY_LEVELS = [
         (0, '0 - No proficiency'),
-        (1, '1 - Elementary proficiency'),
-        (2, '2 - Limited working proficiency'),
-        (3, '3 - Professional working proficiency'),
-        (4, '4 - Full professional proficiency'),
-        (5, '5 - Native or bilingual proficiency'),
-        ('n', 'n - Native'),
+        (1, '1 - Basic proficiency'),
+        (2, '2 - Intermediate proficiency'),
+        (3, '3 - Advanced proficiency'),
+        (4, '4 - "Near-native" proficiency'),
+        (5, '5 - Professional proficiency'),
+        ('n', 'n - Native proficiency'),
     ]
 
     profile = models.ForeignKey(Profile, on_delete=models.CASCADE)
