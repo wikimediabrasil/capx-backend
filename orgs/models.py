@@ -53,6 +53,10 @@ class Organization(models.Model):
         blank=True, null=True,
         help_text='The URL of the organization Mastodon account.',
     )
+    tag_diff = models.CharField(
+        max_length=255, blank=True, default='',
+        help_text='The tag used by the organization on Diff posts (if any).',
+    )
     home_project = models.URLField(
         blank=True, null=True, 
         help_text='The URL of the home project of the organization on Wikimedia (e.g. https://xx.wikimedia.org/).',
