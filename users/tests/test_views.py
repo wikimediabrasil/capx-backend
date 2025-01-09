@@ -115,7 +115,7 @@ class ProfileViewSetTestCase(TestCase):
         data = self.client.get(url).data
         self.assertEqual(data['language'], [])
 
-        data['language'] = [{'language': language.id, 'proficiency': '3'}]
+        data['language'] = [{'id': language.id, 'proficiency': '3'}]
         response = self.client.put(url, data, format='json')
         self.assertEqual(response.status_code, status.HTTP_200_OK)
 

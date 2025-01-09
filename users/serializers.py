@@ -55,10 +55,11 @@ class OrganizationSerializer(serializers.ModelSerializer):
         fields = ['id', 'display_name']
 
 class LanguageProficiencySerializer(serializers.ModelSerializer):
+    id = serializers.IntegerField(source='language.id')
 
     class Meta:
         model = LanguageProficiency
-        fields = ['language', 'proficiency']
+        fields = ['id', 'proficiency']
 
 class ProfileSerializer(serializers.ModelSerializer):
     user = UserSerializer()
@@ -110,11 +111,16 @@ class ProfileSerializer(serializers.ModelSerializer):
         language_proficiency_data = validated_data.pop('languageproficiency_set', None)
         if language_proficiency_data is not None:
             for lang_prof in language_proficiency_data:
-                language = lang_prof['language']
+                language = get_object_or_404(Language, id=lang_prof['language']['id'])
                 proficiency = lang_prof['proficiency']
-                lang_prof_instance, created = LanguageProficiency.objects.get_or_create(profile=instance, language=language)
+                lang_prof_instance, _ = LanguageProficiency.objects.get_or_create(profile=instance, language=language)
                 lang_prof_instance.proficiency = proficiency
                 lang_prof_instance.save()
+
+            # Delete any language proficiencies that were not included in the request
+            instance.languageproficiency_set.exclude(
+                language__in=[lang_prof['language']['id'] for lang_prof in language_proficiency_data]
+                ).delete()
 
         return super().update(instance, validated_data)
 
