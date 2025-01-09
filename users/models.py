@@ -116,6 +116,7 @@ class Profile(models.Model):
         blank=True)
     language = models.ManyToManyField(
         Language,
+        through="LanguageProficiency",
         verbose_name="Language",
         related_name="user_language",
         help_text="ID of the language that the user speaks.",
@@ -181,6 +182,28 @@ class Profile(models.Model):
 
     def __str__(self):
         return self.user.username
+
+
+class LanguageProficiency(models.Model):
+    PROFICIENCY_LEVELS = [
+        (0, '0 - No proficiency'),
+        (1, '1 - Elementary proficiency'),
+        (2, '2 - Limited working proficiency'),
+        (3, '3 - Professional working proficiency'),
+        (4, '4 - Full professional proficiency'),
+        (5, '5 - Native or bilingual proficiency'),
+        ('n', 'n - Native'),
+    ]
+
+    profile = models.ForeignKey(Profile, on_delete=models.CASCADE)
+    language = models.ForeignKey(Language, on_delete=models.CASCADE)
+    proficiency = models.CharField(max_length=1, choices=PROFICIENCY_LEVELS, blank=True)
+
+    class Meta:
+        unique_together = ('profile', 'language')
+
+    def __str__(self):
+        return f"{self.profile.user.username} - {self.language.language_name}"
 
 
 @receiver(post_save, sender=CustomUser)

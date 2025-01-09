@@ -4,7 +4,7 @@ from django.urls import reverse
 from django.test import TestCase
 from rest_framework import status
 from rest_framework.test import APIClient
-from users.models import Profile, CustomUser
+from users.models import Profile, CustomUser, LanguageProficiency
 from users.submodels import Territory, Language, WikimediaProject
 from users.serializers import ProfileSerializer, TerritorySerializer, LanguageSerializer, WikimediaProjectSerializer
 from skills.models import Skill
@@ -108,6 +108,24 @@ class ProfileViewSetTestCase(TestCase):
         profiles = Profile.objects.all()
         serializer = ProfileSerializer(profiles, many=True)
         self.assertEqual(response.data, serializer.data)
+
+    def test_update_language_proficiency(self):
+        language = Language.objects.create(language_name="Spanish", language_code="es")
+        url = '/profile/' + str(self.user.pk) + '/'
+        updated_data = {
+            'user': {},
+            'language_proficiency': [
+                {
+                    'language': {'id': language.id},
+                    'proficiency': '3'
+                }
+            ]
+        }
+        response = self.client.put(url, updated_data, format='json')
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+
+        lang_prof = LanguageProficiency.objects.get(profile=self.user.profile, language=language)
+        self.assertEqual(lang_prof.proficiency, '3')
 
 class QuickListViewSetTestCase(TestCase):
     def setUp(self):

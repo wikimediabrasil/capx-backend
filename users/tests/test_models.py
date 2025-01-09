@@ -3,7 +3,7 @@ from django.test import TestCase
 from django.db import IntegrityError
 from django.core.exceptions import ValidationError
 from ..models import Territory, Language, WikimediaProject, Organization, CustomUser, \
-    Profile
+    Profile, LanguageProficiency
 
 
 class TerritoryModelTest(TestCase):
@@ -158,3 +158,20 @@ class ProfileModelTest(TestCase):
             username="Anthony",
         )
         self.assertEqual(str(user.profile), "Anthony")
+
+    def test_language_proficiency(self):
+        profile = self.user.profile
+        language = Language.objects.create(language_name="Spanish", language_code="es")
+        LanguageProficiency.objects.create(profile=profile, language=language, proficiency='3')
+
+        lang_prof = LanguageProficiency.objects.get(profile=profile, language=language)
+        self.assertEqual(lang_prof.proficiency, '3')
+        self.assertEqual(str(lang_prof), f"{profile.user.username} - {language.language_name} - {lang_prof.get_proficiency_display()}")
+
+    def test_unique_language_proficiency(self):
+        profile = self.user.profile
+        language = Language.objects.create(language_name="Spanish", language_code="es")
+        LanguageProficiency.objects.create(profile=profile, language=language, proficiency='3')
+
+        with self.assertRaises(IntegrityError):
+            LanguageProficiency.objects.create(profile=profile, language=language, proficiency='4')
