@@ -114,14 +114,6 @@ class Profile(models.Model):
         related_name="user_territory",
         help_text="ID of the territory that the user is based in.",
         blank=True)
-    language = models.ManyToManyField(
-        Language,
-        through="LanguageProficiency",
-        verbose_name="Language",
-        related_name="user_language",
-        help_text="ID of the language that the user speaks.",
-        blank=True
-    )
     affiliation = models.ManyToManyField(
         Organization,
         verbose_name="Affiliation",

@@ -63,7 +63,7 @@ class LanguageProficiencySerializer(serializers.ModelSerializer):
 class ProfileSerializer(serializers.ModelSerializer):
     user = UserSerializer()
     is_manager = serializers.SerializerMethodField()
-    language_proficiency = LanguageProficiencySerializer(source='languageproficiency_set', many=True)
+    language = LanguageProficiencySerializer(source='languageproficiency_set', many=True)
     
     class Meta:
         model = Profile
@@ -77,7 +77,6 @@ class ProfileSerializer(serializers.ModelSerializer):
             'wiki_alt',
             'territory',
             'language',
-            'language_proficiency',
             'affiliation',
             'wikimedia_project',
             'team',
@@ -90,7 +89,6 @@ class ProfileSerializer(serializers.ModelSerializer):
         ]
         read_only_fields = [
             'is_manager',
-            'language',
         ]
 
     @extend_schema_field({

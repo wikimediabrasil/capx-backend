@@ -3,18 +3,10 @@
 from django.db import migrations, models
 import django.db.models.deletion
 
-def populate_temp_language(apps, schema_editor):
-    Profile = apps.get_model('users', 'Profile')
-    for profile in Profile.objects.all():
-        profile.temp_language.set(profile.language.all())
-
 def create_language_proficiency(apps, schema_editor):
-    Profile = apps.get_model('users', 'Profile')
-    LanguageProficiency = apps.get_model('users', 'LanguageProficiency')
-
-    for profile in Profile.objects.all():
-        for language in profile.temp_language.all():
-            LanguageProficiency.objects.create(
+    for profile in apps.get_model('users', 'Profile').objects.all():
+        for language in profile.language.all():
+            apps.get_model('users', 'LanguageProficiency').objects.create(
                 profile=profile,
                 language=language,
                 proficiency=''
@@ -27,21 +19,11 @@ class Migration(migrations.Migration):
     ]
 
     operations = [
-        migrations.AddField(
-            model_name='profile',
-            name='temp_language',
-            field=models.ManyToManyField(blank=True, related_name='temp_user_language', to='users.language'),
-        ),
-        migrations.RunPython(populate_temp_language),
-        migrations.RemoveField(
-            model_name='profile',
-            name='language',
-        ),
         migrations.CreateModel(
             name='LanguageProficiency',
             fields=[
                 ('id', models.BigAutoField(auto_created=True, primary_key=True, serialize=False, verbose_name='ID')),
-                ('proficiency', models.CharField(blank=True, choices=[(0, '0 - No proficiency'), (1, '1 - Elementary proficiency'), (2, '2 - Limited working proficiency'), (3, '3 - Professional working proficiency'), (4, '4 - Full professional proficiency'), (5, '5 - Native or bilingual proficiency'), ('n', 'n - Native')], max_length=1)),
+                ('proficiency', models.CharField(blank=True, choices=[(0, '0 - No proficiency'), (1, '1 - Basic proficiency'), (2, '2 - Intermediate proficiency'), (3, '3 - Advanced proficiency'), (4, '4 - "Near-native" proficiency'), (5, '5 - Professional proficiency'), ('n', 'n - Native proficiency')], max_length=1)),
                 ('language', models.ForeignKey(on_delete=django.db.models.deletion.CASCADE, to='users.language')),
                 ('profile', models.ForeignKey(on_delete=django.db.models.deletion.CASCADE, to='users.profile')),
             ],
@@ -50,13 +32,8 @@ class Migration(migrations.Migration):
             },
         ),
         migrations.RunPython(create_language_proficiency),
-        migrations.AddField(
-            model_name='profile',
-            name='language',
-            field=models.ManyToManyField(blank=True, help_text='ID of the language that the user speaks.', related_name='user_language', through='users.LanguageProficiency', to='users.language', verbose_name='Language'),
-        ),
         migrations.RemoveField(
             model_name='profile',
-            name='temp_language',
+            name='language',
         ),
     ]
