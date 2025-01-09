@@ -166,7 +166,7 @@ class ProfileModelTest(TestCase):
 
         lang_prof = LanguageProficiency.objects.get(profile=profile, language=language)
         self.assertEqual(lang_prof.proficiency, '3')
-        self.assertEqual(str(lang_prof), f"{profile.user.username} - {language.language_name} - {lang_prof.get_proficiency_display()}")
+        self.assertEqual(str(lang_prof), f"{profile.user.username} - {language.language_name}")
 
     def test_unique_language_proficiency(self):
         profile = self.user.profile

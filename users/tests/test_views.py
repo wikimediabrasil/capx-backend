@@ -112,16 +112,11 @@ class ProfileViewSetTestCase(TestCase):
     def test_update_language_proficiency(self):
         language = Language.objects.create(language_name="Spanish", language_code="es")
         url = '/profile/' + str(self.user.pk) + '/'
-        updated_data = {
-            'user': {},
-            'language_proficiency': [
-                {
-                    'language': {'id': language.id},
-                    'proficiency': '3'
-                }
-            ]
-        }
-        response = self.client.put(url, updated_data, format='json')
+        data = self.client.get(url).data
+        self.assertEqual(data['language'], [])
+
+        data['language'] = [{'language': language.id, 'proficiency': '3'}]
+        response = self.client.put(url, data, format='json')
         self.assertEqual(response.status_code, status.HTTP_200_OK)
 
         lang_prof = LanguageProficiency.objects.get(profile=self.user.profile, language=language)
