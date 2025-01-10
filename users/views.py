@@ -1,6 +1,6 @@
-from .models import Profile, Territory, Language, WikimediaProject
+from .models import Profile, Territory, Language, WikimediaProject, Avatar
 from orgs.models import Organization
-from .serializers import ProfileSerializer, TerritorySerializer, LanguageSerializer, WikimediaProjectSerializer, UsersBySkillSerializer, UsersByTagSerializer
+from .serializers import ProfileSerializer, TerritorySerializer, LanguageSerializer, WikimediaProjectSerializer, UsersBySkillSerializer, UsersByTagSerializer, AvatarSerializer
 from skills.models import Skill
 from rest_framework import status, viewsets, filters
 from rest_framework.response import Response
@@ -155,6 +155,20 @@ class ProfileViewSet(viewsets.ModelViewSet):
 class TerritoryViewSet(viewsets.ReadOnlyModelViewSet):
     queryset = Territory.objects.all()
     serializer_class = TerritorySerializer
+
+@extend_schema_view(
+    list=extend_schema(
+        summary='List all avatars.',
+        description='This endpoint lists all avatars.',
+    ),
+    retrieve=extend_schema(
+        summary='Retrieve an avatar by ID.',
+        description='This endpoint retrieves an avatar by its ID.',
+    ),
+)
+class AvatarViewSet(viewsets.ReadOnlyModelViewSet):
+    queryset = Avatar.objects.all()
+    serializer_class = AvatarSerializer
 
 
 class UsersBySkillViewSet(viewsets.ReadOnlyModelViewSet):
