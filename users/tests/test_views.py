@@ -35,6 +35,7 @@ class ProfileViewSetTestCase(TestCase):
         url = '/profile/' + str(self.user.pk) + '/'
         updated_data = {
             'user': {},
+            'language': [],
             'about': 'first user ever!',
         }
         response = self.client.put(url, updated_data, format='json')
@@ -85,6 +86,7 @@ class ProfileViewSetTestCase(TestCase):
         url = '/profile/' + str(self.user.pk) + '/'
         updated_data = {
             'user': {},
+            'language': [],
             'skills_known': [str(skill.pk)],
             'skills_available': [str(skill.pk)],
         }
@@ -95,6 +97,7 @@ class ProfileViewSetTestCase(TestCase):
         url = '/profile/' + str(self.user.pk) + '/'
         updated_data = {
             'user': {},
+            'language': [],
             'skills_known': [],
             'skills_available': [],
         }
@@ -315,13 +318,13 @@ class UsersByTagTestCase(TestCase):
             language_code='test'
         )
         profile = Profile.objects.get(user=self.user)
-        profile.language.set([language])
+        lang_prof = LanguageProficiency.objects.create(profile=profile, language=language, proficiency='3')
 
         response = self.client.get('/tags/language/' + str(language.pk) + '/')
         self.assertEqual(response.status_code, status.HTTP_200_OK)
 
         response_data = response.data
-        serializer_data = ProfileSerializer(Profile.objects.filter(language=language), many=True).data
+        serializer_data = ProfileSerializer(Profile.objects.filter(languageproficiency=lang_prof), many=True).data
         simplified_serializer_data = [
             {
                 'id': profile['user']['id'],

@@ -285,7 +285,7 @@ class UsersByTagViewSet(viewsets.ReadOnlyModelViewSet):
         elif tag_type == 'skill_wanted':
             queryset = Profile.objects.filter(skills_wanted__id=tag_id)
         elif tag_type == 'language':
-            queryset = Profile.objects.filter(language__id=tag_id)
+            queryset = Profile.objects.filter(languageproficiency__language__id=tag_id)
         elif tag_type == 'territory':
             queryset = Profile.objects.filter(territory__id=tag_id)
         elif tag_type == 'wikimedia_project':
