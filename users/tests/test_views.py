@@ -4,7 +4,7 @@ from django.urls import reverse
 from django.test import TestCase
 from rest_framework import status
 from rest_framework.test import APIClient
-from users.models import Profile, CustomUser
+from users.models import Profile, CustomUser, LanguageProficiency
 from users.submodels import Territory, Language, WikimediaProject
 from users.serializers import ProfileSerializer, TerritorySerializer, LanguageSerializer, WikimediaProjectSerializer
 from skills.models import Skill
@@ -35,6 +35,7 @@ class ProfileViewSetTestCase(TestCase):
         url = '/profile/' + str(self.user.pk) + '/'
         updated_data = {
             'user': {},
+            'language': [],
             'about': 'first user ever!',
         }
         response = self.client.put(url, updated_data, format='json')
@@ -85,6 +86,7 @@ class ProfileViewSetTestCase(TestCase):
         url = '/profile/' + str(self.user.pk) + '/'
         updated_data = {
             'user': {},
+            'language': [],
             'skills_known': [str(skill.pk)],
             'skills_available': [str(skill.pk)],
         }
@@ -95,6 +97,7 @@ class ProfileViewSetTestCase(TestCase):
         url = '/profile/' + str(self.user.pk) + '/'
         updated_data = {
             'user': {},
+            'language': [],
             'skills_known': [],
             'skills_available': [],
         }
@@ -108,6 +111,19 @@ class ProfileViewSetTestCase(TestCase):
         profiles = Profile.objects.all()
         serializer = ProfileSerializer(profiles, many=True)
         self.assertEqual(response.data, serializer.data)
+
+    def test_update_language_proficiency(self):
+        language = Language.objects.create(language_name="Spanish", language_code="es")
+        url = '/profile/' + str(self.user.pk) + '/'
+        data = self.client.get(url).data
+        self.assertEqual(data['language'], [])
+
+        data['language'] = [{'id': language.id, 'proficiency': '3'}]
+        response = self.client.put(url, data, format='json')
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+
+        lang_prof = LanguageProficiency.objects.get(profile=self.user.profile, language=language)
+        self.assertEqual(lang_prof.proficiency, '3')
 
 class QuickListViewSetTestCase(TestCase):
     def setUp(self):
@@ -151,7 +167,7 @@ class QuickListViewSetTestCase(TestCase):
         response = self.client.get('/list/affiliation/')
         self.assertEqual(response.data, expected_data)
 
-    def test_list_languages(self):
+    def test_list_territories(self):
         Territory.objects.create(territory_name='test')
         Territory.objects.create(territory_name='test2')
         self.client.force_authenticate(self.user)
@@ -161,7 +177,7 @@ class QuickListViewSetTestCase(TestCase):
         expected_data = {territory.pk: territory.territory_name for territory in territories}
         self.assertEqual(response.data, expected_data)
 
-    def test_list_territories(self):
+    def test_list_languages(self):
         Language.objects.create(language_name='test', language_code='test')
         Language.objects.create(language_name='test2', language_code='test2')
         self.client.force_authenticate(self.user)
@@ -302,13 +318,13 @@ class UsersByTagTestCase(TestCase):
             language_code='test'
         )
         profile = Profile.objects.get(user=self.user)
-        profile.language.set([language])
+        lang_prof = LanguageProficiency.objects.create(profile=profile, language=language, proficiency='3')
 
         response = self.client.get('/tags/language/' + str(language.pk) + '/')
         self.assertEqual(response.status_code, status.HTTP_200_OK)
 
         response_data = response.data
-        serializer_data = ProfileSerializer(Profile.objects.filter(language=language), many=True).data
+        serializer_data = ProfileSerializer(Profile.objects.filter(languageproficiency=lang_prof), many=True).data
         simplified_serializer_data = [
             {
                 'id': profile['user']['id'],

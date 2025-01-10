@@ -114,13 +114,6 @@ class Profile(models.Model):
         related_name="user_territory",
         help_text="ID of the territory that the user is based in.",
         blank=True)
-    language = models.ManyToManyField(
-        Language,
-        verbose_name="Language",
-        related_name="user_language",
-        help_text="ID of the language that the user speaks.",
-        blank=True
-    )
     affiliation = models.ManyToManyField(
         Organization,
         verbose_name="Affiliation",
@@ -181,6 +174,28 @@ class Profile(models.Model):
 
     def __str__(self):
         return self.user.username
+
+
+class LanguageProficiency(models.Model):
+    PROFICIENCY_LEVELS = [
+        (0, '0 - No proficiency'),
+        (1, '1 - Basic proficiency'),
+        (2, '2 - Intermediate proficiency'),
+        (3, '3 - Advanced proficiency'),
+        (4, '4 - "Near-native" proficiency'),
+        (5, '5 - Professional proficiency'),
+        ('n', 'n - Native proficiency'),
+    ]
+
+    profile = models.ForeignKey(Profile, on_delete=models.CASCADE)
+    language = models.ForeignKey(Language, on_delete=models.CASCADE)
+    proficiency = models.CharField(max_length=1, choices=PROFICIENCY_LEVELS, blank=True)
+
+    class Meta:
+        unique_together = ('profile', 'language')
+
+    def __str__(self):
+        return f"{self.profile.user.username} - {self.language.language_name}"
 
 
 @receiver(post_save, sender=CustomUser)

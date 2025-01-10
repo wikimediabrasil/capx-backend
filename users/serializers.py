@@ -1,9 +1,10 @@
 from rest_framework import serializers
-from .models import Profile, CustomUser
+from .models import Profile, CustomUser, LanguageProficiency
 from .submodels import Territory, Language, WikimediaProject
 from orgs.models import Organization
 from drf_spectacular.utils import extend_schema_field
 from drf_spectacular.types import OpenApiTypes
+from django.shortcuts import get_object_or_404
 
    
 class UserSerializer(serializers.ModelSerializer):
@@ -53,9 +54,17 @@ class OrganizationSerializer(serializers.ModelSerializer):
         model = Organization
         fields = ['id', 'display_name']
 
+class LanguageProficiencySerializer(serializers.ModelSerializer):
+    id = serializers.IntegerField(source='language.id')
+
+    class Meta:
+        model = LanguageProficiency
+        fields = ['id', 'proficiency']
+
 class ProfileSerializer(serializers.ModelSerializer):
     user = UserSerializer()
     is_manager = serializers.SerializerMethodField()
+    language = LanguageProficiencySerializer(source='languageproficiency_set', many=True)
     
     class Meta:
         model = Profile
@@ -98,6 +107,21 @@ class ProfileSerializer(serializers.ModelSerializer):
             user = instance.user
             user.email = user_data.get('email', user.email)
             user.save()
+
+        language_proficiency_data = validated_data.pop('languageproficiency_set', None)
+        if language_proficiency_data is not None:
+            for lang_prof in language_proficiency_data:
+                language = get_object_or_404(Language, id=lang_prof['language']['id'])
+                proficiency = lang_prof['proficiency']
+                lang_prof_instance, _ = LanguageProficiency.objects.get_or_create(profile=instance, language=language)
+                lang_prof_instance.proficiency = proficiency
+                lang_prof_instance.save()
+
+            # Delete any language proficiencies that were not included in the request
+            instance.languageproficiency_set.exclude(
+                language__in=[lang_prof['language']['id'] for lang_prof in language_proficiency_data]
+                ).delete()
+
         return super().update(instance, validated_data)
 
 class UsersBySkillSerializer(serializers.ModelSerializer):
