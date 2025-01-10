@@ -167,7 +167,7 @@ class QuickListViewSetTestCase(TestCase):
         response = self.client.get('/list/affiliation/')
         self.assertEqual(response.data, expected_data)
 
-    def test_list_languages(self):
+    def test_list_territories(self):
         Territory.objects.create(territory_name='test')
         Territory.objects.create(territory_name='test2')
         self.client.force_authenticate(self.user)
@@ -177,7 +177,7 @@ class QuickListViewSetTestCase(TestCase):
         expected_data = {territory.pk: territory.territory_name for territory in territories}
         self.assertEqual(response.data, expected_data)
 
-    def test_list_territories(self):
+    def test_list_languages(self):
         Language.objects.create(language_name='test', language_code='test')
         Language.objects.create(language_name='test2', language_code='test2')
         self.client.force_authenticate(self.user)
