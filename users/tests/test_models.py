@@ -139,13 +139,13 @@ class ProfileModelTest(TestCase):
     def test_localization(self):
         profile = self.user.profile
         profile.territory.set([self.territory])
-        profile.language.set([self.language])
+        profile.languageproficiency_set.create(language=self.language, proficiency='3')
         profile.wikimedia_project.set([self.wikimedia_project])
         profile.save()
 
         updated_profile = Profile.objects.get(id=profile.id)
         territory = [territory.territory_name for territory in updated_profile.territory.all()]
-        language = [language.language_name for language in updated_profile.language.all()]
+        language = [language.language.language_name for language in updated_profile.languageproficiency_set.all()]
         wikimedia_project = [wikimedia_project.wikimedia_project_name for wikimedia_project in
                              updated_profile.wikimedia_project.all()]
 
