@@ -168,13 +168,13 @@ class QuickListViewSetTestCase(TestCase):
         self.assertEqual(response.data, expected_data)
 
     def test_list_languages(self):
-        Language.objects.create(language_name='test', language_code='test')
-        Language.objects.create(language_name='test2', language_code='test2')
+        Territory.objects.create(territory_name='test')
+        Territory.objects.create(territory_name='test2')
         self.client.force_authenticate(self.user)
 
-        response = self.client.get('/list/language/')
-        languages = Language.objects.all()
-        expected_data = {language.pk: language.language_name for language in languages}
+        response = self.client.get('/list/territory/')
+        territories = Territory.objects.all()
+        expected_data = {territory.pk: territory.territory_name for territory in territories}
         self.assertEqual(response.data, expected_data)
 
     def test_list_territories(self):
