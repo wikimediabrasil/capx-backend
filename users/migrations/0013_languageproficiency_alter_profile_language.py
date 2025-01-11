@@ -12,6 +12,11 @@ def create_language_proficiency(apps, schema_editor):
                 proficiency=''
             )
 
+def undo_create_language_proficiency(apps, schema_editor):
+    for proficiency in apps.get_model('users', 'LanguageProficiency').objects.all():
+        proficiency.profile.language.add(proficiency.language)
+        proficiency.delete()
+
 class Migration(migrations.Migration):
 
     dependencies = [
@@ -31,7 +36,7 @@ class Migration(migrations.Migration):
                 'unique_together': {('profile', 'language')},
             },
         ),
-        migrations.RunPython(create_language_proficiency),
+        migrations.RunPython(create_language_proficiency, undo_create_language_proficiency),
         migrations.RemoveField(
             model_name='profile',
             name='language',
