@@ -49,6 +49,14 @@ class Organization(models.Model):
             message='Invalid URL format. The format should be https://meta.wikimedia.org/wiki/PageName'
         )]
     )
+    email = models.EmailField(
+        blank=True, null=True,
+        help_text='The email address of the organization.',
+    )
+    website = models.URLField(
+        blank=True, null=True,
+        help_text='The URL of the organization website.',
+    )
     mastodon = models.URLField(
         blank=True, null=True,
         help_text='The URL of the organization Mastodon account.',
