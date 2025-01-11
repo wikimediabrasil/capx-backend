@@ -1,5 +1,5 @@
 from rest_framework import serializers
-from orgs.models import Organization, OrganizationType
+from orgs.models import Organization, OrganizationType, TagDiff
 from users.models import CustomUser
 
     
@@ -26,3 +26,8 @@ class OrganizationTypeSerializer(serializers.ModelSerializer):
     class Meta:
         model = OrganizationType
         fields = '__all__'
+
+class TagDiffSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = TagDiff
+        fields = ['tag']

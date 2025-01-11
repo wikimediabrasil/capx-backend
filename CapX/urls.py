@@ -26,7 +26,7 @@ from users.views import (
     UsersBySkillViewSet, UsersByTagViewSet, TerritoryViewSet,
 )
 from bugs.views import BugViewSet, AttachmentViewSet
-from orgs.views import OrganizationViewSet, OrganizationTypeViewSet
+from orgs.views import OrganizationViewSet, OrganizationTypeViewSet, TagDiffViewSet
 from events.views import EventViewSet, EventParticipantViewSet, EventOrganizationsViewSet
 from message.views import MessageViewSet
 from projects.views import ProjectViewSet, ProjectMemberViewSet, ProjectMemberAcceptanceViewSet
@@ -41,6 +41,7 @@ router.register('profile', ProfileViewSet, basename='profile')
 router.register('territory', TerritoryViewSet, basename='territory')
 router.register('organizations', OrganizationViewSet, basename='organizations')
 router.register('organization_type', OrganizationTypeViewSet, basename='organization_type')
+router.register('tag_diff', TagDiffViewSet, basename='tag_diff')
 router.register('bugs', BugViewSet, basename='bugs')
 router.register('attachment', AttachmentViewSet, basename='attachment')
 router.register('users_by_skill', UsersBySkillViewSet, basename='users_by_skill')
