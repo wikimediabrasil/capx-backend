@@ -29,18 +29,6 @@ class OrganizationViewSet(viewsets.ModelViewSet):
             return Organization.objects.all()
         else:
             return Organization.objects.filter(managers__isnull=False)
-    
-    @extend_schema(
-        summary='Retrieve an organization by ID.',
-        description='This endpoint retrieves an organization by its ID.',
-    )  
-    def retrieve(self, request, *args, **kwargs):
-        instance = self.get_object()
-        serializer = self.get_serializer(instance)
-        data = serializer.data
-        data['territory'] = [Territory.objects.get(id=id).territory_name for id in data['territory']]
-        data['managers'] = [User.objects.get(id=id).username for id in data['managers']]
-        return Response(data)
 
     @extend_schema(
         summary='Create a new organization.',
