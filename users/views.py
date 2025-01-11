@@ -144,6 +144,20 @@ class ProfileViewSet(viewsets.ModelViewSet):
 
 @extend_schema_view(
     list=extend_schema(
+        summary='List all Wikimedia projects.',
+        description='This endpoint lists all Wikimedia projects.',
+    ),
+    retrieve=extend_schema(
+        summary='Retrieve a Wikimedia project by ID.',
+        description='This endpoint retrieves a Wikimedia project by its ID.',
+    ),
+)
+class WikimediaProjectViewSet(viewsets.ReadOnlyModelViewSet):
+    queryset = WikimediaProject.objects.all()
+    serializer_class = WikimediaProjectSerializer
+
+@extend_schema_view(
+    list=extend_schema(
         summary='List all territories.',
         description='This endpoint lists all territories.',
     ),

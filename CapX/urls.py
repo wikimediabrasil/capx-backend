@@ -23,7 +23,7 @@ from rest_framework.routers import DefaultRouter
 from skills.views import SkillViewSet, SkillByTypeViewSet
 from users.views import (
     ProfileViewSet, UsersViewSet, QuickListViewSet,
-    UsersBySkillViewSet, UsersByTagViewSet, TerritoryViewSet,
+    UsersBySkillViewSet, UsersByTagViewSet, TerritoryViewSet, WikimediaProjectViewSet
 )
 from bugs.views import BugViewSet, AttachmentViewSet
 from orgs.views import OrganizationViewSet, OrganizationTypeViewSet
@@ -38,6 +38,7 @@ router = DefaultRouter()
 router.register('skill', SkillViewSet, basename='skill')
 router.register('users', UsersViewSet, basename='users')
 router.register('profile', ProfileViewSet, basename='profile')
+router.register('wikimedia_project', WikimediaProjectViewSet, basename='wikimedia_project')
 router.register('territory', TerritoryViewSet, basename='territory')
 router.register('organizations', OrganizationViewSet, basename='organizations')
 router.register('organization_type', OrganizationTypeViewSet, basename='organization_type')
