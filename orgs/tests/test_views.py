@@ -1,7 +1,7 @@
 import secrets
 from rest_framework.test import APITestCase, APIClient
 from rest_framework import status
-from orgs.models import OrganizationType, Organization
+from orgs.models import OrganizationType, Organization, TagDiff
 from users.models import CustomUser
 from users.submodels import Territory
 
@@ -187,3 +187,42 @@ class OrganizationViewSetTestCase(APITestCase):
         self.user.is_staff = True
         response = self.client.delete('/organizations/1/')
         self.assertEqual(response.status_code, status.HTTP_204_NO_CONTENT)
+
+    def test_list_tagdiffs(self):
+        self.client.force_authenticate(self.user)
+        response = self.client.get('/tag_diff/')
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+
+        TagDiff.objects.create(tag='Tag 1')
+        response = self.client.get('/tag_diff/')
+        self.assertEqual(len(response.data), 1)
+
+    def test_create_tagdiff(self):
+        self.client.force_authenticate(self.user)
+        response = self.client.post('/tag_diff/', {'tag': 'Tag 1'})
+        self.assertEqual(response.status_code, status.HTTP_201_CREATED)
+
+        self.user.is_staff = True
+        response = self.client.post('/tag_diff/', {'tag': 'Tag 1'})
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+
+    def test_retrieve_tagdiff(self):
+        self.client.force_authenticate(self.user)
+        response = self.client.get('/tag_diff/1/')
+        self.assertEqual(response.status_code, status.HTTP_404_NOT_FOUND)
+
+        TagDiff.objects.create(tag='Tag 1')
+        response = self.client.get('/tag_diff/1/')
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+
+    def test_update_tagdiff(self):
+        self.client.force_authenticate(self.user)
+        TagDiff.objects.create(tag='Tag 1')
+        response = self.client.put('/tag_diff/1/', {'tag': 'Tag 2'})
+        self.assertEqual(response.status_code, status.HTTP_405_METHOD_NOT_ALLOWED)
+
+    def test_partial_update_tagdiff(self):
+        self.client.force_authenticate(self.user)
+        TagDiff.objects.create(tag='Tag 1')
+        response = self.client.patch('/tag_diff/1/', {'tag': 'Tag 2'})
+        self.assertEqual(response.status_code, status.HTTP_405_METHOD_NOT_ALLOWED)

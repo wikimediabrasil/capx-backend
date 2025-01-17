@@ -64,3 +64,6 @@ class ProjectModelTest(TestCase):
         self.assertEqual(project_member_acceptance.project_member, project_member)
         self.assertTrue(project_member_acceptance.accepted)
         self.assertIsNotNone(project_member_acceptance.date)
+
+    def test_project_str_method(self):
+        self.assertEqual(str(self.project), 'Test Project')

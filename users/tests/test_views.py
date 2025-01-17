@@ -9,6 +9,8 @@ from users.submodels import Territory, Language, WikimediaProject
 from users.serializers import ProfileSerializer, TerritorySerializer, LanguageSerializer, WikimediaProjectSerializer
 from skills.models import Skill
 from orgs.models import Organization, OrganizationType
+from events.models import Events
+from projects.models import Project
 
 class ProfileViewSetTestCase(TestCase):
     def setUp(self):
@@ -205,6 +207,38 @@ class QuickListViewSetTestCase(TestCase):
         response = self.client.get('/list/skills/')
         skills = Skill.objects.all()
         expected_data = {skill.pk: skill.skill_wikidata_item for skill in skills}
+        self.assertEqual(response.data, expected_data)
+
+    def test_list_event(self):
+        Events.objects.create(
+            name='Sample Event',
+            type_of_location='virtual',
+            time_begin='2021-10-10 10:00:00+00:00',
+            time_end='2021-10-10 12:00:00+00:00',
+            creator=CustomUser.objects.get(id=1)
+        )
+        Events.objects.create(
+            name='Sample Event 2',
+            type_of_location='virtual',
+            time_begin='2021-10-10 10:00:00+00:00',
+            time_end='2021-10-10 12:00:00+00:00',
+            creator=CustomUser.objects.get(id=1)
+        )
+        self.client.force_authenticate(self.user)
+
+        response = self.client.get('/list/event/')
+        events = Events.objects.all()
+        expected_data = {event.pk: event.name for event in events}
+        self.assertEqual(response.data, expected_data)
+
+    def test_list_project(self):
+        Project.objects.create(display_name='Sample Project')
+        Project.objects.create(display_name='Sample Project 2')
+        self.client.force_authenticate(self.user)
+
+        response = self.client.get('/list/project/')
+        projects = Project.objects.all()
+        expected_data = {project.pk: project.display_name for project in projects}
         self.assertEqual(response.data, expected_data)
 
 
