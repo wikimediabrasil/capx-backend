@@ -30,4 +30,4 @@ class OrganizationTypeSerializer(serializers.ModelSerializer):
 class TagDiffSerializer(serializers.ModelSerializer):
     class Meta:
         model = TagDiff
-        fields = ['tag']
+        fields = ['id', 'tag']
