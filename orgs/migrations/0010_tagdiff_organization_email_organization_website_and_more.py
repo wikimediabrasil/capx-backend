@@ -7,7 +7,7 @@ import django.utils.timezone
 class Migration(migrations.Migration):
 
     dependencies = [
-        ('orgs', '0008_organization_tag_diff'),
+        ('orgs', '0009_organization_available_capacities_and_more'),
     ]
 
     operations = [
