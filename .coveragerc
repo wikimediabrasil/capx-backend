@@ -2,6 +2,3 @@
 omit =
     ; Don't complain about Django's manage.py file
     manage.py
-    
-    ; Don't complain about language proficiency migration file. It's not possible to test it.
-    0013_languageproficiency_alter_profile_language.py
