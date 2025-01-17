@@ -3,7 +3,7 @@
 from django.db import migrations, models
 import django.db.models.deletion
 
-def create_language_proficiency(apps, schema_editor):
+def create_language_proficiency(apps, schema_editor): # pragma: no cover
     for profile in apps.get_model('users', 'Profile').objects.all():
         for language in profile.language.all():
             apps.get_model('users', 'LanguageProficiency').objects.create(
@@ -11,6 +11,11 @@ def create_language_proficiency(apps, schema_editor):
                 language=language,
                 proficiency=''
             )
+
+def undo_create_language_proficiency(apps, schema_editor): # pragma: no cover
+    for proficiency in apps.get_model('users', 'LanguageProficiency').objects.all():
+        proficiency.profile.language.add(proficiency.language)
+        proficiency.delete()
 
 class Migration(migrations.Migration):
 
@@ -31,7 +36,7 @@ class Migration(migrations.Migration):
                 'unique_together': {('profile', 'language')},
             },
         ),
-        migrations.RunPython(create_language_proficiency),
+        migrations.RunPython(create_language_proficiency, undo_create_language_proficiency),
         migrations.RemoveField(
             model_name='profile',
             name='language',
