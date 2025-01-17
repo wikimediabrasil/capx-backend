@@ -2,6 +2,7 @@ from django.db import models
 from users.submodels import Territory
 from django.core.validators import RegexValidator
 from django.utils import timezone as timezone
+from skills.models import Skill
 
 
 class OrganizationType(models.Model):
@@ -72,6 +73,27 @@ class Organization(models.Model):
         regex=r'^https:\/\/[\w-]+\.wikimedia\.org\/$',
         message='Invalid URL format. The format should be https://xx.wikimedia.org/'
     )])
+    known_capacities = models.ManyToManyField(
+        Skill,
+        verbose_name="Known capacities",
+        related_name="known_capacities",
+        help_text="The known capacities of the organization.",
+        blank=True
+    )
+    available_capacities = models.ManyToManyField(
+        Skill,
+        verbose_name="Available capacities",
+        related_name="available_capacities",
+        help_text="The available capacities of the organization.",
+        blank=True
+    )
+    wanted_capacities = models.ManyToManyField(
+        Skill,
+        verbose_name="Wanted capacities",
+        related_name="wanted_capacities",
+        help_text="The wanted capacities of the organization.",
+        blank=True
+    )
     update_date = models.DateTimeField(default=timezone.now)
 
     def __str__(self):
