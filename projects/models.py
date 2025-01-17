@@ -36,6 +36,9 @@ class Project(models.Model):
         help_text='The date when the project was added on the platform.'
     )
 
+    def __str__(self):
+        return self.display_name
+
 class ProjectMember(models.Model):
     project = models.ForeignKey(
         'projects.Project', on_delete=models.CASCADE, related_name='organizations',

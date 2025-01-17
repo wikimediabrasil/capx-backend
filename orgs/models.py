@@ -49,12 +49,20 @@ class Organization(models.Model):
             message='Invalid URL format. The format should be https://meta.wikimedia.org/wiki/PageName'
         )]
     )
+    email = models.EmailField(
+        blank=True, null=True,
+        help_text='The email address of the organization.',
+    )
+    website = models.URLField(
+        blank=True, null=True,
+        help_text='The URL of the organization website.',
+    )
     mastodon = models.URLField(
         blank=True, null=True,
         help_text='The URL of the organization Mastodon account.',
     )
-    tag_diff = models.CharField(
-        max_length=255, blank=True, default='',
+    tag_diff = models.ManyToManyField(
+        'orgs.TagDiff', related_name='tag_diff', blank=True,
         help_text='The tag used by the organization on Diff posts (if any).',
     )
     home_project = models.URLField(
@@ -71,3 +79,10 @@ class Organization(models.Model):
             return self.display_name + " (" + self.acronym + ")"
         else:
             return self.display_name
+
+class TagDiff(models.Model):
+    tag = models.CharField(max_length=255, unique=True)
+    creation_date = models.DateTimeField(default=timezone.now)
+
+    def __str__(self):
+        return self.tag

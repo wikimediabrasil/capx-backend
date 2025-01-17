@@ -1,7 +1,7 @@
 from rest_framework import viewsets, status, permissions
 from rest_framework.response import Response
-from .models import Organization, OrganizationType
-from .serializers import OrganizationSerializer, OrganizationTypeSerializer
+from .models import Organization, OrganizationType, TagDiff
+from .serializers import OrganizationSerializer, OrganizationTypeSerializer, TagDiffSerializer
 from users.models import CustomUser as User, Territory
 from drf_spectacular.utils import extend_schema, extend_schema_view, OpenApiParameter
 
@@ -29,18 +29,6 @@ class OrganizationViewSet(viewsets.ModelViewSet):
             return Organization.objects.all()
         else:
             return Organization.objects.filter(managers__isnull=False)
-    
-    @extend_schema(
-        summary='Retrieve an organization by ID.',
-        description='This endpoint retrieves an organization by its ID.',
-    )  
-    def retrieve(self, request, *args, **kwargs):
-        instance = self.get_object()
-        serializer = self.get_serializer(instance)
-        data = serializer.data
-        data['territory'] = [Territory.objects.get(id=id).territory_name for id in data['territory']]
-        data['managers'] = [User.objects.get(id=id).username for id in data['managers']]
-        return Response(data)
 
     @extend_schema(
         summary='Create a new organization.',
@@ -89,3 +77,33 @@ class OrganizationViewSet(viewsets.ModelViewSet):
 class OrganizationTypeViewSet(viewsets.ReadOnlyModelViewSet):
     queryset = OrganizationType.objects.all()
     serializer_class = OrganizationTypeSerializer
+
+@extend_schema_view(
+    list=extend_schema(
+        summary='List all tag diffs.',
+        description='This endpoint lists all tag diffs.',
+    ),
+    retrieve=extend_schema(
+        summary='Retrieve a tag diff by ID.',
+        description='This endpoint retrieves a tag diff by its ID.',
+    ),
+    create=extend_schema(
+        summary='Create a new tag diff.',
+        description='This endpoint creates a new tag diff.',
+    ),
+    destroy=extend_schema(
+        summary='Delete a tag diff.',
+        description='This endpoint deletes a tag diff by its ID.',
+    ),
+)
+class TagDiffViewSet(viewsets.ModelViewSet):
+    queryset = TagDiff.objects.all()
+    serializer_class = TagDiffSerializer
+
+    @extend_schema(exclude=True)
+    def update(self, request, *args, **kwargs):
+        return Response("PUT method not allowed", status=status.HTTP_405_METHOD_NOT_ALLOWED)
+
+    @extend_schema(exclude=True)
+    def partial_update(self, request, *args, **kwargs):
+        return Response("PATCH method not allowed", status=status.HTTP_405_METHOD_NOT_ALLOWED)
