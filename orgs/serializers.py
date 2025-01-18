@@ -1,5 +1,5 @@
 from rest_framework import serializers
-from orgs.models import Organization, OrganizationType, TagDiff
+from orgs.models import Organization, OrganizationType, TagDiff, Document
 from users.models import CustomUser
 
     
@@ -21,13 +21,18 @@ class OrganizationSerializer(serializers.ModelSerializer):
         return EventOrganizations.objects.filter(organization=obj).values_list('event', flat=True)
 
     
-
 class OrganizationTypeSerializer(serializers.ModelSerializer):
     class Meta:
         model = OrganizationType
         fields = '__all__'
 
+
 class TagDiffSerializer(serializers.ModelSerializer):
     class Meta:
         model = TagDiff
         fields = ['id', 'tag']
+
+class DocumentSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = Document
+        fields = ['id', 'url', 'organization']
