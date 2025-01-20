@@ -60,6 +60,16 @@ class WikimediaProject(models.Model):
         return self.wikimedia_project_name
 
 
+class Avatar(models.Model):
+    avatar_url = models.URLField(
+        verbose_name="Avatar URL",
+        help_text="URL of the avatar"
+    )
+
+    def __str__(self):
+        return self.avatar_url
+
+
 class AuthExtraInfo(models.Model):
     token = models.CharField(
         verbose_name="Oauth token",

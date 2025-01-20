@@ -22,8 +22,8 @@ from django.conf.urls.static import static
 from rest_framework.routers import DefaultRouter
 from skills.views import SkillViewSet, SkillByTypeViewSet
 from users.views import (
-    ProfileViewSet, UsersViewSet, QuickListViewSet,
-    UsersBySkillViewSet, UsersByTagViewSet, TerritoryViewSet,
+    ProfileViewSet, UsersViewSet, QuickListViewSet, AvatarViewSet,
+    UsersBySkillViewSet, UsersByTagViewSet, TerritoryViewSet, 
 )
 from bugs.views import BugViewSet, AttachmentViewSet
 from orgs.views import OrganizationViewSet, OrganizationTypeViewSet, TagDiffViewSet, DocumentViewSet
@@ -39,6 +39,7 @@ router.register('skill', SkillViewSet, basename='skill')
 router.register('users', UsersViewSet, basename='users')
 router.register('profile', ProfileViewSet, basename='profile')
 router.register('territory', TerritoryViewSet, basename='territory')
+router.register('avatar', AvatarViewSet, basename='avatar')
 router.register('organizations', OrganizationViewSet, basename='organizations')
 router.register('organization_type', OrganizationTypeViewSet, basename='organization_type')
 router.register('tag_diff', TagDiffViewSet, basename='tag_diff')

@@ -3,7 +3,7 @@ from django.test import TestCase
 from django.db import IntegrityError
 from django.core.exceptions import ValidationError
 from ..models import Territory, Language, WikimediaProject, Organization, CustomUser, \
-    Profile, LanguageProficiency
+    Profile, LanguageProficiency, Avatar
 
 
 class TerritoryModelTest(TestCase):
@@ -49,6 +49,18 @@ class LanguageModelTest(TestCase):
         Language.objects.create(language_name="English", language_code="en")
         with self.assertRaises(IntegrityError):
             Language.objects.create(language_name="Hausa", language_code="en")
+
+
+class AvatarModelTest(TestCase):
+    @classmethod
+    def setUpTestData(cls):
+        cls.avatar = Avatar.objects.create(
+            avatar_url='https://example.com/avatar.png'
+        )
+
+    def test_avatar_creation(self):
+        self.assertEqual(self.avatar.avatar_url, 'https://example.com/avatar.png')
+        self.assertEqual(str(self.avatar), 'https://example.com/avatar.png')
 
 
 class WikimediaProjectModelTest(TestCase):
