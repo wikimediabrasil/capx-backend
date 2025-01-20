@@ -48,7 +48,7 @@ def undo_fill_wikimedia_project_picture(apps, schema_editor):
 class Migration(migrations.Migration):
 
     dependencies = [
-        ('users', '0013_languageproficiency_alter_profile_language'),
+        ('users', '0014_avatar_profile_avatar'),
     ]
 
     operations = [
