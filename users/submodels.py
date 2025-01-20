@@ -55,6 +55,12 @@ class WikimediaProject(models.Model):
         unique=True,
         help_text="Code of the Wikimedia project"
     )
+    wikimedia_project_picture = models.URLField(
+        verbose_name="Wikimedia project picture",
+        max_length=255,
+        blank=True,
+        help_text="Picture of the Wikimedia project"
+    )
 
     def __str__(self):
         return self.wikimedia_project_name

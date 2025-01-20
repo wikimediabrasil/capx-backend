@@ -46,7 +46,7 @@ class WikimediaProjectSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = WikimediaProject
-        fields = ['id', 'wikimedia_project_name', 'wikimedia_project_code']
+        fields = ['id', 'wikimedia_project_name', 'wikimedia_project_code', 'wikimedia_project_picture']
 
 class OrganizationSerializer(serializers.ModelSerializer):
 
