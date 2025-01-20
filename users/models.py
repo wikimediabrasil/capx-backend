@@ -5,7 +5,7 @@ from django.utils import timezone
 from django.db.models.signals import post_save
 from orgs.models import Organization
 from skills.models import Skill
-from users.submodels import Territory, Language, WikimediaProject
+from users.submodels import Territory, Language, WikimediaProject, Avatar
 from django.core.validators import RegexValidator
 
 
@@ -70,6 +70,14 @@ class Profile(models.Model):
         help_text="URL of the profile image from Commons.",
         blank=True
     )
+    avatar = models.ForeignKey(
+        'Avatar',
+        on_delete=models.RESTRICT,
+        verbose_name="Avatar",
+        help_text="ID of the avatar that the user uses.",
+        null=True,
+        default=None
+    )
     display_name = models.CharField(
         verbose_name="Display name",
         max_length=387,
@@ -113,7 +121,8 @@ class Profile(models.Model):
         verbose_name="Territory",
         related_name="user_territory",
         help_text="ID of the territory that the user is based in.",
-        blank=True)
+        blank=True
+    )
     affiliation = models.ManyToManyField(
         Organization,
         verbose_name="Affiliation",

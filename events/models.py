@@ -46,6 +46,15 @@ class Events(models.Model):
             message="Invalid Wikidata Qid format. The format should be Q12345"
         )]
     )
+    image_url = models.URLField(
+        blank=True, 
+        verbose_name="Image URL",
+        help_text="URL of the event image on Wikimedia Commons.",
+        validators=[RegexValidator(
+            regex=r'^https://commons\.wikimedia\.org/wiki/File:.+$',
+            message="Invalid Wikimedia Commons URL format. The format should be https://commons.wikimedia.org/wiki/File:Example.jpg"
+        )]
+    )
     time_begin = models.DateTimeField(
         verbose_name="Start Time",
         help_text="Start time of the event."

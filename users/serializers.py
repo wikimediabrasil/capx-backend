@@ -1,8 +1,8 @@
 from rest_framework import serializers
 from .models import Profile, CustomUser, LanguageProficiency
-from .submodels import Territory, Language, WikimediaProject
+from .submodels import Territory, Language, WikimediaProject, Avatar
 from orgs.models import Organization
-from drf_spectacular.utils import extend_schema_field
+from drf_spectacular.utils import extend_schema_field, extend_schema_serializer
 from drf_spectacular.types import OpenApiTypes
 from django.shortcuts import get_object_or_404
 
@@ -61,6 +61,13 @@ class LanguageProficiencySerializer(serializers.ModelSerializer):
         model = LanguageProficiency
         fields = ['id', 'proficiency']
 
+class AvatarSerializer(serializers.ModelSerializer):
+    
+    class Meta:
+        model = Avatar
+        fields = ['id', 'avatar_url']
+
+@extend_schema_serializer(deprecate_fields = ['profile_image'])
 class ProfileSerializer(serializers.ModelSerializer):
     user = UserSerializer()
     is_manager = serializers.SerializerMethodField()
@@ -71,6 +78,7 @@ class ProfileSerializer(serializers.ModelSerializer):
         fields = [
             'user',
             'profile_image',
+            'avatar',
             'display_name',
             'pronoun',
             'about',

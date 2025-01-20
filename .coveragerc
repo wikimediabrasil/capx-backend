@@ -1,4 +1,4 @@
 [run]
 omit =
+    ; Don't complain about Django's manage.py file
     manage.py
-    schema.py

@@ -1,5 +1,5 @@
 from django.test import TestCase
-from ..models import Organization, OrganizationType
+from ..models import Organization, OrganizationType, TagDiff, Document
 
 
 class OrganizationTypeModelTest(TestCase):
@@ -52,3 +52,11 @@ class OrganizationModelTest(TestCase):
             display_name="Organization 2"
         )
         self.assertEqual(str(organization), "Organization 2")
+
+    def test_tagdiff(self):
+        tagdiff = TagDiff.objects.create(tag="Test")
+        self.assertEqual(str(tagdiff), "Test")
+
+    def test_documents(self):
+        url = Document.objects.create(url="https://commons.wikimedia.org/wiki/File:filename.ext")
+        self.assertEqual(str(url), "File:filename.ext")

@@ -2,6 +2,7 @@ from django.db import models
 from users.submodels import Territory
 from django.core.validators import RegexValidator
 from django.utils import timezone as timezone
+from skills.models import Skill
 
 
 class OrganizationType(models.Model):
@@ -49,13 +50,25 @@ class Organization(models.Model):
             message='Invalid URL format. The format should be https://meta.wikimedia.org/wiki/PageName'
         )]
     )
+    email = models.EmailField(
+        blank=True, null=True,
+        help_text='The email address of the organization.',
+    )
+    website = models.URLField(
+        blank=True, null=True,
+        help_text='The URL of the organization website.',
+    )
     mastodon = models.URLField(
         blank=True, null=True,
         help_text='The URL of the organization Mastodon account.',
     )
-    tag_diff = models.CharField(
-        max_length=255, blank=True, default='',
+    tag_diff = models.ManyToManyField(
+        'orgs.TagDiff', related_name='tag_diff', blank=True,
         help_text='The tag used by the organization on Diff posts (if any).',
+    )
+    documents = models.ManyToManyField(
+        'orgs.Document', related_name='documents', blank=True,
+        help_text='The documents related to the organization.',
     )
     home_project = models.URLField(
         blank=True, null=True, 
@@ -64,6 +77,27 @@ class Organization(models.Model):
         regex=r'^https:\/\/[\w-]+\.wikimedia\.org\/$',
         message='Invalid URL format. The format should be https://xx.wikimedia.org/'
     )])
+    known_capacities = models.ManyToManyField(
+        Skill,
+        verbose_name="Known capacities",
+        related_name="known_capacities",
+        help_text="The known capacities of the organization.",
+        blank=True
+    )
+    available_capacities = models.ManyToManyField(
+        Skill,
+        verbose_name="Available capacities",
+        related_name="available_capacities",
+        help_text="The available capacities of the organization.",
+        blank=True
+    )
+    wanted_capacities = models.ManyToManyField(
+        Skill,
+        verbose_name="Wanted capacities",
+        related_name="wanted_capacities",
+        help_text="The wanted capacities of the organization.",
+        blank=True
+    )
     update_date = models.DateTimeField(default=timezone.now)
 
     def __str__(self):
@@ -71,3 +105,23 @@ class Organization(models.Model):
             return self.display_name + " (" + self.acronym + ")"
         else:
             return self.display_name
+
+class TagDiff(models.Model):
+    tag = models.CharField(max_length=255, unique=True)
+    creation_date = models.DateTimeField(default=timezone.now)
+
+    def __str__(self):
+        return self.tag
+
+class Document(models.Model):
+    url = models.URLField(
+        help_text='The URL of the document on Wikimedia Commons.',
+        validators=[RegexValidator(
+            regex=r'^https:\/\/commons\.wikimedia\.org\/wiki\/File:.*?\.[\w]+$',
+            message='Invalid URL format. The format should be https://commons.wikimedia.org/wiki/File:filename.ext'
+        )]
+    )
+    creation_date = models.DateTimeField(default=timezone.now)
+
+    def __str__(self):
+        return self.url.split('/')[-1].replace('_', ' ')

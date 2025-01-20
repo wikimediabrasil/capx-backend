@@ -22,11 +22,11 @@ from django.conf.urls.static import static
 from rest_framework.routers import DefaultRouter
 from skills.views import SkillViewSet, SkillByTypeViewSet
 from users.views import (
-    ProfileViewSet, UsersViewSet, QuickListViewSet,
+    ProfileViewSet, UsersViewSet, QuickListViewSet, AvatarViewSet,
     UsersBySkillViewSet, UsersByTagViewSet, TerritoryViewSet, WikimediaProjectViewSet
 )
 from bugs.views import BugViewSet, AttachmentViewSet
-from orgs.views import OrganizationViewSet, OrganizationTypeViewSet
+from orgs.views import OrganizationViewSet, OrganizationTypeViewSet, TagDiffViewSet, DocumentViewSet
 from events.views import EventViewSet, EventParticipantViewSet, EventOrganizationsViewSet
 from message.views import MessageViewSet
 from projects.views import ProjectViewSet, ProjectMemberViewSet, ProjectMemberAcceptanceViewSet
@@ -40,8 +40,11 @@ router.register('users', UsersViewSet, basename='users')
 router.register('profile', ProfileViewSet, basename='profile')
 router.register('wikimedia_project', WikimediaProjectViewSet, basename='wikimedia_project')
 router.register('territory', TerritoryViewSet, basename='territory')
+router.register('avatar', AvatarViewSet, basename='avatar')
 router.register('organizations', OrganizationViewSet, basename='organizations')
 router.register('organization_type', OrganizationTypeViewSet, basename='organization_type')
+router.register('tag_diff', TagDiffViewSet, basename='tag_diff')
+router.register('document', DocumentViewSet, basename='document')
 router.register('bugs', BugViewSet, basename='bugs')
 router.register('attachment', AttachmentViewSet, basename='attachment')
 router.register('users_by_skill', UsersBySkillViewSet, basename='users_by_skill')
