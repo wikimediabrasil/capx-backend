@@ -4,7 +4,7 @@ from django.apps import apps
 from users.models import WikimediaProject
 import importlib
 
-migration_module = importlib.import_module('users.migrations.0014_wikimediaproject_wikimedia_project_picture')
+migration_module = importlib.import_module('users.migrations.0015_wikimediaproject_wikimedia_project_picture')
 fill_wikimedia_project_picture = migration_module.fill_wikimedia_project_picture
 undo_fill_wikimedia_project_picture = migration_module.undo_fill_wikimedia_project_picture
 
