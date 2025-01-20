@@ -1,7 +1,7 @@
 from rest_framework import viewsets, status, permissions
 from rest_framework.response import Response
-from .models import Organization, OrganizationType, TagDiff
-from .serializers import OrganizationSerializer, OrganizationTypeSerializer, TagDiffSerializer
+from .models import Organization, OrganizationType, TagDiff, Document
+from .serializers import OrganizationSerializer, OrganizationTypeSerializer, TagDiffSerializer, DocumentSerializer
 from users.models import CustomUser as User, Territory
 from drf_spectacular.utils import extend_schema, extend_schema_view, OpenApiParameter
 
@@ -99,6 +99,36 @@ class OrganizationTypeViewSet(viewsets.ReadOnlyModelViewSet):
 class TagDiffViewSet(viewsets.ModelViewSet):
     queryset = TagDiff.objects.all()
     serializer_class = TagDiffSerializer
+
+    @extend_schema(exclude=True)
+    def update(self, request, *args, **kwargs):
+        return Response("PUT method not allowed", status=status.HTTP_405_METHOD_NOT_ALLOWED)
+
+    @extend_schema(exclude=True)
+    def partial_update(self, request, *args, **kwargs):
+        return Response("PATCH method not allowed", status=status.HTTP_405_METHOD_NOT_ALLOWED)
+
+@extend_schema_view(
+    list=extend_schema(
+        summary='List all documents.',
+        description='This endpoint lists all documents.',
+    ),
+    retrieve=extend_schema(
+        summary='Retrieve a document by ID.',
+        description='This endpoint retrieves a document by its ID.',
+    ),
+    create=extend_schema(
+        summary='Create a new document.',
+        description='This endpoint creates a new document.',
+    ),
+    destroy=extend_schema(
+        summary='Delete a document.',
+        description='This endpoint deletes a document by its ID.',
+    ),
+)
+class DocumentViewSet(viewsets.ModelViewSet):
+    queryset = Document.objects.all()
+    serializer_class = DocumentSerializer
 
     @extend_schema(exclude=True)
     def update(self, request, *args, **kwargs):

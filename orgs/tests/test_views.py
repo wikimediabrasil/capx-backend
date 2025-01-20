@@ -1,7 +1,7 @@
 import secrets
 from rest_framework.test import APITestCase, APIClient
 from rest_framework import status
-from orgs.models import OrganizationType, Organization, TagDiff
+from orgs.models import OrganizationType, Organization, TagDiff, Document
 from users.models import CustomUser
 from users.submodels import Territory
 
@@ -225,4 +225,16 @@ class OrganizationViewSetTestCase(APITestCase):
         self.client.force_authenticate(self.user)
         TagDiff.objects.create(tag='Tag 1')
         response = self.client.patch('/tag_diff/1/', {'tag': 'Tag 2'})
+        self.assertEqual(response.status_code, status.HTTP_405_METHOD_NOT_ALLOWED)
+
+    def test_update_documents(self):
+        self.client.force_authenticate(self.user)
+        Document.objects.create(url='https://commons.wikimedia.org/wiki/File:filename.ext')
+        response = self.client.put('/document/1/', {'url': 'https://commons.wikimedia.org/wiki/File:filename2.ext'})
+        self.assertEqual(response.status_code, status.HTTP_405_METHOD_NOT_ALLOWED)
+
+    def test_partial_update_documents(self):
+        self.client.force_authenticate(self.user)
+        Document.objects.create(url='https://commons.wikimedia.org/wiki/File:filename.ext')
+        response = self.client.patch('/document/1/', {'url': 'https://commons.wikimedia.org/wiki/File:filename2.ext'})
         self.assertEqual(response.status_code, status.HTTP_405_METHOD_NOT_ALLOWED)

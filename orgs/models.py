@@ -66,6 +66,10 @@ class Organization(models.Model):
         'orgs.TagDiff', related_name='tag_diff', blank=True,
         help_text='The tag used by the organization on Diff posts (if any).',
     )
+    documents = models.ManyToManyField(
+        'orgs.Document', related_name='documents', blank=True,
+        help_text='The documents related to the organization.',
+    )
     home_project = models.URLField(
         blank=True, null=True, 
         help_text='The URL of the home project of the organization on Wikimedia (e.g. https://xx.wikimedia.org/).',
@@ -108,3 +112,16 @@ class TagDiff(models.Model):
 
     def __str__(self):
         return self.tag
+
+class Document(models.Model):
+    url = models.URLField(
+        help_text='The URL of the document on Wikimedia Commons.',
+        validators=[RegexValidator(
+            regex=r'^https:\/\/commons\.wikimedia\.org\/wiki\/File:.*?\.[\w]+$',
+            message='Invalid URL format. The format should be https://commons.wikimedia.org/wiki/File:filename.ext'
+        )]
+    )
+    creation_date = models.DateTimeField(default=timezone.now)
+
+    def __str__(self):
+        return self.url.split('/')[-1].replace('_', ' ')
