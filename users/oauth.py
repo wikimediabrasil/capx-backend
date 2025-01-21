@@ -50,9 +50,35 @@ class AuthView(SocialKnoxOnlyAuthView):
 
 
 class UserAuthView(SocialKnoxUserAuthView):
+    request = {
+        'type': 'object',
+        'properties': {
+            'oauth_token': {
+                'type': 'string',
+                'required': True,
+                'description': 'The OAuth token'
+            },
+            'oauth_token_secret': {
+                'type': 'string',
+                'required': True,
+                'description': 'The OAuth token secret'
+            },
+            'oauth_verifier': {
+                'type': 'string',
+                'required': True,
+                'description': 'The OAuth verifier'
+            }
+        }
+    }
+
     @extend_schema(
         summary='Authenticate user using OAuth token',
         description='This endpoint is used to authenticate the user using the OAuth token verifier. The OAuth token verifier is obtained from the OAuth provider.',
+        request={
+            ('application/json'): request,
+            ('application/x-www-form-urlencoded'): request,
+            ('multipart/form-data'): request,
+        },
         responses={(200, 'application/json'): {
             'description': 'User authenticated successfully',
             'type': 'object',

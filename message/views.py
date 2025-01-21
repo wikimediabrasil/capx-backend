@@ -2,7 +2,7 @@ from .models import Message
 from .serializers import MessageSerializer
 from rest_framework import status, viewsets, filters
 from rest_framework.response import Response
-from drf_spectacular.utils import extend_schema, extend_schema_view
+from drf_spectacular.utils import extend_schema, extend_schema_view, OpenApiParameter, OpenApiTypes
 
 @extend_schema_view(
     list=extend_schema(
@@ -16,6 +16,7 @@ from drf_spectacular.utils import extend_schema, extend_schema_view
     retrieve=extend_schema(
         summary="Retrieve a message.",
         description="This endpoint retrieves a message by its ID.",
+        parameters=[OpenApiParameter("id", OpenApiTypes.INT, OpenApiParameter.PATH)]
     )
 )
 class MessageViewSet(viewsets.ModelViewSet):
