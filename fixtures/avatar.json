@@ -1,0 +1,128 @@
+[
+    {
+        "model": "users.avatar",
+        "fields": {
+            "avatar_url": "https://commons.wikimedia.org/wiki/Special:Redirect/file/Wikidata.svg"
+        }
+    },
+    {
+        "model": "users.avatar",
+        "fields": {
+            "avatar_url": "https://commons.wikimedia.org/wiki/Special:Redirect/file/CapX_-_Avatar_-_1.svg"
+        }
+    },
+    {
+        "model": "users.avatar",
+        "fields": {
+            "avatar_url": "https://commons.wikimedia.org/wiki/Special:Redirect/file/CapX_-_Avatar_-_2.svg"
+        }
+    },
+    {
+        "model": "users.avatar",
+        "fields": {
+            "avatar_url": "https://commons.wikimedia.org/wiki/Special:Redirect/file/CapX_-_Avatar_-_3.svg"
+        }
+    },
+    {
+        "model": "users.avatar",
+        "fields": {
+            "avatar_url": "https://commons.wikimedia.org/wiki/Special:Redirect/file/CapX_-_Avatar_-_4.svg"
+        }
+    },
+    {
+        "model": "users.avatar",
+        "fields": {
+            "avatar_url": "https://commons.wikimedia.org/wiki/Special:Redirect/file/CapX_-_Avatar_-_5.svg"
+        }
+    },
+    {
+        "model": "users.avatar",
+        "fields": {
+            "avatar_url": "https://commons.wikimedia.org/wiki/Special:Redirect/file/CapX_-_Avatar_-_6.svg"
+        }
+    },
+    {
+        "model": "users.avatar",
+        "fields": {
+            "avatar_url": "https://commons.wikimedia.org/wiki/Special:Redirect/file/CapX_-_Avatar_-_7.svg"
+        }
+    },
+    {
+        "model": "users.avatar",
+        "fields": {
+            "avatar_url": "https://commons.wikimedia.org/wiki/Special:Redirect/file/CapX_-_Avatar_-_8.svg"
+        }
+    },
+    {
+        "model": "users.avatar",
+        "fields": {
+            "avatar_url": "https://commons.wikimedia.org/wiki/Special:Redirect/file/CapX_-_Avatar_-_9.svg"
+        }
+    },
+    {
+        "model": "users.avatar",
+        "fields": {
+            "avatar_url": "https://commons.wikimedia.org/wiki/Special:Redirect/file/CapX_-_Avatar_-_10.svg"
+        }
+    },
+    {
+        "model": "users.avatar",
+        "fields": {
+            "avatar_url": "https://commons.wikimedia.org/wiki/Special:Redirect/file/CapX_-_Avatar_-_11.svg"
+        }
+    },
+    {
+        "model": "users.avatar",
+        "fields": {
+            "avatar_url": "https://commons.wikimedia.org/wiki/Special:Redirect/file/CapX_-_Avatar_-_12.svg"
+        }
+    },
+    {
+        "model": "users.avatar",
+        "fields": {
+            "avatar_url": "https://commons.wikimedia.org/wiki/Special:Redirect/file/CapX_-_Avatar_-_13.svg"
+        }
+    },
+    {
+        "model": "users.avatar",
+        "fields": {
+            "avatar_url": "https://commons.wikimedia.org/wiki/Special:Redirect/file/CapX_-_Avatar_-_14.svg"
+        }
+    },
+    {
+        "model": "users.avatar",
+        "fields": {
+            "avatar_url": "https://commons.wikimedia.org/wiki/Special:Redirect/file/CapX_-_Avatar_-_15.svg"
+        }
+    },
+    {
+        "model": "users.avatar",
+        "fields": {
+            "avatar_url": "https://commons.wikimedia.org/wiki/Special:Redirect/file/CapX_-_Avatar_-_16.svg"
+        }
+    },
+    {
+        "model": "users.avatar",
+        "fields": {
+            "avatar_url": "https://commons.wikimedia.org/wiki/Special:Redirect/file/CapX_-_Avatar_-_17.svg"
+        }
+    },
+    {
+        "model": "users.avatar",
+        "fields": {
+            "avatar_url": "https://commons.wikimedia.org/wiki/Special:Redirect/file/CapX_-_Avatar_-_18.svg"
+        }
+    },
+    {
+        "model": "users.avatar",
+        "fields": {
+            "avatar_url": "https://commons.wikimedia.org/wiki/Special:Redirect/file/CapX_-_Avatar_-_19.svg"
+        }
+    },
+    {
+        "model": "users.avatar",
+        "fields": {
+            "avatar_url": "https://commons.wikimedia.org/wiki/Special:Redirect/file/CapX_-_Avatar_-_20.svg"
+        }
+    }
+]

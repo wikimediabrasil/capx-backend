@@ -4,11 +4,13 @@ from django.urls import reverse
 from django.test import TestCase
 from rest_framework import status
 from rest_framework.test import APIClient
-from users.models import Profile, CustomUser
+from users.models import Profile, CustomUser, LanguageProficiency
 from users.submodels import Territory, Language, WikimediaProject
 from users.serializers import ProfileSerializer, TerritorySerializer, LanguageSerializer, WikimediaProjectSerializer
 from skills.models import Skill
 from orgs.models import Organization, OrganizationType
+from events.models import Events
+from projects.models import Project
 
 class ProfileViewSetTestCase(TestCase):
     def setUp(self):
@@ -35,6 +37,7 @@ class ProfileViewSetTestCase(TestCase):
         url = '/profile/' + str(self.user.pk) + '/'
         updated_data = {
             'user': {},
+            'language': [],
             'about': 'first user ever!',
         }
         response = self.client.put(url, updated_data, format='json')
@@ -85,6 +88,7 @@ class ProfileViewSetTestCase(TestCase):
         url = '/profile/' + str(self.user.pk) + '/'
         updated_data = {
             'user': {},
+            'language': [],
             'skills_known': [str(skill.pk)],
             'skills_available': [str(skill.pk)],
         }
@@ -95,6 +99,7 @@ class ProfileViewSetTestCase(TestCase):
         url = '/profile/' + str(self.user.pk) + '/'
         updated_data = {
             'user': {},
+            'language': [],
             'skills_known': [],
             'skills_available': [],
         }
@@ -108,6 +113,19 @@ class ProfileViewSetTestCase(TestCase):
         profiles = Profile.objects.all()
         serializer = ProfileSerializer(profiles, many=True)
         self.assertEqual(response.data, serializer.data)
+
+    def test_update_language_proficiency(self):
+        language = Language.objects.create(language_name="Spanish", language_code="es")
+        url = '/profile/' + str(self.user.pk) + '/'
+        data = self.client.get(url).data
+        self.assertEqual(data['language'], [])
+
+        data['language'] = [{'id': language.id, 'proficiency': '3'}]
+        response = self.client.put(url, data, format='json')
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+
+        lang_prof = LanguageProficiency.objects.get(profile=self.user.profile, language=language)
+        self.assertEqual(lang_prof.proficiency, '3')
 
 class QuickListViewSetTestCase(TestCase):
     def setUp(self):
@@ -151,7 +169,7 @@ class QuickListViewSetTestCase(TestCase):
         response = self.client.get('/list/affiliation/')
         self.assertEqual(response.data, expected_data)
 
-    def test_list_languages(self):
+    def test_list_territories(self):
         Territory.objects.create(territory_name='test')
         Territory.objects.create(territory_name='test2')
         self.client.force_authenticate(self.user)
@@ -161,7 +179,7 @@ class QuickListViewSetTestCase(TestCase):
         expected_data = {territory.pk: territory.territory_name for territory in territories}
         self.assertEqual(response.data, expected_data)
 
-    def test_list_territories(self):
+    def test_list_languages(self):
         Language.objects.create(language_name='test', language_code='test')
         Language.objects.create(language_name='test2', language_code='test2')
         self.client.force_authenticate(self.user)
@@ -189,6 +207,38 @@ class QuickListViewSetTestCase(TestCase):
         response = self.client.get('/list/skills/')
         skills = Skill.objects.all()
         expected_data = {skill.pk: skill.skill_wikidata_item for skill in skills}
+        self.assertEqual(response.data, expected_data)
+
+    def test_list_event(self):
+        Events.objects.create(
+            name='Sample Event',
+            type_of_location='virtual',
+            time_begin='2021-10-10 10:00:00+00:00',
+            time_end='2021-10-10 12:00:00+00:00',
+            creator=CustomUser.objects.get(id=1)
+        )
+        Events.objects.create(
+            name='Sample Event 2',
+            type_of_location='virtual',
+            time_begin='2021-10-10 10:00:00+00:00',
+            time_end='2021-10-10 12:00:00+00:00',
+            creator=CustomUser.objects.get(id=1)
+        )
+        self.client.force_authenticate(self.user)
+
+        response = self.client.get('/list/event/')
+        events = Events.objects.all()
+        expected_data = {event.pk: event.name for event in events}
+        self.assertEqual(response.data, expected_data)
+
+    def test_list_project(self):
+        Project.objects.create(display_name='Sample Project')
+        Project.objects.create(display_name='Sample Project 2')
+        self.client.force_authenticate(self.user)
+
+        response = self.client.get('/list/project/')
+        projects = Project.objects.all()
+        expected_data = {project.pk: project.display_name for project in projects}
         self.assertEqual(response.data, expected_data)
 
 
@@ -302,13 +352,13 @@ class UsersByTagTestCase(TestCase):
             language_code='test'
         )
         profile = Profile.objects.get(user=self.user)
-        profile.language.set([language])
+        lang_prof = LanguageProficiency.objects.create(profile=profile, language=language, proficiency='3')
 
         response = self.client.get('/tags/language/' + str(language.pk) + '/')
         self.assertEqual(response.status_code, status.HTTP_200_OK)
 
         response_data = response.data
-        serializer_data = ProfileSerializer(Profile.objects.filter(language=language), many=True).data
+        serializer_data = ProfileSerializer(Profile.objects.filter(languageproficiency=lang_prof), many=True).data
         simplified_serializer_data = [
             {
                 'id': profile['user']['id'],

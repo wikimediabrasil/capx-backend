@@ -1,7 +1,9 @@
-from .models import Profile, Territory, Language, WikimediaProject
+from .models import Profile, Territory, Language, WikimediaProject, Avatar
 from orgs.models import Organization
-from .serializers import ProfileSerializer, TerritorySerializer, LanguageSerializer, WikimediaProjectSerializer, UsersBySkillSerializer, UsersByTagSerializer
+from .serializers import ProfileSerializer, TerritorySerializer, LanguageSerializer, WikimediaProjectSerializer, UsersBySkillSerializer, UsersByTagSerializer, AvatarSerializer
 from skills.models import Skill
+from events.models import Events
+from projects.models import Project
 from rest_framework import status, viewsets, filters
 from rest_framework.response import Response
 from django.shortcuts import get_object_or_404
@@ -144,6 +146,20 @@ class ProfileViewSet(viewsets.ModelViewSet):
 
 @extend_schema_view(
     list=extend_schema(
+        summary='List all Wikimedia projects.',
+        description='This endpoint lists all Wikimedia projects.',
+    ),
+    retrieve=extend_schema(
+        summary='Retrieve a Wikimedia project by ID.',
+        description='This endpoint retrieves a Wikimedia project by its ID.',
+    ),
+)
+class WikimediaProjectViewSet(viewsets.ReadOnlyModelViewSet):
+    queryset = WikimediaProject.objects.all()
+    serializer_class = WikimediaProjectSerializer
+
+@extend_schema_view(
+    list=extend_schema(
         summary='List all territories.',
         description='This endpoint lists all territories.',
     ),
@@ -155,6 +171,20 @@ class ProfileViewSet(viewsets.ModelViewSet):
 class TerritoryViewSet(viewsets.ReadOnlyModelViewSet):
     queryset = Territory.objects.all()
     serializer_class = TerritorySerializer
+
+@extend_schema_view(
+    list=extend_schema(
+        summary='List all avatars.',
+        description='This endpoint lists all avatars.',
+    ),
+    retrieve=extend_schema(
+        summary='Retrieve an avatar by ID.',
+        description='This endpoint retrieves an avatar by its ID.',
+    ),
+)
+class AvatarViewSet(viewsets.ReadOnlyModelViewSet):
+    queryset = Avatar.objects.all()
+    serializer_class = AvatarSerializer
 
 
 class UsersBySkillViewSet(viewsets.ReadOnlyModelViewSet):
@@ -199,6 +229,10 @@ class QuickListViewSet(viewsets.ReadOnlyModelViewSet):
             return Organization.objects.all()
         elif list_type == 'territory':
             return Territory.objects.all()
+        elif list_type == 'event':
+            return Events.objects.all()
+        elif list_type == 'project':
+            return Project.objects.all()
         elif list_type == 'skills':
             return Skill.objects.all()
         else:
@@ -219,7 +253,7 @@ class QuickListViewSet(viewsets.ReadOnlyModelViewSet):
                 OpenApiParameter.PATH,
                 required=True,
                 description='The type of list to retrieve.',
-                enum=['language', 'wikimedia_project', 'affiliation', 'territory', 'skills'],
+                enum=['language', 'wikimedia_project', 'affiliation', 'territory', 'skills', 'event', 'project'],
             ),
         ],
         responses={(200, 'application/json'): {
@@ -285,7 +319,7 @@ class UsersByTagViewSet(viewsets.ReadOnlyModelViewSet):
         elif tag_type == 'skill_wanted':
             queryset = Profile.objects.filter(skills_wanted__id=tag_id)
         elif tag_type == 'language':
-            queryset = Profile.objects.filter(language__id=tag_id)
+            queryset = Profile.objects.filter(languageproficiency__language__id=tag_id)
         elif tag_type == 'territory':
             queryset = Profile.objects.filter(territory__id=tag_id)
         elif tag_type == 'wikimedia_project':

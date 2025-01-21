@@ -22,12 +22,14 @@ from django.conf.urls.static import static
 from rest_framework.routers import DefaultRouter
 from skills.views import SkillViewSet, SkillByTypeViewSet
 from users.views import (
-    ProfileViewSet, UsersViewSet, QuickListViewSet,
-    UsersBySkillViewSet, UsersByTagViewSet, TerritoryViewSet,
+    ProfileViewSet, UsersViewSet, QuickListViewSet, AvatarViewSet,
+    UsersBySkillViewSet, UsersByTagViewSet, TerritoryViewSet, WikimediaProjectViewSet
 )
 from bugs.views import BugViewSet, AttachmentViewSet
-from orgs.views import OrganizationViewSet, OrganizationTypeViewSet
+from orgs.views import OrganizationViewSet, OrganizationTypeViewSet, TagDiffViewSet, DocumentViewSet
 from events.views import EventViewSet, EventParticipantViewSet, EventOrganizationsViewSet
+from message.views import MessageViewSet
+from projects.views import ProjectViewSet, ProjectMemberViewSet, ProjectMemberAcceptanceViewSet
 from drf_spectacular.views import SpectacularAPIView, SpectacularSwaggerView
 from users.oauth import UserAuthView, AuthView, CheckView
 
@@ -36,9 +38,13 @@ router = DefaultRouter()
 router.register('skill', SkillViewSet, basename='skill')
 router.register('users', UsersViewSet, basename='users')
 router.register('profile', ProfileViewSet, basename='profile')
+router.register('wikimedia_project', WikimediaProjectViewSet, basename='wikimedia_project')
 router.register('territory', TerritoryViewSet, basename='territory')
+router.register('avatar', AvatarViewSet, basename='avatar')
 router.register('organizations', OrganizationViewSet, basename='organizations')
 router.register('organization_type', OrganizationTypeViewSet, basename='organization_type')
+router.register('tag_diff', TagDiffViewSet, basename='tag_diff')
+router.register('document', DocumentViewSet, basename='document')
 router.register('bugs', BugViewSet, basename='bugs')
 router.register('attachment', AttachmentViewSet, basename='attachment')
 router.register('users_by_skill', UsersBySkillViewSet, basename='users_by_skill')
@@ -46,6 +52,10 @@ router.register('skills_by_type', SkillByTypeViewSet, basename='skills_by_type')
 router.register('events', EventViewSet)
 router.register('events_participants', EventParticipantViewSet)
 router.register('events_organizations', EventOrganizationsViewSet)
+router.register('messages', MessageViewSet, basename='messages')
+router.register('projects', ProjectViewSet, basename='projects')
+router.register('project_members', ProjectMemberViewSet, basename='project_members')
+router.register('project_member_acceptance', ProjectMemberAcceptanceViewSet, basename='project_member_acceptance')
 router.register('list', QuickListViewSet, basename='list')
 
 urlpatterns = [

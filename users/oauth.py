@@ -50,9 +50,35 @@ class AuthView(SocialKnoxOnlyAuthView):
 
 
 class UserAuthView(SocialKnoxUserAuthView):
+    request = {
+        'type': 'object',
+        'properties': {
+            'oauth_token': {
+                'type': 'string',
+                'required': True,
+                'description': 'The OAuth token'
+            },
+            'oauth_token_secret': {
+                'type': 'string',
+                'required': True,
+                'description': 'The OAuth token secret'
+            },
+            'oauth_verifier': {
+                'type': 'string',
+                'required': True,
+                'description': 'The OAuth verifier'
+            }
+        }
+    }
+
     @extend_schema(
         summary='Authenticate user using OAuth token',
         description='This endpoint is used to authenticate the user using the OAuth token verifier. The OAuth token verifier is obtained from the OAuth provider.',
+        request={
+            ('application/json'): request,
+            ('application/x-www-form-urlencoded'): request,
+            ('multipart/form-data'): request,
+        },
         responses={(200, 'application/json'): {
             'description': 'User authenticated successfully',
             'type': 'object',
@@ -103,7 +129,10 @@ class CheckView(SocialKnoxOnlyAuthView):
         }}
     )
     def post(self, request, *args, **kwargs):
-        token = request.data['oauth_token']
+        token = request.data.get('oauth_token')
+        if not token:
+            return Response({'error': 'oauth_token is required'}, status=status.HTTP_400_BAD_REQUEST)
+        
         exists = AuthExtraInfo.objects.filter(token=token).exists()
         extra = AuthExtraInfo.objects.get(token=token).extra if exists else None
         return Response({'exists': exists, 'extra': extra})

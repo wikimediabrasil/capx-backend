@@ -3,7 +3,7 @@ from django.test import TestCase
 from django.db import IntegrityError
 from django.core.exceptions import ValidationError
 from ..models import Territory, Language, WikimediaProject, Organization, CustomUser, \
-    Profile
+    Profile, LanguageProficiency, Avatar
 
 
 class TerritoryModelTest(TestCase):
@@ -49,6 +49,18 @@ class LanguageModelTest(TestCase):
         Language.objects.create(language_name="English", language_code="en")
         with self.assertRaises(IntegrityError):
             Language.objects.create(language_name="Hausa", language_code="en")
+
+
+class AvatarModelTest(TestCase):
+    @classmethod
+    def setUpTestData(cls):
+        cls.avatar = Avatar.objects.create(
+            avatar_url='https://example.com/avatar.png'
+        )
+
+    def test_avatar_creation(self):
+        self.assertEqual(self.avatar.avatar_url, 'https://example.com/avatar.png')
+        self.assertEqual(str(self.avatar), 'https://example.com/avatar.png')
 
 
 class WikimediaProjectModelTest(TestCase):
@@ -139,13 +151,13 @@ class ProfileModelTest(TestCase):
     def test_localization(self):
         profile = self.user.profile
         profile.territory.set([self.territory])
-        profile.language.set([self.language])
+        profile.languageproficiency_set.create(language=self.language, proficiency='3')
         profile.wikimedia_project.set([self.wikimedia_project])
         profile.save()
 
         updated_profile = Profile.objects.get(id=profile.id)
         territory = [territory.territory_name for territory in updated_profile.territory.all()]
-        language = [language.language_name for language in updated_profile.language.all()]
+        language = [language.language.language_name for language in updated_profile.languageproficiency_set.all()]
         wikimedia_project = [wikimedia_project.wikimedia_project_name for wikimedia_project in
                              updated_profile.wikimedia_project.all()]
 
@@ -158,3 +170,20 @@ class ProfileModelTest(TestCase):
             username="Anthony",
         )
         self.assertEqual(str(user.profile), "Anthony")
+
+    def test_language_proficiency(self):
+        profile = self.user.profile
+        language = Language.objects.create(language_name="Spanish", language_code="es")
+        LanguageProficiency.objects.create(profile=profile, language=language, proficiency='3')
+
+        lang_prof = LanguageProficiency.objects.get(profile=profile, language=language)
+        self.assertEqual(lang_prof.proficiency, '3')
+        self.assertEqual(str(lang_prof), f"{profile.user.username} - {language.language_name}")
+
+    def test_unique_language_proficiency(self):
+        profile = self.user.profile
+        language = Language.objects.create(language_name="Spanish", language_code="es")
+        LanguageProficiency.objects.create(profile=profile, language=language, proficiency='3')
+
+        with self.assertRaises(IntegrityError):
+            LanguageProficiency.objects.create(profile=profile, language=language, proficiency='4')
