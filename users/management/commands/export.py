@@ -1,7 +1,9 @@
 from django.core.management.base import BaseCommand
 from users.serializers import ProfileSerializer, LanguageSerializer
 from users.models import Profile, Language, LanguageProficiency
+from skills.models import Skill
 import json
+import requests
 
 class Command(BaseCommand):
     help = "Export data to Commons in JSON tabular format"
@@ -17,7 +19,6 @@ class Command(BaseCommand):
         # Process users
         formatted_data = []
         for profile in profile_serializer.data:
-            print(profile)
             profile_id = Profile.objects.get(user_id=profile['user']['id']).id
             language_proficiencies = LanguageProficiency.objects.filter(profile_id=profile_id).select_related('language')
 
@@ -46,3 +47,38 @@ class Command(BaseCommand):
             "data": formatted_data,
         }
         print(json.dumps(output, indent=4))
+
+        # Get all skills that are known, available, and wanted
+        skills = []
+        for profile in profile_serializer.data:
+            skills.extend(profile['skills_known'])
+            skills.extend(profile['skills_available'])
+            skills.extend(profile['skills_wanted'])
+
+        # Remove duplicate skills
+        skills = list(set(skills))
+
+        # Get Wikidata items for each skill
+        quids = [Skill.objects.get(id=skill).skill_wikidata_item for skill in skills]
+
+        # Metabase SPARQL query
+        query = """
+        PREFIX wbt: <https://metabase.wikibase.cloud/prop/direct/>
+        SELECT ?item ?itemLabel ?itemDescription ?value WHERE {
+            VALUES ?value {
+                %s
+            }
+            ?item wbt:P1 ?value.
+        SERVICE wikibase:label { bd:serviceParam wikibase:language "en". }
+        }
+        """
+
+        # Print the formatted query
+        final = query % ' '.join([f'"{quid}"' for quid in quids])
+
+        # Run the query in Metabase
+        response = requests.get(
+            'https://metabase.wikibase.cloud/query/sparql',
+            params={'query': final, 'format': 'json'}
+        )
+        print(json.dumps(response.json(), indent=4))
