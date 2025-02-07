@@ -13,12 +13,20 @@ class OrganizationSerializer(serializers.ModelSerializer):
         fields = '__all__'
         read_only_fields = ['creation_date']
 
-    @extend_schema_field(OpenApiTypes.OBJECT)
+    @extend_schema_field({
+        'type': 'array',
+        'description': 'List of project\' IDs that are associated with the organization',
+        'items': {'type': 'integer'}
+    })
     def get_projects(self, obj):
         from projects.models import ProjectMember
         return ProjectMember.objects.filter(organization=obj, projectmemberacceptance__accepted=True).values_list('project', flat=True)
 
-    @extend_schema_field(OpenApiTypes.OBJECT)
+    @extend_schema_field({
+        'type': 'array',
+        'description': 'List of event\' IDs that are associated with the organization',
+        'items': {'type': 'integer'}
+    })
     def get_events(self, obj):
         from events.models import EventOrganizations
         return EventOrganizations.objects.filter(organization=obj).values_list('event', flat=True)

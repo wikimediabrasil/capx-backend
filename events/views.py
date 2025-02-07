@@ -211,7 +211,8 @@ class EventOrganizationsViewSet(viewsets.ModelViewSet):
             return super().update(request, *args, **kwargs)
 
         instance = self.get_object()
-        team = EventParticipant.objects.filter(event=request.data['event'], role__in=['organizer', 'committee'])
+        event = EventOrganizations.objects.get(pk=instance.pk).event
+        team = EventParticipant.objects.filter(event=event, role__in=['organizer', 'committee'])
         read_only_fields = ['event', 'organization', 'role']
 
         if request.user.pk not in instance.organization.managers.values_list('pk', flat=True):
