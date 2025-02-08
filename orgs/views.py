@@ -28,7 +28,9 @@ class OrganizationViewSet(viewsets.ModelViewSet):
         if user.is_staff:
             return Organization.objects.all()
         else:
-            return Organization.objects.filter(managers__isnull=False)
+            # Filter organizations that have at least one manager and ensure distinct results
+            active_organizations = Organization.objects.filter(managers__isnull=False).distinct()
+            return active_organizations
 
     @extend_schema(
         summary='Create a new organization.',
