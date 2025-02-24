@@ -120,6 +120,20 @@ class OrganizationViewSetTestCase(APITestCase):
         response = self.client.get('/organizations/1/')
         self.assertEqual(response.status_code, status.HTTP_200_OK)
 
+    def test_retrieve_org_multiple_managers(self):
+        organization = Organization.objects.create(
+            display_name='New Organization',
+            acronym='NO',
+            type=OrganizationType.objects.get(pk=1),
+        )
+        organization.territory.set([Territory.objects.get(pk=1)])
+        manager = CustomUser.objects.create_user(username='manager', password=str(secrets.randbits(16)))
+        organization.managers.set([self.user, manager])
+
+        self.client.force_authenticate(self.user)
+        response = self.client.get('/organizations/1/')
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+
     def test_update_org(self):
         self.client.force_authenticate(self.user)
         response = self.client.put('/organizations/1/', {'display_name': 'New Name','acronym': 'NN'})
