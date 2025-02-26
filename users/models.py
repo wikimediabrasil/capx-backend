@@ -181,6 +181,20 @@ class Profile(models.Model):
         help_text="json"
     )
 
+    def save(self, *args, **kwargs):
+        """
+        Overrides the save method to set the primary key (pk) of the instance to the
+        primary key of the associated user to ensure that both the user and profile
+        have the same primary key.
+
+        Args:
+            *args: Variable length argument list.
+            **kwargs: Arbitrary keyword arguments.
+        """
+        if not self.pk and self.user:
+            self.pk = self.user.pk
+        super().save(*args, **kwargs)
+
     def __str__(self):
         return self.user.username
 
