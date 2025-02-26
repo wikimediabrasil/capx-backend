@@ -65,9 +65,7 @@ class Command(BaseCommand):
         query = """
         PREFIX wbt: <https://metabase.wikibase.cloud/prop/direct/>
         SELECT ?item ?itemLabel ?itemDescription ?value WHERE {
-            VALUES ?value {
-                %s
-            }
+            VALUES ?value { %s}
             ?item wbt:P1 ?value.
         SERVICE wikibase:label { bd:serviceParam wikibase:language "en". }
         }
