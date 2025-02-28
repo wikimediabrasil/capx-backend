@@ -22,3 +22,14 @@ class Skill(models.Model):
 
     def __str__(self):
         return self.skill_wikidata_item
+
+    def save(self, *args, **kwargs):
+        if self.skill_type:
+            parent_skill = self.skill_type
+            level = 1
+            while parent_skill.skill_type:
+                parent_skill = parent_skill.skill_type
+                level += 1
+                if level >= 3:
+                    raise ValidationError("Skills cannot be nested more than 3 levels deep.")
+        super().save(*args, **kwargs)
