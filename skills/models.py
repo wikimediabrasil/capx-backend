@@ -13,9 +13,9 @@ class Skill(models.Model):
         help_text="Wikidata item ID of the skill.",
         validators=[qid_form_validator]
     )
-    skill_type = models.ManyToManyField(
+    skill_type = models.ForeignKey(
         "self", 
-        verbose_name="Skill type", symmetrical=False, blank=True,
+        verbose_name="Skill type", blank=True, on_delete=models.SET_NULL, null=True,
         help_text="ID of the another skill that this skill is a subtype of."
     )
     skill_date_of_creation = models.DateTimeField(default=timezone.now)
