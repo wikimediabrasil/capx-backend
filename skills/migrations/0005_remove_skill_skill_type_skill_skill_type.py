@@ -32,4 +32,9 @@ class Migration(migrations.Migration):
             model_name='skill',
             name='skill_type',
         ),
+        migrations.RenameField(
+            model_name='skill',
+            old_name='skill_class',
+            new_name='skill_type',
+        ),
     ]
