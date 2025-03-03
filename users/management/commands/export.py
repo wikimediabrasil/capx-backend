@@ -1,9 +1,10 @@
 from django.core.management.base import BaseCommand
-from users.serializers import ProfileSerializer, LanguageSerializer
-from users.models import Profile, Language, LanguageProficiency
+from users.serializers import ProfileSerializer
+from users.models import Profile
 from skills.models import Skill
 import json
 import requests
+import os
 
 class Command(BaseCommand):
     help = "Export data to Commons in JSON tabular format"
@@ -11,14 +12,11 @@ class Command(BaseCommand):
     def format_list(self, data_list):
         return '[' + ', '.join(str(item) for item in data_list) + ']'
 
-    def handle(self, *args, **options):
-        profile_serializer = ProfileSerializer(Profile.objects.all(), many=True)
-        
-        # Filter users that uses the template on the meta wiki page
+    def get_meta_wiki_users(self):
         query_params = {
             'action': 'query',
             'prop': 'transcludedin',
-            'pageids': '12493945', # Template:CapXsupporter, for testing purposes
+            'pageids': '12493945',  # Template:CapXsupporter, for testing purposes
             'tilimit': 'max',
             'tiprop': 'title',
             'tinamespace': '2',
@@ -26,21 +24,17 @@ class Command(BaseCommand):
             'formatversion': '2',
         }
         response = requests.get('https://meta.wikimedia.org/w/api.php', params=query_params)
-        meta_wiki_users = [page['title'][5:] for page in response.json()['query']['pages'][0]['transcludedin']]
+        return [page['title'][5:] for page in response.json()['query']['pages'][0]['transcludedin']]
 
-        # Process users
+    def process_profiles(self, profiles, meta_wiki_users):
         formatted_data = []
         skills = []
-        for profile in profile_serializer.data:
+        for profile in profiles:
             if profile['user']['username'] not in meta_wiki_users:
                 continue
 
-            profile_id = Profile.objects.get(user_id=profile['user']['id']).id
-            language_proficiencies = LanguageProficiency.objects.filter(profile_id=profile_id).select_related('language')
-
             data = [
                 profile['user']['username'],
-                self.format_list([f"{lp.language.language_code}-{lp.proficiency}" for lp in language_proficiencies]),
                 self.format_list(profile['skills_known']),
                 self.format_list(profile['skills_available']),
                 self.format_list(profile['skills_wanted'])
@@ -51,34 +45,12 @@ class Command(BaseCommand):
             skills.extend(profile['skills_available'])
             skills.extend(profile['skills_wanted'])
 
-        output = {
-            "license": "CC0-1.0",
-            "description": {"en": "Users enrolled in the CapX platform",},
-            "sources": "https://capx.toolforge.org",
-            "schema": {
-                "fields": [
-                    {"name": "username", "type": "string",},
-                    {"name": "language", "type": "string",},
-                    {"name": "skills_known", "type": "string",},
-                    {"name": "skills_available", "type": "string",},
-                    {"name": "skills_wanted", "type": "string",}
-                ],
-            },
-            "data": formatted_data,
-        }
-        print(json.dumps(output, indent=4))
+        return formatted_data, list(set(skills))
 
+    def get_skill_dict(self, skills):
+        return {Skill.objects.get(id=skill).skill_wikidata_item: skill for skill in skills}
 
-        # Remove duplicate skills
-        skills = list(set(skills))
-
-        # Get Wikidata items for each skill
-        skill_dict = {Skill.objects.get(id=skill).skill_wikidata_item: skill for skill in skills}
-
-        # Create a list of QIDs
-        quids = list(skill_dict.keys())
-
-        # Metabase SPARQL query
+    def get_sparql_query(self, quids):
         query = """
         PREFIX wbt: <https://metabase.wikibase.cloud/prop/direct/>
         SELECT ?item ?itemLabel ?itemDescription ?value WHERE {
@@ -87,17 +59,9 @@ class Command(BaseCommand):
         SERVICE wikibase:label { bd:serviceParam wikibase:language "en". }
         }
         """
+        return query % ' '.join([f'"{quid}"' for quid in quids])
 
-        # Print the formatted query
-        final = query % ' '.join([f'"{quid}"' for quid in quids])
-
-        # Run the query in Metabase
-        response = requests.get(
-            'https://metabase.wikibase.cloud/query/sparql',
-            params={'query': final, 'format': 'json'}
-        )
-
-        # Process capacities
+    def process_sparql_response(self, response, skill_dict):
         formatted_data = []
         for item in response.json()['results']['bindings']:
             data = [
@@ -106,18 +70,118 @@ class Command(BaseCommand):
                 item['itemDescription']['value'] if 'itemDescription' in item else ''
             ]
             formatted_data.append(data)
+        return formatted_data
 
-        output = {
+    def create_output_users(self, formatted_data):
+        return {
             "license": "CC0-1.0",
-            "description": {"en": "Capacities added in the CapX platform",},
+            "description": {"en": "Users enrolled in the CapX platform"},
             "sources": "https://capx.toolforge.org",
             "schema": {
                 "fields": [
-                    {"name": "id", "type": "number",},
-                    {"name": "name", "type": "string",},
-                    {"name": "description", "type": "string",}
+                    {"name": "username", "type": "string"},
+                    {"name": "skills_known", "type": "string"},
+                    {"name": "skills_available", "type": "string"},
+                    {"name": "skills_wanted", "type": "string"}
                 ],
             },
             "data": formatted_data,
         }
-        print(json.dumps(output, indent=4))
+
+    def create_output_capacities(self, formatted_data):
+        return {
+            "license": "CC0-1.0",
+            "description": {"en": "Capacities added in the CapX platform"},
+            "sources": "https://capx.toolforge.org",
+            "schema": {
+                "fields": [
+                    {"name": "id", "type": "number"},
+                    {"name": "name", "type": "string"},
+                    {"name": "description", "type": "string"}
+                ],
+            },
+            "data": formatted_data,
+        }
+
+    def get_login_token(self, session, url):
+        params = {
+            "action": "query",
+            "meta": "tokens",
+            "type": "login",
+            "format": "json"
+        }
+        response = session.get(url=url, params=params)
+        data = response.json()
+        return data['query']['tokens']['logintoken']
+
+    def login(self, session, url, login_token):
+        params = {
+            "action": "login",
+            "lgname": os.environ['CAPX_BOT_USERNAME'],
+            "lgpassword": os.environ['CAPX_BOT_PASSWORD'],
+            "lgtoken": login_token,
+            "format": "json"
+        }
+        response = session.post(url, data=params)
+        return response.json()
+
+    def get_csrf_token(self, session, url):
+        params = {
+            "action": "query",
+            "meta": "tokens",
+            "format": "json"
+        }
+        response = session.get(url=url, params=params)
+        data = response.json()
+        return data['query']['tokens']['csrftoken']
+
+    def edit_page(self, session, url, title, summary, text, csrf_token):
+        params = {
+            "action": "edit",
+            "title": title,
+            "summary": summary,
+            "text": text,
+            "token": csrf_token,
+            "minor": "1",
+            "format": "json"
+        }
+        response = session.post(url, data=params)
+        return response.json()
+
+    def handle(self, *args, **options):
+        profile_serializer = ProfileSerializer(Profile.objects.all(), many=True)
+        meta_wiki_users = self.get_meta_wiki_users()
+        formatted_data, skills = self.process_profiles(profile_serializer.data, meta_wiki_users)
+        output_users = self.create_output_users(formatted_data)
+        print(json.dumps(output_users, indent=4))
+
+        skill_dict = self.get_skill_dict(skills)
+        quids = list(skill_dict.keys())
+        sparql_query = self.get_sparql_query(quids)
+        response = requests.get(
+            'https://metabase.wikibase.cloud/query/sparql',
+            params={'query': sparql_query, 'format': 'json'}
+        )
+        formatted_data = self.process_sparql_response(response, skill_dict)
+        output_capacities = self.create_output_capacities(formatted_data)
+        print(json.dumps(output_capacities, indent=4))
+
+        session = requests.Session()
+        url = "https://commons.wikimedia.org/w/api.php"
+        login_token = self.get_login_token(session, url)
+        login_response = self.login(session, url, login_token)
+        print(login_response)
+
+        csrf_token = self.get_csrf_token(session, url)
+        edit_response_users = self.edit_page(
+            session, url, "Data:CapacityExchange/users.tab", "Updating data",
+            json.dumps(output_users, indent=4), csrf_token
+        )
+        print(edit_response_users)
+
+        csrf_token = self.get_csrf_token(session, url)
+        edit_response_capacities = self.edit_page(
+            session, url, "Data:CapacityExchange/capacities.tab", "Updating data",
+            json.dumps(output_capacities, indent=4), csrf_token
+        )
+        print(edit_response_capacities)
