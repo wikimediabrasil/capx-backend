@@ -154,7 +154,7 @@ class Command(BaseCommand):
         return response.json()
 
     def hash_data(self, data):
-        return hashlib.md5(json.dumps(data, sort_keys=True).encode('utf-8')).hexdigest()
+        return hashlib.sha256(json.dumps(data, sort_keys=True).encode('utf-8')).hexdigest()
 
     def get_previous_hash(self, data_type):
         try:
