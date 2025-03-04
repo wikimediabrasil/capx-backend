@@ -2,6 +2,7 @@ from django.core.management.base import BaseCommand
 from users.serializers import ProfileSerializer
 from users.models import Profile
 from skills.models import Skill
+from django.conf import settings
 import json
 import requests
 import os
@@ -117,8 +118,8 @@ class Command(BaseCommand):
     def login(self, session, url, login_token):
         params = {
             "action": "login",
-            "lgname": os.environ['CAPX_BOT_USERNAME'],
-            "lgpassword": os.environ['CAPX_BOT_PASSWORD'],
+            "lgname": settings.CAPX_BOT_USERNAME,
+            "lgpassword": settings.CAPX_BOT_PASSWORD,
             "lgtoken": login_token,
             "format": "json"
         }
@@ -171,18 +172,18 @@ class Command(BaseCommand):
         url = "https://commons.wikimedia.org/w/api.php"
         login_token = self.get_login_token(session, url)
         login = self.login(session, url, login_token)
-        self.stdout.write(login)
+        self.stdout.write(str(login))
 
         csrf_token = self.get_csrf_token(session, url)
         edit_response_users = self.edit_page(
             session, url, "Data:CapacityExchange/users.tab", "Updating data",
             json.dumps(output_users, indent=4), csrf_token
         )
-        self.stdout.write(edit_response_users)
+        self.stdout.write(str(edit_response_users))
 
         csrf_token = self.get_csrf_token(session, url)
         edit_response_capacities = self.edit_page(
             session, url, "Data:CapacityExchange/capacities.tab", "Updating data",
             json.dumps(output_capacities, indent=4), csrf_token
         )
-        self.stdout.write(edit_response_capacities)
+        self.stdout.write(str(edit_response_capacities))
