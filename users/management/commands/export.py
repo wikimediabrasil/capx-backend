@@ -122,8 +122,11 @@ class Command(BaseCommand):
             "lgtoken": login_token,
             "format": "json"
         }
-        response = session.post(url, data=params)
-        return response.json()
+        response = session.post(url, data=params).json()
+        if response['login']['result'] != 'Success':
+            raise requests.exceptions.RequestException("Login failed")
+
+        return response
 
     def get_csrf_token(self, session, url):
         params = {
@@ -147,13 +150,12 @@ class Command(BaseCommand):
         }
         response = session.post(url, data=params)
         return response.json()
-
+        
     def handle(self, *args, **options):
         profile_serializer = ProfileSerializer(Profile.objects.all(), many=True)
         meta_wiki_users = self.get_meta_wiki_users()
         formatted_data, skills = self.process_profiles(profile_serializer.data, meta_wiki_users)
         output_users = self.create_output_users(formatted_data)
-        print(json.dumps(output_users, indent=4))
 
         skill_dict = self.get_skill_dict(skills)
         quids = list(skill_dict.keys())
@@ -164,24 +166,23 @@ class Command(BaseCommand):
         )
         formatted_data = self.process_sparql_response(response, skill_dict)
         output_capacities = self.create_output_capacities(formatted_data)
-        print(json.dumps(output_capacities, indent=4))
 
         session = requests.Session()
         url = "https://commons.wikimedia.org/w/api.php"
         login_token = self.get_login_token(session, url)
-        login_response = self.login(session, url, login_token)
-        print(login_response)
+        login = self.login(session, url, login_token)
+        self.stdout.write(login)
 
         csrf_token = self.get_csrf_token(session, url)
         edit_response_users = self.edit_page(
             session, url, "Data:CapacityExchange/users.tab", "Updating data",
             json.dumps(output_users, indent=4), csrf_token
         )
-        print(edit_response_users)
+        self.stdout.write(edit_response_users)
 
         csrf_token = self.get_csrf_token(session, url)
         edit_response_capacities = self.edit_page(
             session, url, "Data:CapacityExchange/capacities.tab", "Updating data",
             json.dumps(output_capacities, indent=4), csrf_token
         )
-        print(edit_response_capacities)
+        self.stdout.write(edit_response_capacities)
