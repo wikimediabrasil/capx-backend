@@ -89,3 +89,11 @@ class AuthExtraInfo(models.Model):
         verbose_name="Created at",
         auto_now_add=True
     )
+
+class DataHash(models.Model):
+    data_type = models.CharField(max_length=50, unique=True)
+    hash_value = models.CharField(max_length=32)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    def __str__(self):
+        return f"{self.data_type}: {self.hash_value}"

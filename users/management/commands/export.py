@@ -1,10 +1,11 @@
 from django.core.management.base import BaseCommand
 from users.serializers import ProfileSerializer
-from users.models import Profile
+from users.models import Profile, DataHash
 from skills.models import Skill
 from django.conf import settings
 import json
 import requests
+import hashlib
 import os
 
 class Command(BaseCommand):
@@ -151,6 +152,22 @@ class Command(BaseCommand):
         }
         response = session.post(url, data=params)
         return response.json()
+
+    def hash_data(self, data):
+        return hashlib.md5(json.dumps(data, sort_keys=True).encode('utf-8')).hexdigest()
+
+    def get_previous_hash(self, data_type):
+        try:
+            return DataHash.objects.get(data_type=data_type).hash_value
+        except DataHash.DoesNotExist:
+            return None
+
+    def save_current_hash(self, data_type, hash_value):
+        data_hash, _ = DataHash.objects.update_or_create(
+            data_type=data_type,
+            defaults={'hash_value': hash_value}
+        )
+        return data_hash
         
     def handle(self, *args, **options):
         profile_serializer = ProfileSerializer(Profile.objects.all(), many=True)
@@ -168,19 +185,33 @@ class Command(BaseCommand):
         formatted_data = self.process_sparql_response(response, skill_dict)
         output_capacities = self.create_output_capacities(formatted_data)
 
-        session = requests.Session()
-        url = "https://commons.wikimedia.org/w/api.php"
-        login_token = self.get_login_token(session, url)
-        self.login(session, url, login_token)
+        # Hash current data
+        current_users_hash = self.hash_data(output_users)
+        current_capacities_hash = self.hash_data(output_capacities)
 
-        csrf_token = self.get_csrf_token(session, url)
-        self.edit_page(
-            session, url, "Data:CapacityExchange/users.tab", "Updating data",
-            json.dumps(output_users, indent=4), csrf_token
-        )
+        # Get previous hashes from the database
+        previous_users_hash = self.get_previous_hash('users')
+        previous_capacities_hash = self.get_previous_hash('capacities')
 
-        csrf_token = self.get_csrf_token(session, url)
-        self.edit_page(
-            session, url, "Data:CapacityExchange/capacities.tab", "Updating data",
-            json.dumps(output_capacities, indent=4), csrf_token
-        )
+        # Check if data has changed
+        if current_users_hash != previous_users_hash or current_capacities_hash != previous_capacities_hash:
+            session = requests.Session()
+            url = "https://commons.wikimedia.org/w/api.php"
+            login_token = self.get_login_token(session, url)
+            self.login(session, url, login_token)
+
+            if current_users_hash != previous_users_hash:
+                csrf_token = self.get_csrf_token(session, url)
+                self.edit_page(
+                    session, url, "Data:CapacityExchange/users.tab", "Updating data",
+                    json.dumps(output_users, indent=4), csrf_token
+                )
+                self.save_current_hash('users', current_users_hash)
+
+            if current_capacities_hash != previous_capacities_hash:
+                csrf_token = self.get_csrf_token(session, url)
+                self.edit_page(
+                    session, url, "Data:CapacityExchange/capacities.tab", "Updating data",
+                    json.dumps(output_capacities, indent=4), csrf_token
+                )
+                self.save_current_hash('capacities', current_capacities_hash)

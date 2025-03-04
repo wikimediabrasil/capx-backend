@@ -5,7 +5,7 @@ from django.utils import timezone
 from django.db.models.signals import post_save
 from orgs.models import Organization
 from skills.models import Skill
-from users.submodels import Territory, Language, WikimediaProject, Avatar
+from users.submodels import Territory, Language, WikimediaProject, Avatar, DataHash
 from django.core.validators import RegexValidator
 
 
