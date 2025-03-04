@@ -164,54 +164,51 @@ class CommandTestCase(TestCase):
         self.assertEqual(result, {'edit': {'result': 'Success'}})
 
     @patch('users.management.commands.export.requests.Session')
-    @patch('users.management.commands.export.Profile.objects.all')
-    @patch('users.management.commands.export.requests.get')
-    @patch('users.management.commands.export.Command.get_meta_wiki_users')
-    @patch('users.management.commands.export.Command.process_profiles')
-    @patch('users.management.commands.export.Command.create_output_users')
-    @patch('users.management.commands.export.Command.get_skill_dict')
-    @patch('users.management.commands.export.Command.get_sparql_query')
-    @patch('users.management.commands.export.Command.process_sparql_response')
-    @patch('users.management.commands.export.Command.create_output_capacities')
-    @patch('users.management.commands.export.Command.get_login_token')
-    @patch('users.management.commands.export.Command.login')
-    @patch('users.management.commands.export.Command.get_csrf_token')
-    @patch('users.management.commands.export.Command.edit_page')
-    def test_handle(
-        self, mock_edit_page, mock_get_csrf_token, mock_login, mock_get_login_token,
-        mock_create_output_capacities, mock_process_sparql_response, mock_get_sparql_query,
-        mock_get_skill_dict, mock_create_output_users, mock_process_profiles,
-        mock_get_meta_wiki_users, mock_requests_get, mock_profile_objects_all, mock_session
-    ):
-        # Mocking the return values
-        mock_profile_objects_all.return_value = []
-        mock_get_meta_wiki_users.return_value = ['TestUser1']
-        mock_process_profiles.return_value = ([], [])
-        mock_create_output_users.return_value = {}
-        mock_get_skill_dict.return_value = {}
-        mock_get_sparql_query.return_value = 'sparql_query'
-        mock_requests_get.return_value.json.return_value = {'results': {'bindings': []}}
-        mock_process_sparql_response.return_value = []
-        mock_create_output_capacities.return_value = {}
-        mock_get_login_token.return_value = 'test_login_token'
-        mock_login.return_value = {'login': {'result': 'Success'}}
-        mock_get_csrf_token.return_value = 'test_csrf_token'
-        mock_edit_page.return_value = {'edit': {'result': 'Success'}}
+    def test_handle(self, mock_session):
+        # Redirect stdout to suppress output during test
+        with patch('users.management.commands.export.Profile.objects.all') as mock_profile_objects_all, \
+             patch('users.management.commands.export.requests.get') as mock_requests_get, \
+             patch('users.management.commands.export.Command.get_meta_wiki_users') as mock_get_meta_wiki_users, \
+             patch('users.management.commands.export.Command.process_profiles') as mock_process_profiles, \
+             patch('users.management.commands.export.Command.create_output_users') as mock_create_output_users, \
+             patch('users.management.commands.export.Command.get_skill_dict') as mock_get_skill_dict, \
+             patch('users.management.commands.export.Command.get_sparql_query') as mock_get_sparql_query, \
+             patch('users.management.commands.export.Command.process_sparql_response') as mock_process_sparql_response, \
+             patch('users.management.commands.export.Command.create_output_capacities') as mock_create_output_capacities, \
+             patch('users.management.commands.export.Command.get_login_token') as mock_get_login_token, \
+             patch('users.management.commands.export.Command.login') as mock_login, \
+             patch('users.management.commands.export.Command.get_csrf_token') as mock_get_csrf_token, \
+             patch('users.management.commands.export.Command.edit_page') as mock_edit_page:
+            
+            # Mocking the return values
+            mock_profile_objects_all.return_value = []
+            mock_get_meta_wiki_users.return_value = ['TestUser1']
+            mock_process_profiles.return_value = ([], [])
+            mock_create_output_users.return_value = {}
+            mock_get_skill_dict.return_value = {}
+            mock_get_sparql_query.return_value = 'sparql_query'
+            mock_requests_get.return_value.json.return_value = {'results': {'bindings': []}}
+            mock_process_sparql_response.return_value = []
+            mock_create_output_capacities.return_value = {}
+            mock_get_login_token.return_value = 'test_login_token'
+            mock_login.return_value = {'login': {'result': 'Success'}}
+            mock_get_csrf_token.return_value = 'test_csrf_token'
+            mock_edit_page.return_value = {'edit': {'result': 'Success'}}
 
-        # Execute the handle method
-        self.command.handle()
+            # Execute the handle method
+            self.command.handle()
 
-        # Assertions to ensure each method was called
-        mock_profile_objects_all.assert_called_once()
-        mock_get_meta_wiki_users.assert_called_once()
-        mock_process_profiles.assert_called_once()
-        mock_create_output_users.assert_called_once()
-        mock_get_skill_dict.assert_called_once()
-        mock_get_sparql_query.assert_called_once()
-        mock_requests_get.assert_called_once()
-        mock_process_sparql_response.assert_called_once()
-        mock_create_output_capacities.assert_called_once()
-        mock_get_login_token.assert_called_once()
-        mock_login.assert_called_once()
-        mock_get_csrf_token.assert_called()
-        mock_edit_page.assert_called()
+            # Assertions to ensure each method was called
+            mock_profile_objects_all.assert_called_once()
+            mock_get_meta_wiki_users.assert_called_once()
+            mock_process_profiles.assert_called_once()
+            mock_create_output_users.assert_called_once()
+            mock_get_skill_dict.assert_called_once()
+            mock_get_sparql_query.assert_called_once()
+            mock_requests_get.assert_called_once()
+            mock_process_sparql_response.assert_called_once()
+            mock_create_output_capacities.assert_called_once()
+            mock_get_login_token.assert_called_once()
+            mock_login.assert_called_once()
+            mock_get_csrf_token.assert_called()
+            mock_edit_page.assert_called()

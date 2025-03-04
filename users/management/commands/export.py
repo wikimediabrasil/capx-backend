@@ -171,19 +171,16 @@ class Command(BaseCommand):
         session = requests.Session()
         url = "https://commons.wikimedia.org/w/api.php"
         login_token = self.get_login_token(session, url)
-        login = self.login(session, url, login_token)
-        self.stdout.write(str(login))
+        self.login(session, url, login_token)
 
         csrf_token = self.get_csrf_token(session, url)
-        edit_response_users = self.edit_page(
+        self.edit_page(
             session, url, "Data:CapacityExchange/users.tab", "Updating data",
             json.dumps(output_users, indent=4), csrf_token
         )
-        self.stdout.write(str(edit_response_users))
 
         csrf_token = self.get_csrf_token(session, url)
-        edit_response_capacities = self.edit_page(
+        self.edit_page(
             session, url, "Data:CapacityExchange/capacities.tab", "Updating data",
             json.dumps(output_capacities, indent=4), csrf_token
         )
-        self.stdout.write(str(edit_response_capacities))
