@@ -17,7 +17,7 @@ class Command(BaseCommand):
         query_params = {
             'action': 'query',
             'prop': 'transcludedin',
-            'pageids': '12493945',  # Template:CapXsupporter, for testing purposes
+            'pageids': '12993801',  # Template:CapacityExchange
             'tilimit': 'max',
             'tiprop': 'title',
             'tinamespace': '2',
