@@ -2,8 +2,8 @@ import secrets
 from django.test import TestCase
 from django.db import IntegrityError
 from django.core.exceptions import ValidationError
-from ..models import Territory, Language, WikimediaProject, Organization, CustomUser, \
-    Profile, LanguageProficiency, Avatar, DataHash
+from ..models import Territory, Language, WikimediaProject, Organization, CustomUser, DataHash, \
+    Profile, LanguageProficiency, Avatar
 
 
 class TerritoryModelTest(TestCase):
