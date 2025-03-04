@@ -2,8 +2,9 @@ import secrets
 from django.test import TestCase
 from django.db import IntegrityError
 from django.core.exceptions import ValidationError
-from ..models import Territory, Language, WikimediaProject, Organization, CustomUser, DataHash, \
-    Profile, LanguageProficiency, Avatar
+from django.db.models.signals import post_save
+from ..models import Territory, Language, WikimediaProject, Organization, CustomUser, \
+    Profile, LanguageProficiency, Avatar, create_user_profile, DataHash
 
 
 class TerritoryModelTest(TestCase):
@@ -103,6 +104,32 @@ class CustomUserModelTest(TestCase):
                 email="another@example.com",
                 password=str(secrets.randbits(16)),
             )
+
+    def test_pk_mismatch(self):
+        # Temporarily disconnect the signal
+        post_save.disconnect(create_user_profile, sender=CustomUser)
+        
+        CustomUser.objects.create_user(
+            username="Anthony",
+            email="",
+            password=str(secrets.randbits(16)),
+        )
+        user = CustomUser.objects.get(username="Anthony")
+        self.assertFalse(hasattr(user, 'profile'))
+        
+        # Reconnect the signal
+        post_save.connect(create_user_profile, sender=CustomUser)
+
+        CustomUser.objects.create_user(
+            username="Anthonie",
+            email="",
+            password=str(secrets.randbits(16)),
+        )
+        user = CustomUser.objects.get(username="Anthonie")
+        self.assertTrue(hasattr(user, 'profile'))
+        
+        # Assert that both profile and user have the same pk
+        self.assertEqual(user.pk, user.profile.pk)
 
 
 class ProfileModelTest(TestCase):
