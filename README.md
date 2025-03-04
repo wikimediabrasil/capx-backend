@@ -82,6 +82,8 @@ This will create a SQLite file in your source directory.
    SOCIAL_AUTH_MEDIAWIKI_KEY="<YOUR MEDIAWIKI OAUTH KEY>"
    SOCIAL_AUTH_MEDIAWIKI_SECRET="<YOUR MEDIAWIKI OAUTH SECRET>"
    SECRET_KEY="<CREATE YOUR OWN RANDOM KEY>"
+   CAPX_BOT_USERNAME="<YOUR BOT USERNAME>"
+   CAPX_BOT_PASSWORD="<YOUR BOT PASSWORD>"
    ```
 
 To create a new OAuth app and key, go to https://meta.wikimedia.org/wiki/Special:OAuthConsumerRegistration .  For local development, you can enable "This consumer is for use only by <your username>" and "User identify verification only".
