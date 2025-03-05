@@ -92,7 +92,7 @@ class AuthExtraInfo(models.Model):
 
 class DataHash(models.Model):
     data_type = models.CharField(max_length=50, unique=True)
-    hash_value = models.CharField(max_length=32)
+    hash_value = models.TextField()
     updated_at = models.DateTimeField(auto_now=True)
 
     def __str__(self):
