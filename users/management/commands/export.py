@@ -26,31 +26,61 @@ class Command(BaseCommand):
             'formatversion': '2',
         }
         response = requests.get('https://meta.wikimedia.org/w/api.php', params=query_params)
+        if self.verbosity >= 2:
+            self.stdout.write(f"Meta wiki users response: {response.json()}")
         return [page['title'][5:] for page in response.json()['query']['pages'][0]['transcludedin']]
 
     def process_profiles(self, profiles, meta_wiki_users):
         formatted_data = []
         skills = []
+        processed_usernames = set()
+        
+        # First pass - process regular usernames
         for profile in profiles:
-            if profile['user']['username'] not in meta_wiki_users:
-                continue
+            username = profile['user']['username']
+            if username in meta_wiki_users:
+                data = [
+                    username,
+                    self.format_list(profile['skills_known']),
+                    self.format_list(profile['skills_available']),
+                    self.format_list(profile['skills_wanted'])
+                ]
+                formatted_data.append(data)
+                processed_usernames.add(username)
 
-            data = [
-                profile['user']['username'],
-                self.format_list(profile['skills_known']),
-                self.format_list(profile['skills_available']),
-                self.format_list(profile['skills_wanted'])
-            ]
-            formatted_data.append(data)
+                skills.extend(profile['skills_known'])
+                skills.extend(profile['skills_available'])
+                skills.extend(profile['skills_wanted'])
+        
+        # Second pass - process alternative usernames if not already processed
+        for profile in profiles:
+            if 'wiki_alt' in profile and profile['wiki_alt'] and profile['wiki_alt'] in meta_wiki_users:
+                alt_username = profile['wiki_alt']
+                if alt_username not in processed_usernames:
+                    data = [
+                        alt_username,
+                        self.format_list(profile['skills_known']),
+                        self.format_list(profile['skills_available']),
+                        self.format_list(profile['skills_wanted'])
+                    ]
+                    formatted_data.append(data)
+                    processed_usernames.add(alt_username)
 
-            skills.extend(profile['skills_known'])
-            skills.extend(profile['skills_available'])
-            skills.extend(profile['skills_wanted'])
+                    skills.extend(profile['skills_known'])
+                    skills.extend(profile['skills_available'])
+                    skills.extend(profile['skills_wanted'])
+
+        if self.verbosity >= 2:
+            self.stdout.write(f"Processed profiles: {formatted_data}")
+            self.stdout.write(f"Skills: {skills}")
 
         return formatted_data, list(set(skills))
 
     def get_skill_dict(self, skills):
-        return {Skill.objects.get(id=skill).skill_wikidata_item: skill for skill in skills}
+        skill_dict = {Skill.objects.get(id=skill).skill_wikidata_item: skill for skill in skills}
+        if self.verbosity >= 2:
+            self.stdout.write(f"Skill dictionary: {skill_dict}")
+        return skill_dict
 
     def get_sparql_query(self, quids):
         query = """
@@ -61,7 +91,10 @@ class Command(BaseCommand):
         SERVICE wikibase:label { bd:serviceParam wikibase:language "en". }
         }
         """
-        return query % ' '.join([f'"{quid}"' for quid in quids])
+        sparql_query = query % ' '.join([f'"{quid}"' for quid in quids])
+        if self.verbosity >= 2:
+            self.stdout.write(f"SPARQL query: {sparql_query}")
+        return sparql_query
 
     def process_sparql_response(self, response, skill_dict):
         formatted_data = []
@@ -72,10 +105,12 @@ class Command(BaseCommand):
                 item['itemDescription']['value'] if 'itemDescription' in item else ''
             ]
             formatted_data.append(data)
+        if self.verbosity >= 2:
+            self.stdout.write(f"SPARQL response data: {formatted_data}")
         return formatted_data
 
     def create_output_users(self, formatted_data):
-        return {
+        output_users = {
             "license": "CC0-1.0",
             "description": {"en": "Users enrolled in the CapX platform"},
             "sources": "https://capx.toolforge.org",
@@ -89,9 +124,12 @@ class Command(BaseCommand):
             },
             "data": formatted_data,
         }
+        if self.verbosity >= 2:
+            self.stdout.write(f"Output users: {output_users}")
+        return output_users
 
     def create_output_capacities(self, formatted_data):
-        return {
+        output_capacities = {
             "license": "CC0-1.0",
             "description": {"en": "Capacities added in the CapX platform"},
             "sources": "https://capx.toolforge.org",
@@ -104,6 +142,9 @@ class Command(BaseCommand):
             },
             "data": formatted_data,
         }
+        if self.verbosity >= 2:
+            self.stdout.write(f"Output capacities: {output_capacities}")
+        return output_capacities
 
     def get_login_token(self, session, url):
         params = {
@@ -114,6 +155,8 @@ class Command(BaseCommand):
         }
         response = session.get(url=url, params=params)
         data = response.json()
+        if self.verbosity >= 2:
+            self.stdout.write(f"Login token response: {data}")
         return data['query']['tokens']['logintoken']
 
     def login(self, session, url, login_token):
@@ -127,7 +170,8 @@ class Command(BaseCommand):
         response = session.post(url, data=params).json()
         if response['login']['result'] != 'Success':
             raise requests.exceptions.RequestException("Login failed")
-
+        if self.verbosity >= 2:
+            self.stdout.write(f"Login response: {response}")
         return response
 
     def get_csrf_token(self, session, url):
@@ -138,6 +182,8 @@ class Command(BaseCommand):
         }
         response = session.get(url=url, params=params)
         data = response.json()
+        if self.verbosity >= 2:
+            self.stdout.write(f"CSRF token response: {data}")
         return data['query']['tokens']['csrftoken']
 
     def edit_page(self, session, url, title, summary, text, csrf_token):
@@ -150,16 +196,27 @@ class Command(BaseCommand):
             "minor": "1",
             "format": "json"
         }
+        if self.verbosity >= 2:
+            self.stdout.write(f"Editing page {title} with text: {text}")
+        
         response = session.post(url, data=params)
         return response.json()
 
     def hash_data(self, data):
-        return hashlib.sha256(json.dumps(data, sort_keys=True).encode('utf-8')).hexdigest()
+        hash_value = hashlib.sha256(json.dumps(data, sort_keys=True).encode('utf-8')).hexdigest()
+        if self.verbosity >= 2:
+            self.stdout.write(f"Hashed data: {hash_value}")
+        return hash_value
 
     def get_previous_hash(self, data_type):
         try:
-            return DataHash.objects.get(data_type=data_type).hash_value
+            hash_value = DataHash.objects.get(data_type=data_type).hash_value
+            if self.verbosity >= 2:
+                self.stdout.write(f"Previous hash for {data_type}: {hash_value}")
+            return hash_value
         except DataHash.DoesNotExist:
+            if self.verbosity >= 2:
+                self.stdout.write(f"No previous hash found for {data_type}")
             return None
 
     def save_current_hash(self, data_type, hash_value):
@@ -167,9 +224,12 @@ class Command(BaseCommand):
             data_type=data_type,
             defaults={'hash_value': hash_value}
         )
+        if self.verbosity >= 2:
+            self.stdout.write(f"Saved current hash for {data_type}: {hash_value}")
         return data_hash
         
     def handle(self, *args, **options):
+        self.verbosity = options.get('verbosity', 1)
         profile_serializer = ProfileSerializer(Profile.objects.all(), many=True)
         meta_wiki_users = self.get_meta_wiki_users()
         formatted_data, skills = self.process_profiles(profile_serializer.data, meta_wiki_users)
