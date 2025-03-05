@@ -1,13 +1,16 @@
 from django.test import TestCase
 from unittest.mock import patch, MagicMock
 from users.management.commands.export import Command
-from users.models import Profile
+from users.models import Profile, DataHash
 from skills.models import Skill
+from io import StringIO
+import hashlib, json
 
 class CommandTestCase(TestCase):
     def setUp(self):
         self.command = Command()
-        self.command.verbosity = 1
+        self.command.verbosity = 2
+        self.command.stdout = StringIO()
 
     @patch('users.management.commands.export.requests.get')
     def test_get_meta_wiki_users(self, mock_get):
@@ -33,12 +36,37 @@ class CommandTestCase(TestCase):
     def test_process_profiles(self, mock_profiles):
         mock_profiles.return_value = [
             {'user': {'username': 'TestUser1'}, 'skills_known': [1], 'skills_available': [2], 'skills_wanted': [3]},
-            {'user': {'username': 'TestUser2'}, 'skills_known': [4], 'skills_available': [5], 'skills_wanted': [6]}
+            {'user': {'username': 'TestUser2'}, 'skills_known': [4], 'skills_available': [5], 'skills_wanted': [6], 'wiki_alt': 'AltUser2'}
+        ]
+        meta_wiki_users = ['TestUser1', 'AltUser2']
+        formatted_data, skills = self.command.process_profiles(mock_profiles.return_value, meta_wiki_users)
+        self.assertEqual(formatted_data, [
+            ['TestUser1', '[1]', '[2]', '[3]'],
+            ['AltUser2', '[4]', '[5]', '[6]']
+        ])
+        self.assertEqual(set(skills), {1, 2, 3, 4, 5, 6})
+
+    @patch('users.management.commands.export.Profile.objects.all')
+    def test_process_profiles_no_meta_wiki_users(self, mock_profiles):
+        mock_profiles.return_value = [
+            {'user': {'username': 'TestUser1'}, 'skills_known': [1], 'skills_available': [2], 'skills_wanted': [3]},
+            {'user': {'username': 'TestUser2'}, 'skills_known': [4], 'skills_available': [5], 'skills_wanted': [6], 'wiki_alt': 'AltUser2'}
+        ]
+        meta_wiki_users = []
+        formatted_data, skills = self.command.process_profiles(mock_profiles.return_value, meta_wiki_users)
+        self.assertEqual(formatted_data, [])
+        self.assertEqual(skills, [])
+
+    @patch('users.management.commands.export.Profile.objects.all')
+    def test_process_profiles_partial_meta_wiki_users(self, mock_profiles):
+        mock_profiles.return_value = [
+            {'user': {'username': 'TestUser1'}, 'skills_known': [1], 'skills_available': [2], 'skills_wanted': [3]},
+            {'user': {'username': 'TestUser2'}, 'skills_known': [4], 'skills_available': [5], 'skills_wanted': [6], 'wiki_alt': 'AltUser2'}
         ]
         meta_wiki_users = ['TestUser1']
         formatted_data, skills = self.command.process_profiles(mock_profiles.return_value, meta_wiki_users)
         self.assertEqual(formatted_data, [['TestUser1', '[1]', '[2]', '[3]']])
-        self.assertEqual(skills, [1, 2, 3])
+        self.assertEqual(set(skills), {1, 2, 3})
 
     @patch('users.management.commands.export.Skill.objects.get')
     def test_get_skill_dict(self, mock_get):
@@ -163,6 +191,37 @@ class CommandTestCase(TestCase):
 
         result = self.command.edit_page(mock_session_instance, 'test_url', 'test_title', 'test_summary', 'test_text', 'test_csrf_token')
         self.assertEqual(result, {'edit': {'result': 'Success'}})
+
+    def test_hash_data(self):
+        data = {"data": [['TestUser1', '[1]', '[2]', '[3]']]}
+        expected_hash = hashlib.sha256(json.dumps(data, sort_keys=True).encode('utf-8')).hexdigest()
+        result = self.command.hash_data(data)
+        self.assertEqual(result, expected_hash)
+
+    @patch('users.management.commands.export.DataHash.objects.update_or_create')
+    def test_save_current_hash(self, mock_update_or_create):
+        data_type = 'users'
+        hash_value = 'test_hash_value'
+        mock_update_or_create.return_value = (MagicMock(), True)
+        self.command.save_current_hash(data_type, hash_value)
+        mock_update_or_create.assert_called_once_with(
+            data_type=data_type,
+            defaults={'hash_value': hash_value}
+        )
+
+    @patch('users.management.commands.export.DataHash.objects.get')
+    def test_get_previous_hash_exists(self, mock_get):
+        mock_get.return_value.hash_value = 'test_hash_value'
+        result = self.command.get_previous_hash('users')
+        self.assertEqual(result, 'test_hash_value')
+        mock_get.assert_called_once_with(data_type='users')
+
+    @patch('users.management.commands.export.DataHash.objects.get')
+    def test_get_previous_hash_does_not_exist(self, mock_get):
+        mock_get.side_effect = DataHash.DoesNotExist
+        result = self.command.get_previous_hash('users')
+        self.assertIsNone(result)
+        mock_get.assert_called_once_with(data_type='users')
 
     @patch('users.management.commands.export.requests.Session')
     def test_handle(self, mock_session):
