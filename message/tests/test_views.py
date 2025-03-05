@@ -23,8 +23,8 @@ class MessageViewTest(TestCase):
         )
         response = self.client.get('/messages/')
         self.assertEqual(response.status_code, status.HTTP_200_OK)
-        self.assertEqual(len(response.data), 1)
-        self.assertEqual(response.data[0]['message'], 'Sample message')
+        self.assertEqual(len(response.data['results']), 1)
+        self.assertEqual(response.data['results'][0]['message'], 'Sample message')
 
     @patch('message.models.MessageService.send_message', return_value=None)
     def test_create_message(self, mock_send_message):
@@ -106,8 +106,8 @@ class MessageViewTest(TestCase):
         self.client.force_authenticate(user=self.staff_user)
         response = self.client.get('/messages/')
         self.assertEqual(response.status_code, status.HTTP_200_OK)
-        self.assertEqual(len(response.data), 1)
-        self.assertEqual(response.data[0]['message'], 'Sample message')
+        self.assertEqual(len(response.data['results']), 1)
+        self.assertEqual(response.data['results'][0]['message'], 'Sample message')
 
     @patch('message.models.MessageService.send_message', return_value=None)
     def test_create_message_as_another_user(self, mock_send_message):

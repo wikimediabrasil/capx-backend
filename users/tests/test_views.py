@@ -24,7 +24,7 @@ class ProfileViewSetTestCase(TestCase):
 
         profiles = Profile.objects.all()
         serializer = ProfileSerializer(profiles, many=True)
-        self.assertEqual(response.data, serializer.data)
+        self.assertEqual(response.data['results'], serializer.data)
 
     def test_get_profile_detail(self):
         response = self.client.get('/profile/' + str(self.user.pk) + '/')
@@ -112,7 +112,7 @@ class ProfileViewSetTestCase(TestCase):
 
         profiles = Profile.objects.all()
         serializer = ProfileSerializer(profiles, many=True)
-        self.assertEqual(response.data, serializer.data)
+        self.assertEqual(response.data['results'], serializer.data)
 
     def test_update_language_proficiency(self):
         language = Language.objects.create(language_name="Spanish", language_code="es")

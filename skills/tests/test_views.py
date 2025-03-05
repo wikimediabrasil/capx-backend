@@ -22,7 +22,7 @@ class SkillViewSetTestCase(TestCase):
         response = self.client.get('/skill/')
         skills = Skill.objects.all()
         serializer = SkillSerializer(skills, many=True)
-        self.assertEqual(response.data, serializer.data)
+        self.assertEqual(response.data['results'], serializer.data)
 
     def test_get_skill_detail(self):
         response = self.client.get('/skill/1/')

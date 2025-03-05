@@ -109,7 +109,7 @@ class AttachmentViewSetTestCase(APITestCase):
     def test_attachment_list(self):
         response = self.client.get('/attachment/')
         self.assertEqual(response.status_code, status.HTTP_200_OK)
-        self.assertEqual(len(response.data), 1)
+        self.assertEqual(len(response.data['results']), 1)
 
     def test_attachment_list_staff(self):
         self.user.is_staff = True
