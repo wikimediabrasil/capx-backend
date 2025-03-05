@@ -37,6 +37,8 @@ jobs:
         echo "SOCIAL_AUTH_MEDIAWIKI_KEY = 'key'" >> CapX/settings_local.py
         echo "SOCIAL_AUTH_MEDIAWIKI_URL = 'https://localhost:8000/w/api.php'" >> CapX/settings_local.py
         echo "SOCIAL_AUTH_MEDIAWIKI_SECRET = 'text'" >> CapX/settings_local.py
+        echo "CAPX_BOT_USERNAME = 'CapXBot'" >> CapX/settings_local.py
+        echo "CAPX_BOT_PASSWORD = 'password'" >> CapX/settings_local.py
         echo "EMAIL_HOST = 'localhost'" >> CapX/settings_local.py
         echo "EMAIL_PORT = 25" >> CapX/settings_local.py
         echo "SERVER_EMAIL = 'root@localhost'" >> CapX/settings_local.py

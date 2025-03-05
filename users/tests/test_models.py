@@ -4,7 +4,7 @@ from django.db import IntegrityError
 from django.core.exceptions import ValidationError
 from django.db.models.signals import post_save
 from ..models import Territory, Language, WikimediaProject, Organization, CustomUser, \
-    Profile, LanguageProficiency, Avatar, create_user_profile
+    Profile, LanguageProficiency, Avatar, create_user_profile, DataHash
 
 
 class TerritoryModelTest(TestCase):
@@ -214,3 +214,10 @@ class ProfileModelTest(TestCase):
 
         with self.assertRaises(IntegrityError):
             LanguageProficiency.objects.create(profile=profile, language=language, proficiency='4')
+
+    def test_datahash_str_method(self):
+        data_hash = DataHash.objects.create(
+            data_type="test",
+            hash_value="1234567890",
+        )
+        self.assertEqual(str(data_hash), "test: 1234567890")
