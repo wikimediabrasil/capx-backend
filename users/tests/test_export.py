@@ -7,6 +7,7 @@ from skills.models import Skill
 class CommandTestCase(TestCase):
     def setUp(self):
         self.command = Command()
+        self.command.verbosity = 1
 
     @patch('users.management.commands.export.requests.get')
     def test_get_meta_wiki_users(self, mock_get):
