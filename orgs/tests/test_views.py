@@ -65,7 +65,7 @@ class OrganizationViewSetTestCase(APITestCase):
         )
         organization.territory.set([Territory.objects.get(pk=1)])
         response = self.client.get('/organizations/')
-        self.assertEqual(len(response.data), 0)
+        self.assertEqual(len(response.data['results']), 0)
 
         Organization.objects.create(
             display_name='New Organization 2',
@@ -75,7 +75,7 @@ class OrganizationViewSetTestCase(APITestCase):
         organization.territory.set([Territory.objects.get(pk=1)])
         organization.managers.set([self.user])
         response = self.client.get('/organizations/')
-        self.assertEqual(len(response.data), 1)
+        self.assertEqual(len(response.data['results']), 1)
 
 
     def test_list_orgs_staff(self):
@@ -83,7 +83,7 @@ class OrganizationViewSetTestCase(APITestCase):
         self.client.force_authenticate(self.user)
         response = self.client.get('/organizations/')
         self.assertEqual(response.status_code, status.HTTP_200_OK)
-        self.assertEqual(len(response.data), 0)
+        self.assertEqual(len(response.data['results']), 0)
 
         org_data = {
             'display_name': 'New Organization',
@@ -93,7 +93,7 @@ class OrganizationViewSetTestCase(APITestCase):
         }
         self.client.post('/organizations/', org_data)
         response = self.client.get('/organizations/')
-        self.assertEqual(len(response.data), 1)
+        self.assertEqual(len(response.data['results']), 1)
 
     def test_retrieve_org(self):
         self.client.force_authenticate(self.user)
@@ -209,7 +209,7 @@ class OrganizationViewSetTestCase(APITestCase):
 
         TagDiff.objects.create(tag='Tag 1')
         response = self.client.get('/tag_diff/')
-        self.assertEqual(len(response.data), 1)
+        self.assertEqual(len(response.data['results']), 1)
 
     def test_create_tagdiff(self):
         self.client.force_authenticate(self.user)

@@ -155,6 +155,8 @@ REST_FRAMEWORK = {
     ],
     'DEFAULT_METADATA_CLASS': 'CapX.metadata.CustomMetadata',
     'DEFAULT_SCHEMA_CLASS': 'drf_spectacular.openapi.AutoSchema',
+    'DEFAULT_PAGINATION_CLASS': 'rest_framework.pagination.LimitOffsetPagination',
+    'PAGE_SIZE': 50,
 }
 REST_AUTH_SERIALIZERS = {
     "TOKEN_SERIALIZER": "users.serializers.KnoxSerializer",
