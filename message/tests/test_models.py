@@ -13,6 +13,7 @@ class TestMessageModel(TestCase):
     def test_message_creation(self, mock_send_message):
         message = Message.objects.create(
             message='Sample message',
+            subject='Sample subject',
             sender=self.user,
             receiver='receiver',
             method='email'
@@ -31,6 +32,7 @@ class TestMessageModel(TestCase):
     def test_message_str(self, mock_send_message):
         message = Message.objects.create(
             message='Sample message',
+            subject='Sample subject',
             sender=self.user,
             receiver='receiver',
             method='email'
