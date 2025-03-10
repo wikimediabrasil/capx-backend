@@ -8,6 +8,7 @@ class MessageSerializer(serializers.ModelSerializer):
         fields = [
             'id',
             'message',
+            'subject',
             'receiver',
             'method',
             'status',

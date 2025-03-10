@@ -17,6 +17,7 @@ class MessageViewTest(TestCase):
     def test_list_messages(self, mock_send_message):
         Message.objects.create(
             message='Sample message',
+            subject='Sample subject',
             sender=self.user,
             receiver='receiver',
             method='email'
@@ -30,6 +31,7 @@ class MessageViewTest(TestCase):
     def test_create_message(self, mock_send_message):
         response = self.client.post('/messages/', {
             'message': 'Sample message',
+            'subject': 'Sample subject',
             'receiver': 'receiver',
             'method': 'email'
         })
@@ -41,12 +43,14 @@ class MessageViewTest(TestCase):
     def test_update_message(self, mock_send_message):
         message = Message.objects.create(
             message='Sample message',
+            subject='Sample subject',
             sender=self.user,
             receiver='receiver',
             method='email'
         )
         response = self.client.put(f'/messages/{message.id}/', {
             'message': 'Updated message',
+            'subject': 'Updated subject',
             'receiver': 'receiver',
             'method': 'email'
         })
@@ -57,6 +61,7 @@ class MessageViewTest(TestCase):
     def test_delete_message(self, mock_send_message):
         message = Message.objects.create(
             message='Sample message',
+            subject='Sample subject',
             sender=self.user,
             receiver='receiver',
             method='email'
@@ -70,6 +75,7 @@ class MessageViewTest(TestCase):
     def test_partial_update_message(self, mock_send_message):
         message = Message.objects.create(
             message='Sample message',
+            subject='Sample subject',
             sender=self.user,
             receiver='receiver',
             method='email'
@@ -84,6 +90,7 @@ class MessageViewTest(TestCase):
     def test_retrieve_message(self, mock_send_message):
         message = Message.objects.create(
             message='Sample message',
+            subject='Sample subject',
             sender=self.user,
             receiver='receiver',
             method='email'
@@ -99,6 +106,7 @@ class MessageViewTest(TestCase):
     def test_list_messages_staff(self, mock_send_message):
         Message.objects.create(
             message='Sample message',
+            subject='Sample subject',
             sender=self.user,
             receiver='receiver',
             method='email'
@@ -114,6 +122,7 @@ class MessageViewTest(TestCase):
         self.client.force_authenticate(user=self.staff_user)
         response = self.client.post('/messages/', {
             'message': 'Sample message',
+            'subject': 'Sample subject',
             'receiver': 'receiver',
             'sender': self.user.id,
             'method': 'email'
