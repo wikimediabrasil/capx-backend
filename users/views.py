@@ -7,6 +7,7 @@ from projects.models import Project
 from rest_framework import status, viewsets, filters
 from rest_framework.response import Response
 from django.shortcuts import get_object_or_404
+from django_filters.rest_framework import DjangoFilterBackend
 from drf_spectacular.utils import extend_schema, extend_schema_view, OpenApiParameter, OpenApiTypes, OpenApiExample, OpenApiResponse
 
 
@@ -20,19 +21,21 @@ from drf_spectacular.utils import extend_schema, extend_schema_view, OpenApiPara
         description='This endpoint retrieves a user by their ID.',
     ),
 )
-class UsersViewSet(viewsets.ModelViewSet):
+class UsersViewSet(viewsets.ReadOnlyModelViewSet):
     serializer_class = ProfileSerializer
     queryset = Profile.objects.all()
-    filter_backends = [filters.SearchFilter]
-    search_fields = ['user__username', 'user__email', 'display_name', 'about']
-    http_method_names = ['get', 'head', 'options']
-
-    def get_queryset(self):
-        queryset = Profile.objects.all()
-        username = self.request.query_params.get('username', None)
-        if username is not None:
-            queryset = queryset.filter(user__username=username)
-        return queryset
+    filter_backends = [DjangoFilterBackend]
+    filterset_fields = [
+        'user__username',
+        'about',
+        'territory',
+        'wikimedia_project',
+        'affiliation',
+        'languageproficiency__language',
+        'skills_known',
+        'skills_available',
+        'skills_wanted'
+    ]
 
 @extend_schema_view(
     list=extend_schema(
