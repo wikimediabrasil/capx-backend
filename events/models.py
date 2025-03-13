@@ -38,12 +38,6 @@ class Events(models.Model):
         verbose_name="Event URL",
         help_text="URL of the event."
     )
-    wikilearn_id = models.CharField(
-        max_length=100,
-        blank=True,
-        verbose_name="Wikilearn ID",
-        help_text="Wikilearn ID of the event.",
-    )
     wikidata_qid = models.CharField(
         max_length=10,
         blank=True,
@@ -57,10 +51,10 @@ class Events(models.Model):
     image_url = models.URLField(
         blank=True, 
         verbose_name="Image URL",
-        help_text="URL of the event image on Wikimedia Commons.",
+        help_text="URL of the event image on Wikimedia Commons or Learn Wiki.",
         validators=[RegexValidator(
-            regex=r'^https://commons\.wikimedia\.org/wiki/File:.+$',
-            message="Invalid Wikimedia Commons URL format. The format should be https://commons.wikimedia.org/wiki/File:Example.jpg"
+            regex=r'^(https://commons\.wikimedia\.org/wiki/File:.+|https://learn\.wiki/asset.+)$',
+            message="Invalid URL format. The format should be https://commons.wikimedia.org/wiki/File:Example.jpg or https://learn.wiki/asset..."
         )]
     )
     time_begin = models.DateTimeField(
@@ -112,29 +106,6 @@ class Events(models.Model):
 
     def __str__(self):
         return self.name
-
-    def clean(self):
-        super().clean()
-
-        if self.wikilearn_id:
-            api_url = f"https://learn.wiki/api/courses/v1/courses/{self.wikilearn_id}"
-            response = requests.get(api_url)
-            if response.status_code != 200:
-                raise ConnectionError("Wikilearn service is not available.")
-
-            data = response.json()
-            
-            if not data.get("id"):
-                raise ValueError("Invalid Wikilearn ID.")
-
-            self.name = data.get("name")
-            self.time_begin = data.get("start")
-            self.time_end = data.get("end") if data.get("end") else ""
-            self.url = f"https://learn.wiki/courses/{self.wikilearn_id}/about"
-
-    def save(self, *args, **kwargs):
-        self.clean()
-        super().save(*args, **kwargs)
 
     
 class EventParticipant(models.Model):
