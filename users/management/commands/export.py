@@ -43,14 +43,12 @@ class Command(BaseCommand):
                     username,
                     self.format_list(profile['skills_known']),
                     self.format_list(profile['skills_available']),
-                    self.format_list(profile['skills_wanted'])
                 ]
                 formatted_data.append(data)
                 processed_usernames.add(username)
 
                 skills.extend(profile['skills_known'])
                 skills.extend(profile['skills_available'])
-                skills.extend(profile['skills_wanted'])
         
         # Second pass - process alternative usernames if not already processed
         for profile in profiles:
@@ -61,15 +59,25 @@ class Command(BaseCommand):
                         alt_username,
                         self.format_list(profile['skills_known']),
                         self.format_list(profile['skills_available']),
-                        self.format_list(profile['skills_wanted'])
                     ]
                     formatted_data.append(data)
                     processed_usernames.add(alt_username)
 
                     skills.extend(profile['skills_known'])
                     skills.extend(profile['skills_available'])
-                    skills.extend(profile['skills_wanted'])
 
+        # Get badges from Wikilearn
+        for profile in formatted_data:
+            api = f"https://learn.wiki/api/badges/v1/assertions/user/{profile[0]}/"
+            response = requests.get(api)
+            if response.status_code == 200:
+                response_data = response.json()
+                data = [f"{badge['badge_class']['display_name']}§{badge['badge_class']['course_id']}§{badge['assertion_url']}" for badge in response_data.get('results')]
+            else:
+                data = ''
+            
+            profile.append(data)
+        
         if self.verbosity >= 2:
             self.stdout.write(f"Processed profiles: {formatted_data}")
             self.stdout.write(f"Skills: {skills}")
@@ -119,7 +127,7 @@ class Command(BaseCommand):
                     {"name": "username", "type": "string"},
                     {"name": "skills_known", "type": "string"},
                     {"name": "skills_available", "type": "string"},
-                    {"name": "skills_wanted", "type": "string"}
+                    {"name": "badges", "type": "string"}
                 ],
             },
             "data": formatted_data,
