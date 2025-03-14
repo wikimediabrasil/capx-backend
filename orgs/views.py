@@ -3,6 +3,7 @@ from rest_framework.response import Response
 from .models import Organization, OrganizationType, TagDiff, Document
 from .serializers import OrganizationSerializer, OrganizationTypeSerializer, TagDiffSerializer, DocumentSerializer
 from users.models import CustomUser as User, Territory
+from django_filters.rest_framework import DjangoFilterBackend
 from drf_spectacular.utils import extend_schema, extend_schema_view, OpenApiParameter
 
 @extend_schema_view(
@@ -22,6 +23,18 @@ from drf_spectacular.utils import extend_schema, extend_schema_view, OpenApiPara
 class OrganizationViewSet(viewsets.ModelViewSet):
     queryset = Organization.objects.all()
     serializer_class = OrganizationSerializer
+    filter_backends = [DjangoFilterBackend]
+    filterset_fields = [
+        'display_name',
+        'acronym',
+        'type',
+        'territory',
+        'managers',
+        'known_capacities',
+        'available_capacities',
+        'wanted_capacities',
+    ]
+
 
     def get_queryset(self):
         user = self.request.user

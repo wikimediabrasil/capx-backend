@@ -71,7 +71,7 @@ class MessageService:
         params = {
             'action': 'emailuser',
             'target': instance.receiver,
-            'subject': instance.sender.username + ' @ Capacity Exchange',
+            'subject': '[Capacity Exchange] ' + instance.subject,
             'text': instance.message,
             'ccme': '1',
             'format': 'json',
@@ -86,7 +86,7 @@ class MessageService:
             'action': 'edit',
             'title': f'User talk:{instance.receiver}',
             'section': 'new',
-            'sectiontitle': instance.sender.username + ' @ Capacity Exchange',
+            'sectiontitle': '[Capacity Exchange] ' + instance.subject,
             'text': instance.message + '\n\n--~~~~',
             'format': 'json',
             'token': token,

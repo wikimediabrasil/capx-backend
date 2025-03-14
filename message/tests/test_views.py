@@ -17,19 +17,21 @@ class MessageViewTest(TestCase):
     def test_list_messages(self, mock_send_message):
         Message.objects.create(
             message='Sample message',
+            subject='Sample subject',
             sender=self.user,
             receiver='receiver',
             method='email'
         )
         response = self.client.get('/messages/')
         self.assertEqual(response.status_code, status.HTTP_200_OK)
-        self.assertEqual(len(response.data), 1)
-        self.assertEqual(response.data[0]['message'], 'Sample message')
+        self.assertEqual(len(response.data['results']), 1)
+        self.assertEqual(response.data['results'][0]['message'], 'Sample message')
 
     @patch('message.models.MessageService.send_message', return_value=None)
     def test_create_message(self, mock_send_message):
         response = self.client.post('/messages/', {
             'message': 'Sample message',
+            'subject': 'Sample subject',
             'receiver': 'receiver',
             'method': 'email'
         })
@@ -41,12 +43,14 @@ class MessageViewTest(TestCase):
     def test_update_message(self, mock_send_message):
         message = Message.objects.create(
             message='Sample message',
+            subject='Sample subject',
             sender=self.user,
             receiver='receiver',
             method='email'
         )
         response = self.client.put(f'/messages/{message.id}/', {
             'message': 'Updated message',
+            'subject': 'Updated subject',
             'receiver': 'receiver',
             'method': 'email'
         })
@@ -57,6 +61,7 @@ class MessageViewTest(TestCase):
     def test_delete_message(self, mock_send_message):
         message = Message.objects.create(
             message='Sample message',
+            subject='Sample subject',
             sender=self.user,
             receiver='receiver',
             method='email'
@@ -70,6 +75,7 @@ class MessageViewTest(TestCase):
     def test_partial_update_message(self, mock_send_message):
         message = Message.objects.create(
             message='Sample message',
+            subject='Sample subject',
             sender=self.user,
             receiver='receiver',
             method='email'
@@ -84,6 +90,7 @@ class MessageViewTest(TestCase):
     def test_retrieve_message(self, mock_send_message):
         message = Message.objects.create(
             message='Sample message',
+            subject='Sample subject',
             sender=self.user,
             receiver='receiver',
             method='email'
@@ -99,6 +106,7 @@ class MessageViewTest(TestCase):
     def test_list_messages_staff(self, mock_send_message):
         Message.objects.create(
             message='Sample message',
+            subject='Sample subject',
             sender=self.user,
             receiver='receiver',
             method='email'
@@ -106,14 +114,15 @@ class MessageViewTest(TestCase):
         self.client.force_authenticate(user=self.staff_user)
         response = self.client.get('/messages/')
         self.assertEqual(response.status_code, status.HTTP_200_OK)
-        self.assertEqual(len(response.data), 1)
-        self.assertEqual(response.data[0]['message'], 'Sample message')
+        self.assertEqual(len(response.data['results']), 1)
+        self.assertEqual(response.data['results'][0]['message'], 'Sample message')
 
     @patch('message.models.MessageService.send_message', return_value=None)
     def test_create_message_as_another_user(self, mock_send_message):
         self.client.force_authenticate(user=self.staff_user)
         response = self.client.post('/messages/', {
             'message': 'Sample message',
+            'subject': 'Sample subject',
             'receiver': 'receiver',
             'sender': self.user.id,
             'method': 'email'

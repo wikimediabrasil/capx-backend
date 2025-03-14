@@ -14,6 +14,7 @@ class MessageServiceTest(TestCase):
             sender=self.sender,
             receiver=self.receiver,
             message='Test message',
+            subject='Test subject',
             method='email'
         )
         self.user_social_auth = UserSocialAuth.objects.create(

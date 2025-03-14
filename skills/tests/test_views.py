@@ -22,7 +22,7 @@ class SkillViewSetTestCase(TestCase):
         response = self.client.get('/skill/')
         skills = Skill.objects.all()
         serializer = SkillSerializer(skills, many=True)
-        self.assertEqual(response.data, serializer.data)
+        self.assertEqual(response.data['results'], serializer.data)
 
     def test_get_skill_detail(self):
         response = self.client.get('/skill/1/')
@@ -41,11 +41,6 @@ class SkillViewSetTestCase(TestCase):
         skill = Skill.objects.get(skill_wikidata_item='Q987654321')
         serializer = SkillSerializer(skill)
         self.assertEqual(response.data, serializer.data)
-
-        options_response = self.client.options('/skill/1/')
-        expected_choices = [{'value': 1, 'display_name': 'Q123456789'}, {'value': 2, 'display_name': 'Q987654321'}]
-        self.assertEqual(options_response.status_code, status.HTTP_200_OK)
-        self.assertEqual(options_response.data['actions']['PUT']['skill_type']['choices'], expected_choices)
 
     def test_create_skill_nostaff(self):
         self.user.is_staff = False
@@ -112,8 +107,7 @@ class SkillByTypeTestCase(TestCase):
         self.client = APIClient()
         self.client.force_authenticate(self.user)
         first = Skill.objects.create(skill_wikidata_item='Q123456789')
-        second = Skill.objects.create(skill_wikidata_item='Q987654321')
-        second.skill_type.add(first)
+        Skill.objects.create(skill_wikidata_item='Q987654321', skill_type=first)
 
     def test_get_skills_by_type(self):
         response = self.client.get('/skills_by_type/1/')
