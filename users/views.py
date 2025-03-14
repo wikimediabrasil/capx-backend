@@ -50,7 +50,7 @@ from drf_spectacular.utils import extend_schema, extend_schema_view, OpenApiPara
 class UsersViewSet(viewsets.ReadOnlyModelViewSet):
     serializer_class = ProfileSerializer
     queryset = Profile.objects.all()
-    filter_backends = [DjangoFilterBackend, filters.SearchFilter]
+    filter_backends = [DjangoFilterBackend]
     filterset_fields = [
         'user__username',
         'about',
