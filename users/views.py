@@ -6,6 +6,7 @@ from events.models import Events
 from projects.models import Project
 from rest_framework import status, viewsets, filters
 from rest_framework.response import Response
+from django.db import models
 from django.shortcuts import get_object_or_404
 from django_filters.rest_framework import DjangoFilterBackend
 from drf_spectacular.utils import extend_schema, extend_schema_view, OpenApiParameter, OpenApiTypes, OpenApiExample, OpenApiResponse

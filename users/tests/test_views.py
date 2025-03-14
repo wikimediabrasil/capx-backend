@@ -499,4 +499,66 @@ class UsersByTagTestCase(TestCase):
                 'profile_image': profile['profile_image']
             } for profile in serializer_data
         ]
-        self.assertEqual(response_data, simplified_serializer_data)    
+        self.assertEqual(response_data, simplified_serializer_data)
+
+class UsersFilterTestCase(TestCase):
+    def setUp(self):
+        self.user = CustomUser.objects.create_user(username='test', password=str(secrets.randbits(16)))
+        self.client = APIClient()
+        self.client.force_authenticate(self.user)
+
+    def test_get_queryset_has_skills_known_true(self):
+        skill = Skill.objects.create(skill_wikidata_item="Q123456789")
+        profile = Profile.objects.get(user=self.user)
+        profile.skills_known.add(skill)
+
+        response = self.client.get('/users/', {'has_skills_known': 'true'})
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(len(response.data['results']), 1)
+
+    def test_get_queryset_has_skills_known_false(self):
+        response = self.client.get('/users/', {'has_skills_known': 'false'})
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(len(response.data['results']), 1)
+
+    def test_get_queryset_has_skills_available_true(self):
+        skill = Skill.objects.create(skill_wikidata_item="Q123456789")
+        profile = Profile.objects.get(user=self.user)
+        profile.skills_available.add(skill)
+
+        response = self.client.get('/users/', {'has_skills_available': 'true'})
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(len(response.data['results']), 1)
+
+    def test_get_queryset_has_skills_available_false(self):
+        response = self.client.get('/users/', {'has_skills_available': 'false'})
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(len(response.data['results']), 1)
+
+    def test_get_queryset_has_skills_wanted_true(self):
+        skill = Skill.objects.create(skill_wikidata_item="Q123456789")
+        profile = Profile.objects.get(user=self.user)
+        profile.skills_wanted.add(skill)
+
+        response = self.client.get('/users/', {'has_skills_wanted': 'true'})
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(len(response.data['results']), 1)
+
+    def test_get_queryset_has_skills_wanted_false(self):
+        response = self.client.get('/users/', {'has_skills_wanted': 'false'})
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(len(response.data['results']), 1)
+
+    def test_get_queryset_has_any_skills_true(self):
+        skill = Skill.objects.create(skill_wikidata_item="Q123456789")
+        profile = Profile.objects.get(user=self.user)
+        profile.skills_known.add(skill)
+
+        response = self.client.get('/users/', {'has_any_skills': 'true'})
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(len(response.data['results']), 1)
+
+    def test_get_queryset_has_any_skills_false(self):
+        response = self.client.get('/users/', {'has_any_skills': 'false'})
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(len(response.data['results']), 1)
