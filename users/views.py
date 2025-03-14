@@ -6,6 +6,7 @@ from events.models import Events
 from projects.models import Project
 from rest_framework import status, viewsets, filters
 from rest_framework.response import Response
+from django.db import models
 from django.shortcuts import get_object_or_404
 from django_filters.rest_framework import DjangoFilterBackend
 from drf_spectacular.utils import extend_schema, extend_schema_view, OpenApiParameter, OpenApiTypes, OpenApiExample, OpenApiResponse
@@ -15,6 +16,32 @@ from drf_spectacular.utils import extend_schema, extend_schema_view, OpenApiPara
     list=extend_schema(
         summary='List all users.',
         description='This endpoint lists all users.',
+        parameters=[
+            OpenApiParameter(
+                name='has_skills_known',
+                description='Filter users by whether they have known skills.',
+                required=False,
+                type=OpenApiTypes.BOOL,
+            ),
+            OpenApiParameter(
+                name='has_skills_available',
+                description='Filter users by whether they have available skills.',
+                required=False,
+                type=OpenApiTypes.BOOL,
+            ),
+            OpenApiParameter(
+                name='has_skills_wanted',
+                description='Filter users by whether they have wanted skills.',
+                required=False,
+                type=OpenApiTypes.BOOL,
+            ),
+            OpenApiParameter(
+                name='has_any_skills',
+                description='Filter users by whether they have any skills.',
+                required=False,
+                type=OpenApiTypes.BOOL,
+            ),
+        ],
     ),
     retrieve=extend_schema(
         summary='Retrieve a user by ID.',
@@ -36,6 +63,48 @@ class UsersViewSet(viewsets.ReadOnlyModelViewSet):
         'skills_available',
         'skills_wanted'
     ]
+
+
+    def get_queryset(self):
+        queryset = super().get_queryset()
+        has_skills_known = self.request.query_params.get('has_skills_known')
+        has_skills_available = self.request.query_params.get('has_skills_available')
+        has_skills_wanted = self.request.query_params.get('has_skills_wanted')
+        has_any_skills = self.request.query_params.get('has_any_skills')
+
+        if has_skills_known is not None:
+            if has_skills_known.lower() == 'true':
+                queryset = queryset.filter(skills_known__isnull=False).distinct()
+            elif has_skills_known.lower() == 'false':
+                queryset = queryset.filter(skills_known__isnull=True).distinct()
+
+        if has_skills_available is not None:
+            if has_skills_available.lower() == 'true':
+                queryset = queryset.filter(skills_available__isnull=False).distinct()
+            elif has_skills_available.lower() == 'false':
+                queryset = queryset.filter(skills_available__isnull=True).distinct()
+
+        if has_skills_wanted is not None:
+            if has_skills_wanted.lower() == 'true':
+                queryset = queryset.filter(skills_wanted__isnull=False).distinct()
+            elif has_skills_wanted.lower() == 'false':
+                queryset = queryset.filter(skills_wanted__isnull=True).distinct()
+
+        if has_any_skills is not None:
+            if has_any_skills.lower() == 'true':
+                queryset = queryset.filter(
+                    models.Q(skills_known__isnull=False) |
+                    models.Q(skills_available__isnull=False) |
+                    models.Q(skills_wanted__isnull=False)
+                ).distinct()
+            elif has_any_skills.lower() == 'false':
+                queryset = queryset.filter(
+                    models.Q(skills_known__isnull=True) &
+                    models.Q(skills_available__isnull=True) &
+                    models.Q(skills_wanted__isnull=True)
+                ).distinct()
+
+        return queryset
 
 @extend_schema_view(
     list=extend_schema(
