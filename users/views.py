@@ -69,6 +69,7 @@ class UsersViewSet(viewsets.ReadOnlyModelViewSet):
         has_skills_known = self.request.query_params.get('has_skills_known')
         has_skills_available = self.request.query_params.get('has_skills_available')
         has_skills_wanted = self.request.query_params.get('has_skills_wanted')
+        has_any_skills = self.request.query_params.get('has_any_skills')
 
         if has_skills_known is not None:
             if has_skills_known.lower() == 'true':
