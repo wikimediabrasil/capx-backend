@@ -4,12 +4,39 @@ from .models import Organization, OrganizationType, TagDiff, Document
 from .serializers import OrganizationSerializer, OrganizationTypeSerializer, TagDiffSerializer, DocumentSerializer
 from users.models import CustomUser as User, Territory
 from django_filters.rest_framework import DjangoFilterBackend
-from drf_spectacular.utils import extend_schema, extend_schema_view, OpenApiParameter
+from drf_spectacular.utils import extend_schema, extend_schema_view, OpenApiParameter, OpenApiTypes
+from django.db import models
 
 @extend_schema_view(
     list=extend_schema(
         summary='List all organizations.',
         description='This endpoint lists all organizations that has been activated (i.e. has at least one manager). If the user is a staff member, all organizations are listed.',
+        parameters=[
+            OpenApiParameter(
+                name='has_capacities_known',
+                description='Filter organizations that have known capacities.',
+                required=False,
+                type=OpenApiTypes.BOOL,
+            ),
+            OpenApiParameter(
+                name='has_capacities_available',
+                description='Filter organizations that have available capacities.',
+                required=False,
+                type=OpenApiTypes.BOOL,
+            ),
+            OpenApiParameter(
+                name='has_capacities_wanted',
+                description='Filter organizations that have wanted capacities.',
+                required=False,
+                type=OpenApiTypes.BOOL,
+            ),
+            OpenApiParameter(
+                name='has_any_capacities',
+                description='Filter organizations that have any capacities.',
+                required=False,
+                type=OpenApiTypes.BOOL,
+            ),
+        ]
     ),
     create=extend_schema(
         summary='Create a new organization.',
@@ -37,13 +64,52 @@ class OrganizationViewSet(viewsets.ModelViewSet):
 
 
     def get_queryset(self):
+        has_capacities_known = self.request.query_params.get('has_capacities_known', None)
+        has_capacities_wanted = self.request.query_params.get('has_capacities_wanted', None)
+        has_capacities_available = self.request.query_params.get('has_capacities_available', None)
+        has_any_capacities = self.request.query_params.get('has_any_capacities', None)
+
         user = self.request.user
         if user.is_staff:
-            return Organization.objects.all()
+            queryset = Organization.objects.all()
         else:
             # Filter organizations that have at least one manager and ensure distinct results
-            active_organizations = Organization.objects.filter(managers__isnull=False).distinct()
-            return active_organizations
+            queryset = Organization.objects.filter(managers__isnull=False).distinct()
+        
+        if has_capacities_known is not None:
+            if has_capacities_known.lower() == 'true':
+                queryset = queryset.filter(known_capacities__isnull=False).distinct()
+            elif has_capacities_known.lower() == 'false':
+                queryset = queryset.filter(known_capacities__isnull=True).distinct()
+
+        if has_capacities_wanted is not None:
+            if has_capacities_wanted.lower() == 'true':
+                queryset = queryset.filter(wanted_capacities__isnull=False).distinct()
+            elif has_capacities_wanted.lower() == 'false':
+                queryset = queryset.filter(wanted_capacities__isnull=True).distinct()
+
+        if has_capacities_available is not None:
+            if has_capacities_available.lower() == 'true':
+                queryset = queryset.filter(available_capacities__isnull=False).distinct()
+            elif has_capacities_available.lower() == 'false':
+                queryset = queryset.filter(available_capacities__isnull=True).distinct()
+
+        if has_any_capacities is not None:
+            if has_any_capacities.lower() == 'true':
+                queryset = queryset.filter(
+                    models.Q(known_capacities__isnull=False) |
+                    models.Q(available_capacities__isnull=False) |
+                    models.Q(wanted_capacities__isnull=False)
+                ).distinct()
+            elif has_any_capacities.lower() == 'false':
+                queryset = queryset.filter(
+                    models.Q(known_capacities__isnull=True) &
+                    models.Q(available_capacities__isnull=True) &
+                    models.Q(wanted_capacities__isnull=True)
+                ).distinct()
+
+        return queryset
+
 
     @extend_schema(
         summary='Create a new organization.',
