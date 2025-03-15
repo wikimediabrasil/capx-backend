@@ -4,6 +4,8 @@ from rest_framework import status
 from orgs.models import OrganizationType, Organization, TagDiff, Document
 from users.models import CustomUser
 from users.submodels import Territory
+from skills.models import Skill
+from django.db import models
 
 
 class OrganizationViewSetTestCase(APITestCase):
@@ -252,3 +254,83 @@ class OrganizationViewSetTestCase(APITestCase):
         Document.objects.create(url='https://commons.wikimedia.org/wiki/File:filename.ext')
         response = self.client.patch('/document/1/', {'url': 'https://commons.wikimedia.org/wiki/File:filename2.ext'})
         self.assertEqual(response.status_code, status.HTTP_405_METHOD_NOT_ALLOWED)
+
+class OrganizationFilterViewSetTestCase(APITestCase):
+    def setUp(self):
+        self.user = CustomUser.objects.create_user(username='test', password=str(secrets.randbits(16)))
+        self.staff_user = CustomUser.objects.create_user(username='staff', password=str(secrets.randbits(16)), is_staff=True)
+        self.client = APIClient()
+        self.organization = Organization.objects.create(display_name='Test Organization', acronym='TO')
+        self.organization.managers.add(self.user)
+
+    def test_get_queryset_as_staff(self):
+        self.client.force_authenticate(self.staff_user)
+        response = self.client.get('/organizations/')
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(len(response.data['results']), Organization.objects.count())
+
+    def test_get_queryset_as_non_staff(self):
+        self.client.force_authenticate(self.user)
+        response = self.client.get('/organizations/')
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(len(response.data['results']), Organization.objects.filter(managers__isnull=False).distinct().count())
+
+    def test_get_queryset_has_capacities_known_true(self):
+        self.client.force_authenticate(self.staff_user)
+        self.organization.known_capacities.add(Skill.objects.create(skill_wikidata_item="Q123456789"))
+        response = self.client.get('/organizations/', {'has_capacities_known': 'true'})
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(len(response.data['results']), Organization.objects.filter(known_capacities__isnull=False).distinct().count())
+
+    def test_get_queryset_has_capacities_known_false(self):
+        self.client.force_authenticate(self.staff_user)
+        response = self.client.get('/organizations/', {'has_capacities_known': 'false'})
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(len(response.data['results']), Organization.objects.filter(known_capacities__isnull=True).distinct().count())
+
+    def test_get_queryset_has_capacities_available_true(self):
+        self.client.force_authenticate(self.staff_user)
+        self.organization.available_capacities.add(Skill.objects.create(skill_wikidata_item="Q123456789"))
+        response = self.client.get('/organizations/', {'has_capacities_available': 'true'})
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(len(response.data['results']), Organization.objects.filter(available_capacities__isnull=False).distinct().count())
+
+    def test_get_queryset_has_capacities_available_false(self):
+        self.client.force_authenticate(self.staff_user)
+        response = self.client.get('/organizations/', {'has_capacities_available': 'false'})
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(len(response.data['results']), Organization.objects.filter(available_capacities__isnull=True).distinct().count())
+
+    def test_get_queryset_has_capacities_wanted_true(self):
+        self.client.force_authenticate(self.staff_user)
+        self.organization.wanted_capacities.add(Skill.objects.create(skill_wikidata_item="Q123456789"))
+        response = self.client.get('/organizations/', {'has_capacities_wanted': 'true'})
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(len(response.data['results']), Organization.objects.filter(wanted_capacities__isnull=False).distinct().count())
+
+    def test_get_queryset_has_capacities_wanted_false(self):
+        self.client.force_authenticate(self.staff_user)
+        response = self.client.get('/organizations/', {'has_capacities_wanted': 'false'})
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(len(response.data['results']), Organization.objects.filter(wanted_capacities__isnull=True).distinct().count())
+
+    def test_get_queryset_has_any_capacities_true(self):
+        self.client.force_authenticate(self.staff_user)
+        self.organization.known_capacities.add(Skill.objects.create(skill_wikidata_item="Q123456789"))
+        response = self.client.get('/organizations/', {'has_any_capacities': 'true'})
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(len(response.data['results']), Organization.objects.filter(
+            models.Q(known_capacities__isnull=False) |
+            models.Q(available_capacities__isnull=False) |
+            models.Q(wanted_capacities__isnull=False)
+        ).distinct().count())
+
+    def test_get_queryset_has_any_capacities_false(self):
+        self.client.force_authenticate(self.staff_user)
+        response = self.client.get('/organizations/', {'has_any_capacities': 'false'})
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(len(response.data['results']), Organization.objects.filter(
+            models.Q(known_capacities__isnull=True) &
+            models.Q(available_capacities__isnull=True) &
+            models.Q(wanted_capacities__isnull=True)
+        ).distinct().count())
