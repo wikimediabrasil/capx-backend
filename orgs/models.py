@@ -58,6 +58,10 @@ class Organization(models.Model):
         blank=True, null=True,
         help_text='The URL of the organization website.',
     )
+    report = models.URLField(
+        blank=True, null=True,
+        help_text='The URL of the organization report.',
+    )
     mastodon = models.URLField(
         blank=True, null=True,
         help_text='The URL of the organization Mastodon account.',
