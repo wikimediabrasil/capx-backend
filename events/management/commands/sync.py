@@ -1,5 +1,6 @@
 from django.core.management.base import BaseCommand
 from events.models import Events
+import requests
 
 class Command(BaseCommand):
     help = 'Sync WikiLearn events with CapX events'
