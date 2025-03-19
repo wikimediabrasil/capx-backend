@@ -5,6 +5,7 @@ from users.models import Profile, DataHash
 from skills.models import Skill
 from io import StringIO
 import hashlib, json
+from django.core.management import call_command
 
 class CommandTestCase(TestCase):
     def setUp(self):
@@ -35,22 +36,22 @@ class CommandTestCase(TestCase):
     @patch('users.management.commands.export.Profile.objects.all')
     def test_process_profiles(self, mock_profiles):
         mock_profiles.return_value = [
-            {'user': {'username': 'TestUser1'}, 'skills_known': [1], 'skills_available': [2], 'skills_wanted': [3]},
-            {'user': {'username': 'TestUser2'}, 'skills_known': [4], 'skills_available': [5], 'skills_wanted': [6], 'wiki_alt': 'AltUser2'}
+            {'user': {'username': 'TestUser1'}, 'skills_known': [1], 'skills_available': [2]},
+            {'user': {'username': 'TestUser2'}, 'skills_known': [4], 'skills_available': [5], 'wiki_alt': 'AltUser2'}
         ]
         meta_wiki_users = ['TestUser1', 'AltUser2']
         formatted_data, skills = self.command.process_profiles(mock_profiles.return_value, meta_wiki_users)
         self.assertEqual(formatted_data, [
-            ['TestUser1', '[1]', '[2]', '[3]'],
-            ['AltUser2', '[4]', '[5]', '[6]']
+            ['TestUser1', '[1]', '[2]', ''],
+            ['AltUser2', '[4]', '[5]', '']
         ])
-        self.assertEqual(set(skills), {1, 2, 3, 4, 5, 6})
+        self.assertEqual(set(skills), {1, 2, 4, 5})
 
     @patch('users.management.commands.export.Profile.objects.all')
     def test_process_profiles_no_meta_wiki_users(self, mock_profiles):
         mock_profiles.return_value = [
-            {'user': {'username': 'TestUser1'}, 'skills_known': [1], 'skills_available': [2], 'skills_wanted': [3]},
-            {'user': {'username': 'TestUser2'}, 'skills_known': [4], 'skills_available': [5], 'skills_wanted': [6], 'wiki_alt': 'AltUser2'}
+            {'user': {'username': 'TestUser1'}, 'skills_known': [1], 'skills_available': [2]},
+            {'user': {'username': 'TestUser2'}, 'skills_known': [4], 'skills_available': [5], 'wiki_alt': 'AltUser2'}
         ]
         meta_wiki_users = []
         formatted_data, skills = self.command.process_profiles(mock_profiles.return_value, meta_wiki_users)
@@ -60,13 +61,13 @@ class CommandTestCase(TestCase):
     @patch('users.management.commands.export.Profile.objects.all')
     def test_process_profiles_partial_meta_wiki_users(self, mock_profiles):
         mock_profiles.return_value = [
-            {'user': {'username': 'TestUser1'}, 'skills_known': [1], 'skills_available': [2], 'skills_wanted': [3]},
-            {'user': {'username': 'TestUser2'}, 'skills_known': [4], 'skills_available': [5], 'skills_wanted': [6], 'wiki_alt': 'AltUser2'}
+            {'user': {'username': 'TestUser1'}, 'skills_known': [1], 'skills_available': [2]},
+            {'user': {'username': 'TestUser2'}, 'skills_known': [4], 'skills_available': [5], 'wiki_alt': 'AltUser2'}
         ]
         meta_wiki_users = ['TestUser1']
         formatted_data, skills = self.command.process_profiles(mock_profiles.return_value, meta_wiki_users)
-        self.assertEqual(formatted_data, [['TestUser1', '[1]', '[2]', '[3]']])
-        self.assertEqual(set(skills), {1, 2, 3})
+        self.assertEqual(formatted_data, [['TestUser1', '[1]', '[2]', '']])
+        self.assertEqual(set(skills), {1, 2})
 
     @patch('users.management.commands.export.Skill.objects.get')
     def test_get_skill_dict(self, mock_get):
@@ -116,7 +117,7 @@ class CommandTestCase(TestCase):
                     {"name": "username", "type": "string"},
                     {"name": "skills_known", "type": "string"},
                     {"name": "skills_available", "type": "string"},
-                    {"name": "skills_wanted", "type": "string"}
+                    {"name": "badges", "type": "string"}
                 ],
             },
             "data": formatted_data,
@@ -223,6 +224,82 @@ class CommandTestCase(TestCase):
         self.assertIsNone(result)
         mock_get.assert_called_once_with(data_type='users')
 
+    @patch('users.management.commands.export.requests.get')
+    def test_process_profiles_with_badges(self, mock_requests_get):
+        profiles = [
+            {'user': {'username': 'TestUser1'}, 'skills_known': [1], 'skills_available': [2]},
+            {'user': {'username': 'TestUser2'}, 'skills_known': [3], 'skills_available': [4], 'wiki_alt': 'AltUser2'}
+        ]
+        meta_wiki_users = ['TestUser1', 'AltUser2']
+
+        # Mock badge API responses
+        mock_requests_get.side_effect = [
+            MagicMock(status_code=200, json=MagicMock(return_value={
+                'results': [
+                    {'badge_class': {'display_name': 'Badge1', 'course_id': 'Course1'}, 'assertion_url': 'URL1'},
+                    {'badge_class': {'display_name': 'Badge2', 'course_id': 'Course2'}, 'assertion_url': 'URL2'}
+                ]
+            })),
+            MagicMock(status_code=200, json=MagicMock(return_value={
+                'results': [
+                    {'badge_class': {'display_name': 'Badge3', 'course_id': 'Course3'}, 'assertion_url': 'URL3'}
+                ]
+            }))
+        ]
+
+        formatted_data, skills = self.command.process_profiles(profiles, meta_wiki_users)
+
+        expected_data = [
+            ['TestUser1', '[1]', '[2]', ['Badge1§Course1§URL1', 'Badge2§Course2§URL2']],
+            ['AltUser2', '[3]', '[4]', ['Badge3§Course3§URL3']]
+        ]
+        expected_skills = [1, 2, 3, 4]
+
+        self.assertEqual(formatted_data, expected_data)
+        self.assertEqual(set(skills), set(expected_skills))
+
+    @patch('users.management.commands.export.requests.get')
+    def test_process_profiles_with_missing_badges(self, mock_requests_get):
+        profiles = [
+            {'user': {'username': 'TestUser1'}, 'skills_known': [1], 'skills_available': [2]},
+            {'user': {'username': 'TestUser2'}, 'skills_known': [3], 'skills_available': [4], 'wiki_alt': 'AltUser2'}
+        ]
+        meta_wiki_users = ['TestUser1', 'AltUser2']
+
+        # Mock badge API responses with one failure
+        mock_requests_get.side_effect = [
+            MagicMock(status_code=200, json=MagicMock(return_value={
+                'results': [
+                    {'badge_class': {'display_name': 'Badge1', 'course_id': 'Course1'}, 'assertion_url': 'URL1'}
+                ]
+            })),
+            MagicMock(status_code=404)  # Simulate failure for the second user
+        ]
+
+        formatted_data, skills = self.command.process_profiles(profiles, meta_wiki_users)
+
+        expected_data = [
+            ['TestUser1', '[1]', '[2]', ['Badge1§Course1§URL1']],
+            ['AltUser2', '[3]', '[4]', '']
+        ]
+        expected_skills = [1, 2, 3, 4]
+
+        self.assertEqual(formatted_data, expected_data)
+        self.assertEqual(set(skills), set(expected_skills))
+
+    @patch('users.management.commands.export.requests.get')
+    def test_process_profiles_no_meta_wiki_users_with_badges(self, mock_requests_get):
+        profiles = [
+            {'user': {'username': 'TestUser1'}, 'skills_known': [1], 'skills_available': [2]},
+            {'user': {'username': 'TestUser2'}, 'skills_known': [3], 'skills_available': [4], 'wiki_alt': 'AltUser2'}
+        ]
+        meta_wiki_users = []
+
+        formatted_data, skills = self.command.process_profiles(profiles, meta_wiki_users)
+
+        self.assertEqual(formatted_data, [])
+        self.assertEqual(skills, [])
+
     @patch('users.management.commands.export.requests.Session')
     def test_handle(self, mock_session):
         # Redirect stdout to suppress output during test
@@ -272,3 +349,10 @@ class CommandTestCase(TestCase):
             mock_login.assert_called_once()
             mock_get_csrf_token.assert_called()
             mock_edit_page.assert_called()
+
+class AddArgumentsTestCase(TestCase):
+    def test_add_arguments_dry_run(self):
+        out = StringIO()
+        call_command('export', '--dry-run', stdout=out)
+        self.assertIn("Dry run mode enabled", out.getvalue())
+        
