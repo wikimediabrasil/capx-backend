@@ -23,4 +23,6 @@ class Command(BaseCommand):
             event.time_end = data.get("end") if data.get("end") != event.time_end else event.time_end
             event.image_url = data.get("media").get("image").get("raw") if data.get("media").get("image").get("raw") != event.image_url else event.image_url
             event.save()
-            self.stdout.write(f"Successfully synced event {event.name}")
+            
+            if self.verbosity >= 2:
+                self.stdout.write(f"Successfully synced event {event.name}")
