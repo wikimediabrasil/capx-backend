@@ -11,6 +11,13 @@ import os
 class Command(BaseCommand):
     help = "Export data to Commons in JSON tabular format"
 
+    def add_arguments(self, parser):
+        parser.add_argument(
+            '--dry-run',
+            action='store_true',
+            help='Skip login/session steps and print JSON instead of saving pages'
+        )
+
     def format_list(self, data_list):
         return '[' + ', '.join(str(item) for item in data_list) + ']'
 
@@ -43,14 +50,12 @@ class Command(BaseCommand):
                     username,
                     self.format_list(profile['skills_known']),
                     self.format_list(profile['skills_available']),
-                    self.format_list(profile['skills_wanted'])
                 ]
                 formatted_data.append(data)
                 processed_usernames.add(username)
 
                 skills.extend(profile['skills_known'])
                 skills.extend(profile['skills_available'])
-                skills.extend(profile['skills_wanted'])
         
         # Second pass - process alternative usernames if not already processed
         for profile in profiles:
@@ -61,15 +66,24 @@ class Command(BaseCommand):
                         alt_username,
                         self.format_list(profile['skills_known']),
                         self.format_list(profile['skills_available']),
-                        self.format_list(profile['skills_wanted'])
                     ]
                     formatted_data.append(data)
                     processed_usernames.add(alt_username)
 
                     skills.extend(profile['skills_known'])
                     skills.extend(profile['skills_available'])
-                    skills.extend(profile['skills_wanted'])
 
+        # Get badges from Wikilearn
+        for profile in formatted_data:
+            api = f"https://learn.wiki/api/badges/v1/assertions/user/{profile[0]}/"
+            response = requests.get(api)
+            if response.status_code == 200 and response.json().get('results', None):
+                data = [f"{badge['badge_class']['display_name']}§{badge['badge_class']['course_id']}§{badge['assertion_url']}" for badge in response.json().get('results')]
+            else:
+                data = ['Capacity Exchange supporter§Capx-logo-redux.svg§https://meta.wikimedia.org/wiki/Capacity_Exchange/Network/']
+            
+            profile.append(self.format_list(data))
+        
         if self.verbosity >= 2:
             self.stdout.write(f"Processed profiles: {formatted_data}")
             self.stdout.write(f"Skills: {skills}")
@@ -119,7 +133,7 @@ class Command(BaseCommand):
                     {"name": "username", "type": "string"},
                     {"name": "skills_known", "type": "string"},
                     {"name": "skills_available", "type": "string"},
-                    {"name": "skills_wanted", "type": "string"}
+                    {"name": "badges", "type": "string"}
                 ],
             },
             "data": formatted_data,
@@ -230,6 +244,8 @@ class Command(BaseCommand):
         
     def handle(self, *args, **options):
         self.verbosity = options.get('verbosity', 1)
+        dry_run = options.get('dry_run', False)  # Add a dry-run option
+
         profile_serializer = ProfileSerializer(Profile.objects.all(), many=True)
         meta_wiki_users = self.get_meta_wiki_users()
         formatted_data, skills = self.process_profiles(profile_serializer.data, meta_wiki_users)
@@ -255,23 +271,31 @@ class Command(BaseCommand):
 
         # Check if data has changed
         if current_users_hash != previous_users_hash or current_capacities_hash != previous_capacities_hash:
-            session = requests.Session()
-            url = "https://commons.wikimedia.org/w/api.php"
-            login_token = self.get_login_token(session, url)
-            self.login(session, url, login_token)
+            if dry_run:
+                # Print JSON instead of saving
+                self.stdout.write("Dry run mode enabled. Outputting JSON data:")
+                self.stdout.write("Users JSON:")
+                self.stdout.write(json.dumps(output_users, indent=4))
+                self.stdout.write("Capacities JSON:")
+                self.stdout.write(json.dumps(output_capacities, indent=4))
+            else:
+                session = requests.Session()
+                url = "https://commons.wikimedia.org/w/api.php"
+                login_token = self.get_login_token(session, url)
+                self.login(session, url, login_token)
 
-            if current_users_hash != previous_users_hash:
-                csrf_token = self.get_csrf_token(session, url)
-                self.edit_page(
-                    session, url, "Data:CapacityExchange/users.tab", "Updating data",
-                    json.dumps(output_users, indent=4), csrf_token
-                )
-                self.save_current_hash('users', current_users_hash)
+                if current_users_hash != previous_users_hash:
+                    csrf_token = self.get_csrf_token(session, url)
+                    self.edit_page(
+                        session, url, "Data:CapacityExchange/users.tab", "Updating data",
+                        json.dumps(output_users, indent=4), csrf_token
+                    )
+                    self.save_current_hash('users', current_users_hash)
 
-            if current_capacities_hash != previous_capacities_hash:
-                csrf_token = self.get_csrf_token(session, url)
-                self.edit_page(
-                    session, url, "Data:CapacityExchange/capacities.tab", "Updating data",
-                    json.dumps(output_capacities, indent=4), csrf_token
-                )
-                self.save_current_hash('capacities', current_capacities_hash)
+                if current_capacities_hash != previous_capacities_hash:
+                    csrf_token = self.get_csrf_token(session, url)
+                    self.edit_page(
+                        session, url, "Data:CapacityExchange/capacities.tab", "Updating data",
+                        json.dumps(output_capacities, indent=4), csrf_token
+                    )
+                    self.save_current_hash('capacities', current_capacities_hash)

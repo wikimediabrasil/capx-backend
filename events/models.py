@@ -3,6 +3,8 @@ from users.models import Profile, CustomUser
 from django.conf import settings
 from orgs.models import Organization
 from django.core.validators import RegexValidator
+from django.core.exceptions import ValidationError
+import requests
 
 
 class Events(models.Model):
@@ -49,10 +51,10 @@ class Events(models.Model):
     image_url = models.URLField(
         blank=True, 
         verbose_name="Image URL",
-        help_text="URL of the event image on Wikimedia Commons.",
+        help_text="URL of the event image on Wikimedia Commons or Learn Wiki.",
         validators=[RegexValidator(
-            regex=r'^https://commons\.wikimedia\.org/wiki/File:.+$',
-            message="Invalid Wikimedia Commons URL format. The format should be https://commons.wikimedia.org/wiki/File:Example.jpg"
+            regex=r'^(https://commons\.wikimedia\.org/wiki/File:.+|https://learn\.wiki/asset.+)$',
+            message="Invalid URL format. The format should be https://commons.wikimedia.org/wiki/File:Example.jpg or https://learn.wiki/asset..."
         )]
     )
     time_begin = models.DateTimeField(
@@ -61,7 +63,8 @@ class Events(models.Model):
     )
     time_end = models.DateTimeField(
         verbose_name="End Time",
-        help_text="End time of the event."
+        help_text="End time of the event.",
+        blank=True
     )
     creator = models.ForeignKey(
         settings.AUTH_USER_MODEL,
@@ -103,6 +106,7 @@ class Events(models.Model):
 
     def __str__(self):
         return self.name
+
     
 class EventParticipant(models.Model):
     ROLE_TYPES = [
