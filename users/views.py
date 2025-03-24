@@ -1,6 +1,6 @@
-from .models import Profile, Territory, Language, WikimediaProject, Avatar
+from .models import Profile, Territory, Language, WikimediaProject, Avatar, SavedItem
 from orgs.models import Organization
-from .serializers import ProfileSerializer, TerritorySerializer, LanguageSerializer, WikimediaProjectSerializer, UsersBySkillSerializer, UsersByTagSerializer, AvatarSerializer
+from .serializers import ProfileSerializer, TerritorySerializer, LanguageSerializer, WikimediaProjectSerializer, UsersBySkillSerializer, UsersByTagSerializer, AvatarSerializer, SavedItemSerializer
 from skills.models import Skill
 from events.models import Events
 from projects.models import Project
@@ -402,3 +402,35 @@ class UsersByTagViewSet(viewsets.ReadOnlyModelViewSet):
             return Response({'message': 'Invalid tag type. Options are: skill_known, skill_available, skill_wanted, language, territory, wikimedia_project, affiliation.'}, status=status.HTTP_400_BAD_REQUEST)
 
         return Response(self.get_serializer(queryset, many=True).data)
+
+@extend_schema_view(
+    list=extend_schema(
+        summary='List all items saved by the logged-in user.',
+        description='This endpoint lists all items saved by the logged-in user.',
+    ),
+    retrieve=extend_schema(
+        summary='Retrieve a saved item by ID.',
+        description='This endpoint retrieves a saved item by its ID.',
+    ),
+    create=extend_schema(
+        summary='Create a new saved item.',
+        description='This endpoint creates a new saved item.',
+    ),
+    destroy=extend_schema(
+        summary='Delete a saved item by ID.',
+        description='This endpoint deletes a saved item by its ID.',
+    ),
+)
+class SavedItemViewSet(viewsets.ModelViewSet):
+    serializer_class = SavedItemSerializer
+
+    def get_queryset(self):
+        return SavedItem.objects.filter(user=self.request.user)
+
+    def perform_create(self, serializer):
+        serializer.save(user=self.request.user)
+
+    @extend_schema(exclude=True)
+    def partial_update(self, request, *args, **kwargs):
+        response = {'message': 'Partial updates are not allowed for saved items.'}
+        return Response(response, status=status.HTTP_405_METHOD_NOT_ALLOWED)

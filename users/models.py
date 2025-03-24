@@ -221,6 +221,29 @@ class LanguageProficiency(models.Model):
         return f"{self.profile.user.username} - {self.language.language_name}"
 
 
+class SavedItem(models.Model):
+    RELATION_TYPES = [
+        ('learner', 'Learner'),
+        ('sharer', 'Sharer'),
+    ]
+    ENTITY_TYPES = [
+        ('user', 'User'),
+        ('org', 'Organization'),
+    ]
+
+    user =  models.ForeignKey(CustomUser, on_delete=models.CASCADE)
+    relation = models.CharField(max_length=7, choices=RELATION_TYPES)
+    entity = models.CharField(max_length=4, choices=ENTITY_TYPES)
+    entity_id = models.IntegerField()
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        unique_together = ('user', 'relation', 'entity', 'entity_id')
+
+    def __str__(self):
+        return f"{self.user.username}: {self.relation} - {self.entity} - {self.entity_id}"
+    
+
 @receiver(post_save, sender=CustomUser)
 def create_user_profile(sender, instance, created, **kwargs):
     if created:

@@ -1,5 +1,5 @@
 from rest_framework import serializers
-from .models import Profile, CustomUser, LanguageProficiency
+from .models import Profile, CustomUser, LanguageProficiency, SavedItem
 from .submodels import Territory, Language, WikimediaProject, Avatar
 from orgs.models import Organization
 from drf_spectacular.utils import extend_schema_field, extend_schema_serializer
@@ -161,3 +161,11 @@ class UsersByTagSerializer(serializers.ModelSerializer):
             'username', 
             'profile_image'
         ]
+
+
+class SavedItemSerializer(serializers.ModelSerializer):
+
+    class Meta:
+        model = SavedItem
+        fields = ['id', 'relation', 'entity', 'entity_id', 'created_at']
+        read_only_fields = ['created_at']

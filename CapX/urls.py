@@ -22,7 +22,7 @@ from django.conf.urls.static import static
 from rest_framework.routers import DefaultRouter
 from skills.views import SkillViewSet, SkillByTypeViewSet
 from users.views import (
-    ProfileViewSet, UsersViewSet, QuickListViewSet, AvatarViewSet,
+    ProfileViewSet, UsersViewSet, QuickListViewSet, AvatarViewSet, SavedItemViewSet,
     UsersBySkillViewSet, UsersByTagViewSet, TerritoryViewSet, WikimediaProjectViewSet
 )
 from bugs.views import BugViewSet, AttachmentViewSet
@@ -41,6 +41,7 @@ router.register('profile', ProfileViewSet, basename='profile')
 router.register('wikimedia_project', WikimediaProjectViewSet, basename='wikimedia_project')
 router.register('territory', TerritoryViewSet, basename='territory')
 router.register('avatar', AvatarViewSet, basename='avatar')
+router.register('saved_item', SavedItemViewSet, basename='saved_item')
 router.register('organizations', OrganizationViewSet, basename='organizations')
 router.register('organization_type', OrganizationTypeViewSet, basename='organization_type')
 router.register('tag_diff', TagDiffViewSet, basename='tag_diff')
