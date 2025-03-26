@@ -7,6 +7,7 @@ from orgs.models import Organization
 from skills.models import Skill
 from users.submodels import Territory, Language, WikimediaProject, Avatar, DataHash
 from django.core.validators import RegexValidator
+from django.core.exceptions import ValidationError
 
 
 class CustomUser(AbstractBaseUser, PermissionsMixin):
@@ -220,6 +221,78 @@ class LanguageProficiency(models.Model):
     def __str__(self):
         return f"{self.profile.user.username} - {self.language.language_name}"
 
+
+class SavedItem(models.Model):
+    RELATION_TYPES = [
+        ('learner', 'Learner'),
+        ('sharer', 'Sharer'),
+    ]
+    ENTITY_TYPES = [
+        ('user', 'User'),
+        ('org', 'Organization'),
+    ]
+
+    user = models.ForeignKey(CustomUser, on_delete=models.CASCADE)
+    relation = models.CharField(max_length=7, choices=RELATION_TYPES)
+    entity = models.CharField(max_length=4, choices=ENTITY_TYPES)
+    related_org = models.ForeignKey(
+        Organization, 
+        on_delete=models.CASCADE, 
+        null=True, 
+        blank=True, 
+        related_name="saved_items"
+    )
+    related_user = models.ForeignKey(
+        CustomUser, 
+        on_delete=models.CASCADE, 
+        null=True, 
+        blank=True, 
+        related_name="related_saved_items"
+    )
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        constraints = [
+            models.UniqueConstraint(
+                fields=['user', 'relation', 'entity', 'related_user'],
+                name='unique_user_relation_entity_related_user',
+                condition=models.Q(entity='user')
+            ),
+            models.UniqueConstraint(
+                fields=['user', 'relation', 'entity', 'related_org'],
+                name='unique_user_relation_entity_related_org',
+                condition=models.Q(entity='org')
+            ),
+        ]
+
+    def clean(self):
+        """
+        Custom validation to ensure that related_org and related_user are set correctly
+        based on the entity type.
+        """
+        if self.entity == 'org':
+            if not self.related_org or self.related_user:
+                raise ValidationError("For entity 'org', related_org must be set and related_user must be null.")
+        elif self.entity == 'user':
+            if not self.related_user or self.related_org:
+                raise ValidationError("For entity 'user', related_user must be set and related_org must be null.")
+        else:
+            raise ValidationError("Invalid entity type.")
+
+    def save(self, *args, **kwargs):
+        """
+        Overrides the save method to call the clean method for validation
+        before saving the instance.
+        """
+        self.clean()
+        super().save(*args, **kwargs)
+
+    def __str__(self):
+        if self.related_org:
+            return f"{self.user.username}: {self.relation} - Organization - {self.related_org.display_name}"
+        elif self.related_user:
+            return f"{self.user.username}: {self.relation} - User - {self.related_user.username}"
+    
 
 @receiver(post_save, sender=CustomUser)
 def create_user_profile(sender, instance, created, **kwargs):

@@ -26,7 +26,7 @@ class TestSyncCommand(TestCase):
         mock_get.return_value = mock_response
 
         # Call the command
-        call_command('sync')
+        call_command('sync', verbosity=2)
 
         # Refresh the event from the database
         event.refresh_from_db()
@@ -36,6 +36,7 @@ class TestSyncCommand(TestCase):
         self.assertEqual(event.time_begin.isoformat(timespec='seconds').replace('+00:00', 'Z'), "2023-01-01T12:00:00Z")
         self.assertEqual(event.time_end.isoformat(timespec='seconds').replace('+00:00', 'Z'), "2023-01-02T12:00:00Z")
         self.assertEqual(event.image_url, "https://new.image.url")
+
 
     @patch('events.management.commands.sync.requests.get')
     def test_handle_invalid_response(self, mock_get):
@@ -71,4 +72,9 @@ class TestSyncCommand(TestCase):
 
         # Call the command and assert it raises ConnectionError
         with self.assertRaises(ConnectionError):
-            call_command('sync')
+            with patch('sys.stdout.write') as mock_stdout:
+                call_command('sync', verbosity=2)
+
+                # Assert that stdout.write was called with expected messages
+                mock_stdout.assert_any_call('Starting sync process...\n')
+                mock_stdout.assert_any_call('Sync completed successfully.\n')
