@@ -251,31 +251,21 @@ class SavedItem(models.Model):
     )
     created_at = models.DateTimeField(auto_now_add=True)
 
-    class Meta:
-        constraints = [
-            models.UniqueConstraint(
-                fields=['user', 'relation', 'entity', 'related_user'],
-                name='unique_user_relation_entity_related_user',
-                condition=models.Q(entity='user')
-            ),
-            models.UniqueConstraint(
-                fields=['user', 'relation', 'entity', 'related_org'],
-                name='unique_user_relation_entity_related_org',
-                condition=models.Q(entity='org')
-            ),
-        ]
-
     def clean(self):
         """
         Custom validation to ensure that related_org and related_user are set correctly
-        based on the entity type.
+        based on the entity type and to enforce uniqueness constraints.
         """
         if self.entity == 'org':
             if not self.related_org or self.related_user:
                 raise ValidationError("For entity 'org', related_org must be set and related_user must be null.")
+            if SavedItem.objects.filter(user=self.user, relation=self.relation, entity='org', related_org=self.related_org).exists():
+                raise ValidationError("This combination of user, relation, entity, and related_org already exists.")
         elif self.entity == 'user':
             if not self.related_user or self.related_org:
                 raise ValidationError("For entity 'user', related_user must be set and related_org must be null.")
+            if SavedItem.objects.filter(user=self.user, relation=self.relation, entity='user', related_user=self.related_user).exists():
+                raise ValidationError("This combination of user, relation, entity, and related_user already exists.")
         else:
             raise ValidationError("Invalid entity type.")
 

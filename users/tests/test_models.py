@@ -271,15 +271,32 @@ class SavedItemModelTest(TestCase):
             f"{self.user.username}: sharer - Organization - Test Org"
         )
 
-
     def test_unique_saved_item(self):
-        with self.assertRaises(IntegrityError):
+        with self.assertRaises(ValidationError):
             SavedItem.objects.create(
                 user=self.user,
                 relation="learner",
                 entity="user",
                 related_user=self.other_user,
             )
+
+        org_type = OrganizationType.objects.create(type_name="TestType")
+        org = Organization.objects.create(display_name='Test Org', acronym='TO', type=org_type)
+        SavedItem.objects.create(
+            user=self.user,
+            relation="sharer",
+            entity="org",
+            related_org=org,
+        )
+
+        with self.assertRaises(ValidationError):
+            SavedItem.objects.create(
+                user=self.user,
+                relation="sharer",
+                entity="org",
+                related_org=org,
+            )
+
 
     def test_different_saved_items(self):
         SavedItem.objects.create(
