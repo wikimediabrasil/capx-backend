@@ -3,7 +3,8 @@ from django.test import TestCase
 from django.db import IntegrityError
 from django.core.exceptions import ValidationError
 from django.db.models.signals import post_save
-from ..models import Territory, Language, WikimediaProject, Organization, CustomUser, \
+from orgs.models import Organization, OrganizationType
+from ..models import Territory, Language, WikimediaProject, CustomUser, \
     Profile, LanguageProficiency, Avatar, create_user_profile, DataHash, SavedItem
 
 
@@ -231,25 +232,45 @@ class SavedItemModelTest(TestCase):
             email="testuser@example.com",
             password=str(secrets.randbits(16)),
         )
+        cls.other_user = CustomUser.objects._create_user(
+            username="OtherUser",
+            email="test2@example.com",
+            password=str(secrets.randbits(16)),
+        )
         cls.saved_item = SavedItem.objects.create(
             user=cls.user,
             relation="learner",
             entity="user",
-            entity_id=1,
+            related_user=cls.other_user,
         )
 
     def test_saved_item_creation(self):
         self.assertEqual(self.saved_item.user, self.user)
         self.assertEqual(self.saved_item.relation, "learner")
         self.assertEqual(self.saved_item.entity, "user")
-        self.assertEqual(self.saved_item.entity_id, 1)
+        self.assertEqual(self.saved_item.related_user, self.other_user)
+        self.assertEqual(self.saved_item.related_org, None)
         self.assertIsNotNone(self.saved_item.created_at)
 
     def test_saved_item_str_method(self):
         self.assertEqual(
             str(self.saved_item),
-            f"{self.user.username}: learner - user - 1"
+            f"{self.user.username}: learner - User - OtherUser"
         )
+
+        org_type = OrganizationType.objects.create(type_name="TestType")
+        org = Organization.objects.create(display_name='Test Org', acronym='TO', type=org_type)
+        saved_item = SavedItem.objects.create(
+            user=self.user,
+            relation="sharer",
+            entity="org",
+            related_org=org,
+        )
+        self.assertEqual(
+            str(saved_item),
+            f"{self.user.username}: sharer - Organization - Test Org"
+        )
+
 
     def test_unique_saved_item(self):
         with self.assertRaises(IntegrityError):
@@ -257,15 +278,45 @@ class SavedItemModelTest(TestCase):
                 user=self.user,
                 relation="learner",
                 entity="user",
-                entity_id=1,
+                related_user=self.other_user,
             )
 
     def test_different_saved_items(self):
         SavedItem.objects.create(
             user=self.user,
             relation="sharer",
-            entity="org",
-            entity_id=2,
+            entity="user",
+            related_user=self.other_user,
         )
         saved_items = SavedItem.objects.filter(user=self.user)
         self.assertEqual(saved_items.count(), 2)
+
+    def test_both_related_org_and_related_user(self):
+        org_type = OrganizationType.objects.create(type_name="TestType")
+        org = Organization.objects.create(display_name='Test Org', acronym='TO', type=org_type)
+        with self.assertRaises(ValidationError):
+            SavedItem.objects.create(
+                user=self.user,
+                relation="sharer",
+                entity="user",
+                related_user=self.other_user,
+                related_org=org,
+            )
+
+        with self.assertRaises(ValidationError):
+            SavedItem.objects.create(
+                user=self.user,
+                relation="sharer",
+                entity="org",
+                related_user=self.other_user,
+                related_org=org,
+            )
+
+    def test_invalid_entity_type(self):
+        with self.assertRaises(ValidationError):
+            SavedItem.objects.create(
+                user=self.user,
+                relation="sharer",
+                entity="invalid",
+                related_user=self.other_user,
+            )

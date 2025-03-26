@@ -408,17 +408,35 @@ class UsersByTagViewSet(viewsets.ReadOnlyModelViewSet):
         summary='List all items saved by the logged-in user.',
         description='This endpoint lists all items saved by the logged-in user.',
     ),
-    retrieve=extend_schema(
-        summary='Retrieve a saved item by ID.',
-        description='This endpoint retrieves a saved item by its ID.',
-    ),
     create=extend_schema(
         summary='Create a new saved item.',
         description='This endpoint creates a new saved item.',
     ),
+    retrieve=extend_schema(
+        summary='Retrieve a saved item by ID.',
+        description='This endpoint retrieves a saved item by its ID.',
+        parameters=[
+            OpenApiParameter(
+                "id",
+                OpenApiTypes.INT,
+                OpenApiParameter.PATH,
+                required=True,
+                description='The ID of the saved item to retrieve.',
+            ),
+        ],
+    ),
     destroy=extend_schema(
         summary='Delete a saved item by ID.',
         description='This endpoint deletes a saved item by its ID.',
+        parameters=[
+            OpenApiParameter(
+                "id",
+                OpenApiTypes.INT,
+                OpenApiParameter.PATH,
+                required=True,
+                description='The ID of the saved item to retrieve.',
+            ),
+        ],
     ),
 )
 class SavedItemViewSet(viewsets.ModelViewSet):
@@ -433,4 +451,9 @@ class SavedItemViewSet(viewsets.ModelViewSet):
     @extend_schema(exclude=True)
     def partial_update(self, request, *args, **kwargs):
         response = {'message': 'Partial updates are not allowed for saved items.'}
+        return Response(response, status=status.HTTP_405_METHOD_NOT_ALLOWED)
+
+    @extend_schema(exclude=True)
+    def update(self, request, *args, **kwargs):
+        response = {'message': 'Updates are not allowed for saved items.'}
         return Response(response, status=status.HTTP_405_METHOD_NOT_ALLOWED)
