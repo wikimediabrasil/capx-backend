@@ -10,11 +10,11 @@ import secrets
 
 
 class EventsModelTest(TestCase):
-    @classmethod
-    def setUpTestData(cls):
+    
+    def setUp(self):
         # Create a user
-        test_user = CustomUser.objects.create_user(username='testuser', password=str(secrets.randbits(16)))
-        test_user.save()
+        self.test_user = CustomUser.objects.create_user(username='testuser', password=str(secrets.randbits(16)))
+        self.test_user.save()
 
     def test_event_creation(self):
         # Create an event
@@ -23,7 +23,7 @@ class EventsModelTest(TestCase):
             type_of_location='virtual',
             time_begin='2021-10-10 10:00:00+00:00',
             time_end='2021-10-10 12:00:00+00:00',
-            creator=CustomUser.objects.get(id=1)
+            creator=self.test_user,
         )
 
         # Get the event
@@ -48,18 +48,17 @@ class EventsModelTest(TestCase):
             type_of_location='virtual',
             time_begin='2021-10-10 10:00:00+00:00',
             time_end='2021-10-10 12:00:00+00:00',
-            creator=CustomUser.objects.get(id=1)
+            creator=self.test_user
         )
 
         # Create an event participant
-        EventParticipant.objects.create(
+        event_participant = EventParticipant.objects.create(
             event=event,
-            participant=CustomUser.objects.get(id=1),
+            participant=self.test_user,
             role='organizer'
         )
 
         # Get the event participant
-        event_participant = EventParticipant.objects.get(id=1)
         expected_event = f'{event_participant.event}'
         expected_participant = f'{event_participant.participant}'
         expected_role = f'{event_participant.role}'
@@ -76,29 +75,28 @@ class EventsModelTest(TestCase):
             type_of_location='virtual',
             time_begin='2021-10-10 10:00:00+00:00',
             time_end='2021-10-10 12:00:00+00:00',
-            creator=CustomUser.objects.get(id=1)
+            creator=self.test_user
         )
 
         # Create an organization
-        OrganizationType.objects.create(
+        org_type = OrganizationType.objects.create(
             type_code='org',
             type_name='Organization'
         )
         organization = Organization.objects.create(
             display_name='Sample Organization',
             acronym='SO',
-            type=OrganizationType.objects.get(id=1),
+            type=org_type,
         )
 
         # Create an event organization
-        EventOrganizations.objects.create(
+        event_organization = EventOrganizations.objects.create(
             event=event,
             organization=organization,
             role='organizer'
         )
 
         # Get the event organization
-        event_organization = EventOrganizations.objects.get(id=1)
         expected_event = f'{event_organization.event}'
         expected_organization = f'{event_organization.organization}'
         expected_role = f'{event_organization.role}'

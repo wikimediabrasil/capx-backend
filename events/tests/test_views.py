@@ -185,6 +185,10 @@ class EventParticipantViewSetTests(TestCase):
             role='committee'
         )
         self.client.force_login(self.regular_user)
+
+        self.assertTrue(EventParticipant.objects.get(event=self.event, participant=self.participant.participant).confirmed_organizer)
+        self.assertTrue(self.event.creator == self.participant.participant)
+
         response = self.client.put(f'/events_participants/{self.participant.id}/', {
             'event': self.event.id,
             'participant': self.participant.id,
@@ -252,19 +256,19 @@ class EventOrganizationsViewSetTests(TestCase):
             type_code='org',
             type_name='Organization'
         )
-        org_obj = Organization.objects.create(
+        self.organization = Organization.objects.create(
             display_name='Sample Organization',
             acronym='SO',
             type=org_type,
         )
-        self.organization = EventOrganizations.objects.create(
+        self.event_organization = EventOrganizations.objects.create(
             event=self.event, 
-            organization=org_obj, 
+            organization=self.organization, 
             role='sponsor',
             confirmed_organizer=False,
             confirmed_organization=False,
         )
-        self.organization.organization.managers.add(self.manager_user)
+        self.organization.managers.add(self.manager_user)
         self.client.force_login(self.user)
     
     def test_list_organizations(self):
@@ -273,16 +277,16 @@ class EventOrganizationsViewSetTests(TestCase):
 
     def test_retrieve_as_staff(self):
         self.client.force_login(self.staff_user)
-        response = self.client.get(f'/events_organizations/{self.organization.id}/')
+        response = self.client.get(f'/events_organizations/{self.event_organization.id}/')
         self.assertEqual(response.status_code, status.HTTP_200_OK)
 
     def test_retrieve_as_organization_manager(self):
         self.client.force_login(self.manager_user)
-        response = self.client.get(f'/events_organizations/{self.organization.id}/')
+        response = self.client.get(f'/events_organizations/{self.event_organization.id}/')
         self.assertEqual(response.status_code, status.HTTP_200_OK)
 
     def test_retrieve_as_creator(self):
-        response = self.client.get(f'/events_organizations/{self.organization.id}/')
+        response = self.client.get(f'/events_organizations/{self.event_organization.id}/')
         self.assertEqual(response.status_code, status.HTTP_200_OK)
 
     def test_create_organization_by_organizer(self):
@@ -295,38 +299,38 @@ class EventOrganizationsViewSetTests(TestCase):
         self.assertEqual(response.status_code, status.HTTP_403_FORBIDDEN)
     
     def test_update_organization_by_creator(self):
-        response = self.client.put(f'/events_organizations/{self.organization.id}/', {'event': self.event.id, 'organization': self.organization.pk, 'confirmed_organizer': True})
+        response = self.client.put(f'/events_organizations/{self.event_organization.id}/', {'event': self.event.id, 'organization': self.organization.pk, 'confirmed_organizer': True, 'role': 'sponsor'})
         self.assertEqual(response.status_code, status.HTTP_200_OK)
 
     def test_update_organization_by_staff(self):
         self.client.force_login(self.staff_user)
-        response = self.client.put(f'/events_organizations/{self.organization.id}/', {'event': self.event.id, 'organization': self.organization.pk, 'role': 'supporter'})
+        response = self.client.put(f'/events_organizations/{self.event_organization.id}/', {'event': self.event.id, 'organization': self.organization.pk, 'role': 'supporter'})
         self.assertEqual(response.status_code, status.HTTP_200_OK)
 
     def test_update_organization_by_regular(self):
         self.client.force_login(self.regular_user)
-        response = self.client.put(f'/events_organizations/{self.organization.id}/', {'event': self.event.id, 'organization': self.organization.pk, 'role': 'supporter'})
+        response = self.client.put(f'/events_organizations/{self.event_organization.id}/', {'event': self.event.id, 'organization': self.organization.pk, 'role': 'supporter'})
         self.assertEqual(response.status_code, status.HTTP_403_FORBIDDEN)
 
     def test_delete_organization_by_admin(self):
         self.client.force_login(self.staff_user)
-        response = self.client.delete(f'/events_organizations/{self.organization.id}/')
+        response = self.client.delete(f'/events_organizations/{self.event_organization.id}/')
         self.assertEqual(response.status_code, status.HTTP_204_NO_CONTENT)
 
     def test_delete_organization_by_creator(self):
-        response = self.client.delete(f'/events_organizations/{self.organization.id}/')
+        response = self.client.delete(f'/events_organizations/{self.event_organization.id}/')
         self.assertEqual(response.status_code, status.HTTP_204_NO_CONTENT)
 
     def test_delete_organization_by_manager(self):
         self.client.force_login(self.manager_user)
-        response = self.client.delete(f'/events_organizations/{self.organization.id}/')
+        response = self.client.delete(f'/events_organizations/{self.event_organization.id}/')
         self.assertEqual(response.status_code, status.HTTP_204_NO_CONTENT)
 
     def test_delete_organization_by_regular(self):
         self.client.force_login(self.regular_user)
-        response = self.client.delete(f'/events_organizations/{self.organization.id}/')
+        response = self.client.delete(f'/events_organizations/{self.event_organization.id}/')
         self.assertEqual(response.status_code, status.HTTP_403_FORBIDDEN)
 
     def test_partial_update(self):
-        response = self.client.patch(f'/events_organizations/{self.organization.id}/', {'role': 'supporter'})
+        response = self.client.patch(f'/events_organizations/{self.event_organization.id}/', {'role': 'supporter'})
         self.assertEqual(response.status_code, status.HTTP_405_METHOD_NOT_ALLOWED)

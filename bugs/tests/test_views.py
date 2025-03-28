@@ -52,45 +52,45 @@ class BugViewSetTestCase(APITestCase):
 
     def test_bug_update(self):
         self.client.force_authenticate(self.user)
-        self.client.post('/bugs/', {'title': 'Bug', 'description': 'Bug',})
+        bug = self.client.post('/bugs/', {'title': 'Bug', 'description': 'Bug',})
         bug_data = {
             'title': 'Updated Bug',
             'description': 'Updated Bug Description',
         }
-        response = self.client.put('/bugs/1/', bug_data)
+        response = self.client.put(f'/bugs/{bug.data['id']}/', bug_data)
         self.assertEqual(response.status_code, status.HTTP_403_FORBIDDEN)
 
         self.user.is_staff = True
         self.user.save()
-        response = self.client.put('/bugs/1/', bug_data)
+        response = self.client.put(f'/bugs/{bug.data['id']}/', bug_data)
         self.assertEqual(response.status_code, status.HTTP_200_OK)
 
     def test_bug_partial_update(self):
         self.client.force_authenticate(self.user)
-        self.client.post('/bugs/', {'title': 'Bug', 'description': 'Bug',})
+        bug = self.client.post('/bugs/', {'title': 'Bug', 'description': 'Bug',})
         bug_data = {
             'title': 'Updated Bug',
         }
-        response = self.client.patch('/bugs/1/', bug_data)
+        response = self.client.patch(f'/bugs/{bug.data['id']}/', bug_data)
         self.assertEqual(response.status_code, status.HTTP_405_METHOD_NOT_ALLOWED)
 
         self.user.is_staff = True
         self.user.save()
-        response = self.client.patch('/bugs/1/', bug_data)
+        response = self.client.patch(f'/bugs/{bug.data['id']}/', bug_data)
         self.assertEqual(response.status_code, status.HTTP_405_METHOD_NOT_ALLOWED)
 
     def test_bug_delete(self):
         self.client.force_authenticate(self.user)
-        self.client.post('/bugs/', {'title': 'Bug', 'description': 'Bug',})
-        response = self.client.delete('/bugs/1/')
+        bug = self.client.post('/bugs/', {'title': 'Bug', 'description': 'Bug',})
+        response = self.client.delete(f'/bugs/{bug.data['id']}/')
         self.assertEqual(response.status_code, status.HTTP_403_FORBIDDEN)
 
     def test_bug_delete_staff(self):
         self.user.is_staff = True
         self.user.save()
         self.client.force_authenticate(self.user)
-        self.client.post('/bugs/', {'title': 'Bug', 'description': 'Bug',})
-        response = self.client.delete('/bugs/1/')
+        bug = self.client.post('/bugs/', {'title': 'Bug', 'description': 'Bug',})
+        response = self.client.delete(f'/bugs/{bug.data['id']}/')
         self.assertEqual(response.status_code, status.HTTP_204_NO_CONTENT)
 
 
@@ -99,12 +99,12 @@ class AttachmentViewSetTestCase(APITestCase):
         self.user = CustomUser.objects.create_user(username='test', password=str(secrets.randbits(16)))
         self.client = APIClient()
         self.client.force_authenticate(self.user)
-        self.client.post('/bugs/', {'title': 'Bug', 'description': 'Bug',})
+        self.bug = self.client.post('/bugs/', {'title': 'Bug', 'description': 'Bug',})
         attachment_data = {
             'file': SimpleUploadedFile('attachment.test', b'attachment content'),
-            'bug': '1',
+            'bug': self.bug.data['id'],
         }
-        self.client.post('/attachment/', attachment_data)
+        self.attachment = self.client.post('/attachment/', attachment_data)
 
     def test_attachment_list(self):
         response = self.client.get('/attachment/')
@@ -119,15 +119,14 @@ class AttachmentViewSetTestCase(APITestCase):
         self.assertEqual(response.status_code, status.HTTP_200_OK)
 
     def test_attachment_retrieve(self):
-        attachment_id = 1
-        response = self.client.get(f'/attachment/{attachment_id}/')
+        response = self.client.get(f'/attachment/{self.attachment.data['id']}/')
         self.assertEqual(response.status_code, status.HTTP_200_OK)
         self.assertEqual(response.data['file'].split('/')[-1].split('_')[0], 'attachment.test')
 
     def test_attachment_create(self):
         attachment_data = {
             'file': SimpleUploadedFile('new_attach.test', b'new attachment content'),
-            'bug': '1',
+            'bug': self.bug.data['id'],
         }
         response = self.client.post('/attachment/', attachment_data)
         self.assertEqual(response.status_code, status.HTTP_201_CREATED)
@@ -135,22 +134,22 @@ class AttachmentViewSetTestCase(APITestCase):
     def test_attachment_update(self):
         attachment_data = {
             'file': SimpleUploadedFile('updated_attachment.test', b'updated attachment content'),
-            'bug': '1',
+            'bug': self.bug.data['id'],
         }
-        response = self.client.put('/attachment/1/', attachment_data)
+        response = self.client.put(f'/attachment/{self.bug.data['id']}/', attachment_data)
         self.assertEqual(response.status_code, status.HTTP_405_METHOD_NOT_ALLOWED)
 
     def test_attachment_partial_update(self):
         attachment_data = {
             'file': SimpleUploadedFile('updated_attachment.test', b'updated attachment content'),
         }
-        response = self.client.patch('/attachment/1/', attachment_data)
+        response = self.client.patch(f'/attachment/{self.bug.data['id']}/', attachment_data)
         self.assertEqual(response.status_code, status.HTTP_405_METHOD_NOT_ALLOWED)
 
     def test_attachment_create_exceed_size(self):
         attachment_data = {
             'file': SimpleUploadedFile('exceed_size.test', b'a' * 1024 * 1025),
-            'bug': '1',
+            'bug': self.bug.data['id'],
         }
         response = self.client.post('/attachment/', attachment_data)
         self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
@@ -158,17 +157,17 @@ class AttachmentViewSetTestCase(APITestCase):
     def test_attachment_create_exceed_count(self):
         attachment_data = {
             'file': SimpleUploadedFile('attachment1.test', b'attachment content'),
-            'bug': '1',
+            'bug': self.bug.data['id'],
         }
         self.client.post('/attachment/', attachment_data)
         attachment_data = {
             'file': SimpleUploadedFile('attachment2.test', b'attachment content'),
-            'bug': '1',
+            'bug': self.bug.data['id'],
         }
         self.client.post('/attachment/', attachment_data)
         attachment_data = {
             'file': SimpleUploadedFile('attachment3.test', b'attachment content'),
-            'bug': '1',
+            'bug': self.bug.data['id'],
         }
         response = self.client.post('/attachment/', attachment_data)
         self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
@@ -181,12 +180,12 @@ class AttachmentViewSetTestCase(APITestCase):
         self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
 
     def test_attachment_delete(self):
-        response = self.client.delete('/attachment/1/')
+        response = self.client.delete(f'/attachment/{self.attachment.data['id']}/')
         self.assertEqual(response.status_code, status.HTTP_403_FORBIDDEN)
 
         self.user.is_staff = True
         self.user.save()
-        response = self.client.delete('/attachment/1/')
+        response = self.client.delete(f'/attachment/{self.attachment.data['id']}/')
         self.assertEqual(response.status_code, status.HTTP_204_NO_CONTENT)
  
     # Delete *.test files on folder after test

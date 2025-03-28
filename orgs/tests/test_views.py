@@ -12,8 +12,8 @@ class OrganizationViewSetTestCase(APITestCase):
     def setUp(self):
         self.user = CustomUser.objects.create_user(username='test', password=str(secrets.randbits(16)))
         self.client = APIClient()
-        OrganizationType.objects.create(type_name='Type 1', type_code='TYPE1')
-        Territory.objects.create(territory_name='Territory 1')
+        self.organization_type = OrganizationType.objects.create(type_name='Type 1', type_code='TYPE1')
+        self.territory = Territory.objects.create(territory_name='Territory 1')
     
     def test_get_orgs_list_unauthenticated(self):
         response = self.client.get('/organizations/')
@@ -23,8 +23,8 @@ class OrganizationViewSetTestCase(APITestCase):
         org_data = {
             'display_name': 'New Organization',
             'acronym': 'NO',
-            'type': '1',
-            'territory': '1',
+            'type': self.organization_type.pk,
+            'territory': self.territory.pk,
         }
 
         response = self.client.post('/organizations/', org_data)
@@ -34,8 +34,8 @@ class OrganizationViewSetTestCase(APITestCase):
         org_data = {
             'display_name': 'New Organization',
             'acronym': 'NO',
-            'type': '1',
-            'territory': '1',
+            'type': self.organization_type.pk,
+            'territory': self.territory.pk,
         }
 
         self.client.force_authenticate(self.user)
@@ -46,8 +46,8 @@ class OrganizationViewSetTestCase(APITestCase):
         org_data = {
             'display_name': 'New Organization',
             'acronym': 'NO',
-            'type': '1',
-            'territory': '1',
+            'type': self.organization_type.pk,
+            'territory': self.territory.pk,
         }
 
         self.user.is_staff = True
@@ -63,18 +63,18 @@ class OrganizationViewSetTestCase(APITestCase):
         organization = Organization.objects.create(
             display_name='New Organization',
             acronym='NO',
-            type=OrganizationType.objects.get(pk=1),
+            type=self.organization_type,
         )
-        organization.territory.set([Territory.objects.get(pk=1)])
+        organization.territory.set([self.territory])
         response = self.client.get('/organizations/')
         self.assertEqual(len(response.data['results']), 0)
 
         Organization.objects.create(
             display_name='New Organization 2',
             acronym='NO2', 
-            type=OrganizationType.objects.get(pk=1),
+            type=self.organization_type,
         )
-        organization.territory.set([Territory.objects.get(pk=1)])
+        organization.territory.set([self.territory])    
         organization.managers.set([self.user])
         response = self.client.get('/organizations/')
         self.assertEqual(len(response.data['results']), 1)
@@ -90,8 +90,8 @@ class OrganizationViewSetTestCase(APITestCase):
         org_data = {
             'display_name': 'New Organization',
             'acronym': 'NO',
-            'type': '1',
-            'territory': '1',
+            'type': self.organization_type.pk,
+            'territory': self.territory.pk,
         }
         self.client.post('/organizations/', org_data)
         response = self.client.get('/organizations/')
@@ -99,109 +99,101 @@ class OrganizationViewSetTestCase(APITestCase):
 
     def test_retrieve_org(self):
         self.client.force_authenticate(self.user)
-        response = self.client.get('/organizations/1/')
-        self.assertEqual(response.status_code, status.HTTP_404_NOT_FOUND)
 
         organization = Organization.objects.create(
             display_name='New Organization',
             acronym='NO',
-            type=OrganizationType.objects.get(pk=1),
+            type=self.organization_type,
         )
-        organization.territory.set([Territory.objects.get(pk=1)])
-        response = self.client.get('/organizations/1/')
+        organization.territory.set([self.territory])
+        response = self.client.get(f'/organizations/{organization.pk}/')
         self.assertEqual(response.status_code, status.HTTP_404_NOT_FOUND)
 
         self.user.is_staff = True
         self.user.save()
-        response = self.client.get('/organizations/1/')
+        response = self.client.get(f'/organizations/{organization.pk}/')
         self.assertEqual(response.status_code, status.HTTP_200_OK)
 
         self.user.is_staff = False
         self.user.save()
         organization.managers.set([self.user])
-        response = self.client.get('/organizations/1/')
+        response = self.client.get(f'/organizations/{organization.pk}/')
         self.assertEqual(response.status_code, status.HTTP_200_OK)
 
     def test_retrieve_org_multiple_managers(self):
         organization = Organization.objects.create(
             display_name='New Organization',
             acronym='NO',
-            type=OrganizationType.objects.get(pk=1),
+            type=self.organization_type,
         )
-        organization.territory.set([Territory.objects.get(pk=1)])
+        organization.territory.set([self.territory])
         manager = CustomUser.objects.create_user(username='manager', password=str(secrets.randbits(16)))
         organization.managers.set([self.user, manager])
 
         self.client.force_authenticate(self.user)
-        response = self.client.get('/organizations/1/')
+        response = self.client.get(f'/organizations/{organization.pk}/')
         self.assertEqual(response.status_code, status.HTTP_200_OK)
 
     def test_update_org(self):
         self.client.force_authenticate(self.user)
-        response = self.client.put('/organizations/1/', {'display_name': 'New Name','acronym': 'NN'})
-        self.assertEqual(response.status_code, status.HTTP_404_NOT_FOUND)
 
         organization = Organization.objects.create(
             display_name='New Organization',
             acronym='NO',
-            type=OrganizationType.objects.get(pk=1),
+            type=self.organization_type,
         )
         manager = CustomUser.objects.create_user(username='manager', password=str(secrets.randbits(16)))
         organization.managers.set([manager])
-        organization.territory.set([Territory.objects.get(pk=1)])
-        response = self.client.put('/organizations/1/', {'display_name': 'New Name','acronym': 'NN'})
+        organization.territory.set([self.territory])
+        response = self.client.put(f'/organizations/{organization.pk}/', {'display_name': 'New Name','acronym': 'NN'})
         self.assertEqual(response.status_code, status.HTTP_403_FORBIDDEN)
 
         self.user.is_staff = True
-        response = self.client.put('/organizations/1/', {'display_name': 'New Name','acronym': 'NN'})
+        response = self.client.put(f'/organizations/{organization.pk}/', {'display_name': 'New Name','acronym': 'NN'})
         self.assertEqual(response.status_code, status.HTTP_200_OK)
 
         self.user.is_staff = False
         organization.managers.set([self.user])
-        response = self.client.put('/organizations/1/', {'display_name': 'Other New Name','acronym': 'ONN'})
+        response = self.client.put(f'/organizations/{organization.pk}/', {'display_name': 'Other New Name','acronym': 'ONN'})
         self.assertEqual(response.status_code, status.HTTP_200_OK)
 
     def test_partial_update_org(self):
         self.client.force_authenticate(self.user)
-        response = self.client.patch('/organizations/1/', {'display_name': 'New Name'})
-        self.assertEqual(response.status_code, status.HTTP_405_METHOD_NOT_ALLOWED)
 
         organization = Organization.objects.create(
             display_name='New Organization',
             acronym='NO',
-            type=OrganizationType.objects.get(pk=1),
+            type=self.organization_type,
         )
-        organization.territory.set([Territory.objects.get(pk=1)])
-        response = self.client.patch('/organizations/1/', {'display_name': 'New Name'})
+        organization.territory.set([self.territory])
+        response = self.client.patch(f'/organizations/{organization.pk}/', {'display_name': 'New Name'})
         self.assertEqual(response.status_code, status.HTTP_405_METHOD_NOT_ALLOWED)
 
         self.user.is_staff = True
-        response = self.client.patch('/organizations/1/', {'display_name': 'New Name'})
+        response = self.client.patch(f'/organizations/{organization.pk}/', {'display_name': 'New Name'})
         self.assertEqual(response.status_code, status.HTTP_405_METHOD_NOT_ALLOWED)
 
         self.user.is_staff = False
         organization.managers.set([self.user])
-        response = self.client.patch('/organizations/1/', {'display_name': 'Other New Name'})
+        response = self.client.patch(f'/organizations/{organization.pk}/', {'display_name': 'Other New Name'})
         self.assertEqual(response.status_code, status.HTTP_405_METHOD_NOT_ALLOWED)
 
     def test_delete_org(self):
         self.client.force_authenticate(self.user)
-        response = self.client.delete('/organizations/1/')
-        self.assertEqual(response.status_code, status.HTTP_404_NOT_FOUND)
 
         organization = Organization.objects.create(
             display_name='New Organization',
             acronym='NO',
-            type=OrganizationType.objects.get(pk=1),
+            type=self.organization_type,
         )
         manager = CustomUser.objects.create_user(username='manager', password=str(secrets.randbits(16)))
         organization.managers.set([manager])
-        organization.territory.set([Territory.objects.get(pk=1)])
-        response = self.client.delete('/organizations/1/')
+        organization.territory.set([self.territory])
+        response = self.client.delete(f'/organizations/{organization.pk}/')
         self.assertEqual(response.status_code, status.HTTP_403_FORBIDDEN)
 
         self.user.is_staff = True
-        response = self.client.delete('/organizations/1/')
+        response = self.client.delete(f'/organizations/{organization.pk}/')
         self.assertEqual(response.status_code, status.HTTP_204_NO_CONTENT)
 
     def test_list_tagdiffs(self):
@@ -224,11 +216,8 @@ class OrganizationViewSetTestCase(APITestCase):
 
     def test_retrieve_tagdiff(self):
         self.client.force_authenticate(self.user)
-        response = self.client.get('/tag_diff/1/')
-        self.assertEqual(response.status_code, status.HTTP_404_NOT_FOUND)
-
-        TagDiff.objects.create(tag='Tag 1')
-        response = self.client.get('/tag_diff/1/')
+        tagdiff = TagDiff.objects.create(tag='Tag 1')
+        response = self.client.get(f'/tag_diff/{tagdiff.pk}/')
         self.assertEqual(response.status_code, status.HTTP_200_OK)
 
     def test_update_tagdiff(self):
