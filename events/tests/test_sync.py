@@ -4,8 +4,10 @@ from django.test import TestCase
 from events.models import Events
 
 class TestSyncCommand(TestCase):
+
+    @patch('sys.stdout.write')
     @patch('events.management.commands.sync.requests.get')
-    def test_handle_successful_sync(self, mock_get):
+    def test_handle_successful_sync(self, mock_get, mock_stdout):
         # Setup mock data
         event = Events.objects.create(
             url="https://learn.wiki/courses/course-123",
@@ -36,6 +38,7 @@ class TestSyncCommand(TestCase):
         self.assertEqual(event.time_begin.isoformat(timespec='seconds').replace('+00:00', 'Z'), "2023-01-01T12:00:00Z")
         self.assertEqual(event.time_end.isoformat(timespec='seconds').replace('+00:00', 'Z'), "2023-01-02T12:00:00Z")
         self.assertEqual(event.image_url, "https://new.image.url")
+        mock_stdout.assert_called_with("Successfully synced event New Event Name\n")
 
 
     @patch('events.management.commands.sync.requests.get')
@@ -72,9 +75,6 @@ class TestSyncCommand(TestCase):
 
         # Call the command and assert it raises ConnectionError
         with self.assertRaises(ConnectionError):
-            with patch('sys.stdout.write') as mock_stdout:
-                call_command('sync', verbosity=2)
+            call_command('sync')
 
-                # Assert that stdout.write was called with expected messages
-                mock_stdout.assert_any_call('Starting sync process...\n')
-                mock_stdout.assert_any_call('Sync completed successfully.\n')
+

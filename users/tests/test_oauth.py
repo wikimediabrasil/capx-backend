@@ -116,3 +116,10 @@ class CheckViewTestCase(TestCase):
         self.assertEqual(response.status_code, status.HTTP_200_OK)
         self.assertFalse(response.data['exists'])
         self.assertIsNone(response.data['extra'])
+
+    def test_post_without_token(self):
+        data = {}
+        response = self.client.post('/api/login/social/check/', data, format='json')
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+        self.assertIn('error', response.data)
+        self.assertEqual(response.data['error'], 'oauth_token is required')
