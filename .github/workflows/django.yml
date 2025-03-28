@@ -21,6 +21,7 @@ jobs:
       with:
         mariadb version: '10.6.20'
         mysql user: 'runner'
+        mysql password: 'runner'
     - name: Set up Python ${{ matrix.python-version }}
       uses: actions/setup-python@v3
       with:
@@ -35,7 +36,7 @@ jobs:
         echo "DEBUG = True" >> CapX/settings_local.py
         echo "ALLOWED_HOSTS = ['localhost', '127.0.0.1']" >> CapX/settings_local.py
         echo "BASE_DIR = '${GITHUB_WORKSPACE}'" >> CapX/settings_local.py
-        echo "DATABASES = {'default': {'ENGINE': 'django.db.backends.mysql', 'NAME': 'test', 'USER': 'runner'}}" >> CapX/settings_local.py
+        echo "DATABASES = {'default': {'ENGINE': 'django.db.backends.mysql', 'NAME': 'test', 'USER': 'runner', PASSWORD: 'runner'}}" >> CapX/settings_local.py
         echo "LANGUAGES = (('en', 'English'),('pt', 'Portuguese'),('es', 'Spanish'),)" >> CapX/settings_local.py
         echo "SOCIAL_AUTH_MEDIAWIKI_CALLBACK = 'https://localhost:8000/oauth/complete/mediawiki/'" >> CapX/settings_local.py
         echo "SOCIAL_AUTH_MEDIAWIKI_KEY = 'key'" >> CapX/settings_local.py
