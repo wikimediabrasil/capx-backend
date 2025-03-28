@@ -144,7 +144,7 @@ class EventParticipantViewSet(viewsets.ModelViewSet):
                 return Response("Only the organizer, committee or staff can edit participants", status=status.HTTP_403_FORBIDDEN)
         
         # Check if the user is trying to unconfirm the creator of the event
-        if request.data['participant'] == str(self.get_object().event.creator.pk):
+        if self.get_object().participant == self.get_object().event.creator:
             if 'confirmed_organizer' in changed_fields:
                 return Response("The creator of the event cannot be unconfirmed", status=status.HTTP_403_FORBIDDEN)
             
