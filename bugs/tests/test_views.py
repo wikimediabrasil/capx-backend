@@ -136,7 +136,7 @@ class AttachmentViewSetTestCase(APITestCase):
             'file': SimpleUploadedFile('updated_attachment.test', b'updated attachment content'),
             'bug': self.bug.data['id'],
         }
-        response = self.client.put(f'/attachment/{self.bug.data["id"]}/', attachment_data)
+        response = self.client.put(f'/attachment/{self.attachment.data["id"]}/', attachment_data)
         self.assertEqual(response.status_code, status.HTTP_405_METHOD_NOT_ALLOWED)
 
     def test_attachment_partial_update(self):
