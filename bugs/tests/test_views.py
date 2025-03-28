@@ -143,7 +143,7 @@ class AttachmentViewSetTestCase(APITestCase):
         attachment_data = {
             'file': SimpleUploadedFile('updated_attachment.test', b'updated attachment content'),
         }
-        response = self.client.patch(f'/attachment/{self.bug.data["id"]}/', attachment_data)
+        response = self.client.patch(f'/attachment/{self.attachment.data["id"]}/', attachment_data)
         self.assertEqual(response.status_code, status.HTTP_405_METHOD_NOT_ALLOWED)
 
     def test_attachment_create_exceed_size(self):
