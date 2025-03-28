@@ -1,6 +1,7 @@
 import os
 from pathlib import Path
 from dotenv import load_dotenv
+import pymysql
 
 load_dotenv()
 
@@ -51,12 +52,33 @@ def configure_settings():
         server_email = 'root@localhost'
         admins = []
 
-        databases = {
-            'default': {
-                'ENGINE': 'django.db.backends.sqlite3',
-                'NAME':  Path(__file__).resolve().parent.parent / 'db.sqlite3',
+        try:
+            connection = pymysql.connect(
+                host='localhost',
+                user='root',
+                password='runner',
+                database='test',
+                port=3306
+            )
+            connection.close()
+            databases = {
+                'default': {
+                    'ENGINE': 'django.db.backends.mysql',
+                    'NAME': 'test',
+                    'USER': 'root',
+                    'PASSWORD': 'runner',
+                    'HOST': 'localhost',
+                    'PORT': '3306',
+                }
             }
-        }
+        except Exception as e:
+            print("MySQL connection failed, falling back to SQLite:", e)
+            databases = {
+                'default': {
+                    'ENGINE': 'django.db.backends.sqlite3',
+                    'NAME':  Path(__file__).resolve().parent.parent / 'db.sqlite3',
+                }
+            }
 
     return {
         'DEBUG': debug,
