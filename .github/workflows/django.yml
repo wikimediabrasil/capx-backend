@@ -22,7 +22,7 @@ jobs:
         mariadb version: '10.6.20'
         mysql user: 'runner'
         mysql password: 'runner'
-        mysql database: 'test'
+        mysql database: 'test_test'
     - name: Set up Python ${{ matrix.python-version }}
       uses: actions/setup-python@v3
       with:
