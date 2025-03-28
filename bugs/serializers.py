@@ -21,6 +21,7 @@ class AttachmentSerializer(serializers.ModelSerializer):
     class Meta:
         model = Attachment
         fields = [
+            'id',
             'bug',
             'file',
             'uploaded_at',

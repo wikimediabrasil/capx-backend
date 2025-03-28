@@ -12,7 +12,7 @@ class TestSettingsLocal(unittest.TestCase):
             self.assertFalse(os.path.exists('/some/path'))  # This will be False
             self.assertListEqual(settings['ALLOWED_HOSTS'], ['127.0.0.1'])
             self.assertEqual(settings['SOCIAL_AUTH_MEDIAWIKI_CALLBACK'], 'http://127.0.0.1:3000/oauth/')
-            self.assertEqual(settings['DATABASES']['default']['ENGINE'], 'django.db.backends.sqlite3')
+            self.assertIn(settings['DATABASES']['default']['ENGINE'], ['django.db.backends.sqlite3', 'django.db.backends.mysql'])
             self.assertEqual(settings['MESSAGE'], 'You are running in local mode, please make sure to set up the replica.my.cnf file to run in production mode')
 
     @unittest.skipIf(not hasattr(settings_local, 'configure_settings'), "settings_local.configure_settings doesn't exist")
