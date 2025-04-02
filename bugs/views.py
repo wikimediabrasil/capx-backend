@@ -1,6 +1,6 @@
 from .models import Bug, Attachment
 from .serializers import BugSerializer, AttachmentSerializer
-from rest_framework import viewsets, status
+from rest_framework import viewsets, status, filters
 from rest_framework.response import Response
 from drf_spectacular.utils import extend_schema, extend_schema_view, OpenApiParameter, OpenApiTypes, OpenApiResponse
 
@@ -23,6 +23,9 @@ from drf_spectacular.utils import extend_schema, extend_schema_view, OpenApiPara
 )
 class BugViewSet(viewsets.ModelViewSet):
     serializer_class = BugSerializer
+    filter_backends = [filter.OrderingFilter]
+    ordering_fields = ['created_at']
+    ordering = ['-created_at']
 
     def get_queryset(self):
         user = self.request.user
