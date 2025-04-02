@@ -467,7 +467,7 @@ class SavedItemViewSet(viewsets.ModelViewSet):
 
         if existing_item:
             serializer = self.get_serializer(existing_item)
-            return Response(serializer.data, status=status.HTTP_202_ACCEPTED)
+            return Response(serializer.data, status=status.HTTP_208_ALREADY_REPORTED)
 
         return super().create(request, *args, **kwargs)
 
