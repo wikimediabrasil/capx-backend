@@ -616,6 +616,18 @@ class SavedItemViewSetTestCase(TestCase):
         response = self.client.post('/saved_item/', data, format='json')
         self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
 
+    def test_create_saved_item_already_exists(self):
+        SavedItem.objects.create(user=self.user, relation='sharer', entity='user', related_user=CustomUser.objects.get(username='test2'))
+        data = {'relation': 'sharer', 'entity': 'user', 'entity_id': CustomUser.objects.get(username='test2').pk}
+        response = self.client.post('/saved_item/', data, format='json')
+        self.assertEqual(response.status_code, status.HTTP_208_ALREADY_REPORTED)
+
+    def test_create_saved_item_invalid_entity(self):
+        data = {'relation': 'sharer', 'entity': 'invalid', 'entity_id': 1}
+        response = self.client.post('/saved_item/', data, format='json')
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+        self.assertEqual(response.data['message'], 'Invalid entity type.')
+
     def test_delete_saved_item(self):
         saved_item = SavedItem.objects.create(user=self.user, relation='sharer', entity='user', related_user=CustomUser.objects.get(username='test2'))
 
