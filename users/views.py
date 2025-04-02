@@ -448,6 +448,29 @@ class SavedItemViewSet(viewsets.ModelViewSet):
     def perform_create(self, serializer):
         serializer.save(user=self.request.user)
 
+    def create(self, request, *args, **kwargs):
+        user = request.user
+        relation = request.data.get('relation')
+        entity = request.data.get('entity')
+        entity_id = request.data.get('entity_id')
+
+        if entity == 'org':
+            existing_item = SavedItem.objects.filter(
+                user=user, relation=relation, entity='org', related_org_id=entity_id
+            ).first()
+        elif entity == 'user':
+            existing_item = SavedItem.objects.filter(
+                user=user, relation=relation, entity='user', related_user_id=entity_id
+            ).first()
+        else:
+            return Response({'message': 'Invalid entity type.'}, status=status.HTTP_400_BAD_REQUEST)
+
+        if existing_item:
+            serializer = self.get_serializer(existing_item)
+            return Response(serializer.data, status=status.HTTP_208_ALREADY_REPORTED)
+
+        return super().create(request, *args, **kwargs)
+
     @extend_schema(exclude=True)
     def partial_update(self, request, *args, **kwargs):
         response = {'message': 'Partial updates are not allowed for saved items.'}
