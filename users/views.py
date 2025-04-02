@@ -454,10 +454,16 @@ class SavedItemViewSet(viewsets.ModelViewSet):
         entity = request.data.get('entity')
         entity_id = request.data.get('entity_id')
 
-        if entity not in ['org', 'user']:
+        if entity == 'org':
+            existing_item = SavedItem.objects.filter(
+                user=user, relation=relation, entity='org', related_org_id=entity_id
+            ).first()
+        elif entity == 'user':
+            existing_item = SavedItem.objects.filter(
+                user=user, relation=relation, entity='user', related_user_id=entity_id
+            ).first()
+        else:
             return Response({'message': 'Invalid entity type.'}, status=status.HTTP_400_BAD_REQUEST)
-
-        existing_item = SavedItem.objects.filter(user=user, relation=relation, entity=entity, related_user_id=entity_id).first()
 
         if existing_item:
             serializer = self.get_serializer(existing_item)
