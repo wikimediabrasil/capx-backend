@@ -182,6 +182,13 @@ class Profile(models.Model):
         help_text="json"
     )
 
+    # LAST UPDATE
+    last_update = models.DateTimeField(
+        verbose_name="Last update",
+        auto_now=True,
+        help_text="Timestamp of the last update to the profile."
+    )
+
     def save(self, *args, **kwargs):
         """
         Overrides the save method to set the primary key (pk) of the instance to the
