@@ -23,7 +23,7 @@ from drf_spectacular.utils import extend_schema, extend_schema_view, OpenApiPara
 )
 class BugViewSet(viewsets.ModelViewSet):
     serializer_class = BugSerializer
-    filter_backends = [filter.OrderingFilter]
+    filter_backends = [filters.OrderingFilter]
     ordering_fields = ['created_at']
     ordering = ['-created_at']
 
