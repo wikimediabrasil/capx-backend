@@ -25,7 +25,8 @@ class SkillViewSetTestCase(TestCase):
         self.assertEqual(response.data['results'], serializer.data)
 
     def test_get_skill_detail(self):
-        response = self.client.get('/skill/1/')
+        skill = Skill.objects.get(skill_wikidata_item='Q123456789')
+        response = self.client.get('/skill/' + str(skill.pk) + '/')
         skills = Skill.objects.all()
         serializer = SkillSerializer(skills.first())
         self.assertEqual(response.status_code, status.HTTP_200_OK)
@@ -82,23 +83,26 @@ class SkillViewSetTestCase(TestCase):
         self.assertEqual(response.status_code, status.HTTP_405_METHOD_NOT_ALLOWED)
 
     def test_delete_skill(self):
-        response = self.client.delete('/skill/1/')
+        skill = Skill.objects.get(skill_wikidata_item='Q123456789')
+        response = self.client.delete('/skill/' + str(skill.pk) + '/')
         self.assertEqual(response.status_code, status.HTTP_204_NO_CONTENT)
 
     def test_delete_skill_nostaff(self):
         self.user.is_staff = False
         self.user.save()
-        response = self.client.delete('/skill/1/')
+        skill = Skill.objects.get(skill_wikidata_item='Q123456789')
+        response = self.client.delete('/skill/' + str(skill.pk) + '/')
         self.assertEqual(response.status_code, status.HTTP_403_FORBIDDEN)
 
     def test_delete_skill_referenced(self):
         # Create a second skill that references the first skill
         skill = {
             'skill_wikidata_item': "Q987654321",
-            'skill_type': 1
+            'skill_type': Skill.objects.get(skill_wikidata_item='Q123456789').pk
         }
         self.client.post('/skill/', skill)
-        response = self.client.delete('/skill/1/')
+        skill_root = Skill.objects.get(skill_wikidata_item='Q123456789')
+        response = self.client.delete('/skill/' + str(skill_root.pk) + '/')
         self.assertEqual(response.status_code, status.HTTP_403_FORBIDDEN)
 
 class SkillByTypeTestCase(TestCase):

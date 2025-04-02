@@ -7,14 +7,13 @@ from django.core.files.uploadedfile import SimpleUploadedFile
 
 
 class BugModelTest(TestCase):
-    @classmethod
-    def setUpTestData(cls):
+    def setUp(self):
         # Create a user
         test_user = CustomUser.objects.create_user(username='testuser', password=str(secrets.randbits(16)))
         test_user.save()
 
         # Create a Bug instance to use in tests
-        Bug.objects.create(
+        self.bug = Bug.objects.create(
             user=test_user,
             title='Sample Bug',
             description='Sample Description',
@@ -23,7 +22,7 @@ class BugModelTest(TestCase):
         )
 
     def test_bug_creation(self):
-        bug = Bug.objects.get(id=1)
+        bug = self.bug
         expected_user = f'{bug.user}'
         expected_title = f'{bug.title}'
         expected_description = f'{bug.description}'
@@ -37,7 +36,7 @@ class BugModelTest(TestCase):
         self.assertEqual(expected_status, 'to_do')
 
     def test_bug_str(self):
-        bug = Bug.objects.get(id=1)
+        bug = self.bug
         expected_str = f'{bug.title}'
         self.assertEqual(expected_str, str(bug))
 

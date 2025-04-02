@@ -148,22 +148,22 @@ class QuickListViewSetTestCase(TestCase):
         self.assertEqual(response.data, {})
         
     def test_list_orgs(self):
-        OrganizationType.objects.create(type_name='Type 1', type_code='TYPE1')
-        Territory.objects.create(territory_name='Territory 1')
+        test_org_type = OrganizationType.objects.create(type_name='Type 1', type_code='TYPE1')
+        test_territory = Territory.objects.create(territory_name='Territory 1')
         self.client.force_authenticate(self.user)
 
         organization = Organization.objects.create(
             display_name='New Organization',
             acronym='NO',
-            type=OrganizationType.objects.get(pk=1),
+            type=test_org_type,
         )
-        organization.territory.set([Territory.objects.get(pk=1)])
+        organization.territory.set([test_territory])
         Organization.objects.create(
             display_name='New Organization 2',
             acronym='NO2', 
-            type=OrganizationType.objects.get(pk=1),
+            type=test_org_type,
         )
-        organization.territory.set([Territory.objects.get(pk=1)])
+        organization.territory.set([test_territory])
         organizations = Organization.objects.all()
         expected_data = {organization.pk: organization.display_name + ' (' + organization.acronym + ')' for organization in organizations}
         response = self.client.get('/list/affiliation/')
@@ -215,14 +215,14 @@ class QuickListViewSetTestCase(TestCase):
             type_of_location='virtual',
             time_begin='2021-10-10 10:00:00+00:00',
             time_end='2021-10-10 12:00:00+00:00',
-            creator=CustomUser.objects.get(id=1)
+            creator=self.user
         )
         Events.objects.create(
             name='Sample Event 2',
             type_of_location='virtual',
             time_begin='2021-10-10 10:00:00+00:00',
             time_end='2021-10-10 12:00:00+00:00',
-            creator=CustomUser.objects.get(id=1)
+            creator=self.user
         )
         self.client.force_authenticate(self.user)
 
