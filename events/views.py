@@ -50,13 +50,14 @@ class EventViewSet(viewsets.ModelViewSet):
     
     @extend_schema(
         summary='Delete an event.',
-        description='This endpoint deletes an event. Only staff can delete an event.'
+        description='This endpoint deletes an event. Only staff or the event creator can delete an event.'
     )
     def destroy(self, request, *args, **kwargs):
-        if request.user.is_staff:
+        event = self.get_object()
+        if request.user.is_staff or request.user == event.creator:
             return super().destroy(request, *args, **kwargs)
         else:
-            return Response("Only staff can delete an event", status=status.HTTP_403_FORBIDDEN)
+            return Response("Only staff or the event creator can delete an event", status=status.HTTP_403_FORBIDDEN)
 
 @extend_schema_view(
     list=extend_schema(
