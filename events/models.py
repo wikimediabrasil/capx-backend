@@ -38,6 +38,11 @@ class Events(models.Model):
         verbose_name="Event URL",
         help_text="URL of the event."
     )
+    description = models.TextField(
+        blank=True,
+        verbose_name="Event Description",
+        help_text="Description of the event."
+    )
     wikidata_qid = models.CharField(
         max_length=10,
         blank=True,
