@@ -6,7 +6,6 @@ from users.models import CustomUser as User, Territory
 from django_filters.rest_framework import DjangoFilterBackend
 from drf_spectacular.utils import extend_schema, extend_schema_view, OpenApiParameter, OpenApiTypes
 from django.db import models
-from django.db.models import Q
 
 @extend_schema_view(
     list=extend_schema(
@@ -81,7 +80,8 @@ class OrganizationViewSet(viewsets.ModelViewSet):
         if territory_id:
             # Include organizations in the specified territory or its child territories
             child_territories = Territory.objects.filter(
-                Q(id=territory_id) | Q(parent_territory__id=territory_id)
+                models.Q(id=territory_id) | 
+                models.Q(parent_territory__id=territory_id)
             ).values_list('id', flat=True)
             queryset = queryset.filter(territory__id__in=child_territories)
 
