@@ -80,7 +80,7 @@ class Command(BaseCommand):
             if response.status_code == 200 and response.json().get('results', None):
                 data = [f"{badge['badge_class']['display_name']}§{badge['badge_class']['course_id']}§{badge['assertion_url']}" for badge in response.json().get('results')]
             else:
-                data = ['Capacity Exchange supporter§Capx-logo-redux.svg§https://meta.wikimedia.org/wiki/Capacity_Exchange/Network/']
+                data = ['Capacity Exchange supporter§Capx-logo-redux.svg§https://meta.wikimedia.org/wiki/Capacity_Exchange/Network']
             
             profile.append(self.format_list(data))
         
