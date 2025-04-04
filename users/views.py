@@ -10,6 +10,7 @@ from django.db import models
 from django.shortcuts import get_object_or_404
 from django_filters.rest_framework import DjangoFilterBackend
 from drf_spectacular.utils import extend_schema, extend_schema_view, OpenApiParameter, OpenApiTypes, OpenApiExample, OpenApiResponse
+from django.db.models import Q
 
 
 @extend_schema_view(
@@ -71,6 +72,14 @@ class UsersViewSet(viewsets.ReadOnlyModelViewSet):
         has_skills_available = self.request.query_params.get('has_skills_available')
         has_skills_wanted = self.request.query_params.get('has_skills_wanted')
         has_any_skills = self.request.query_params.get('has_any_skills')
+        territory_id = self.request.query_params.get('territory')
+
+        if territory_id:
+            # Include profiles in the specified territory or its child territories
+            child_territories = Territory.objects.filter(
+                Q(id=territory_id) | Q(parent_territory__id=territory_id)
+            ).values_list('id', flat=True)
+            queryset = queryset.filter(territory__id__in=child_territories)
 
         if has_skills_known is not None:
             if has_skills_known.lower() == 'true':
