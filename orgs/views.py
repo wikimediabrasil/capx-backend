@@ -6,6 +6,7 @@ from users.models import CustomUser as User, Territory
 from django_filters.rest_framework import DjangoFilterBackend
 from drf_spectacular.utils import extend_schema, extend_schema_view, OpenApiParameter, OpenApiTypes
 from django.db import models
+from django.db.models import Q
 
 @extend_schema_view(
     list=extend_schema(
@@ -68,6 +69,7 @@ class OrganizationViewSet(viewsets.ModelViewSet):
         has_capacities_wanted = self.request.query_params.get('has_capacities_wanted', None)
         has_capacities_available = self.request.query_params.get('has_capacities_available', None)
         has_any_capacities = self.request.query_params.get('has_any_capacities', None)
+        territory_id = self.request.query_params.get('territory')
 
         user = self.request.user
         if user.is_staff:
@@ -76,6 +78,13 @@ class OrganizationViewSet(viewsets.ModelViewSet):
             # Filter organizations that have at least one manager and ensure distinct results
             queryset = Organization.objects.filter(managers__isnull=False).distinct()
         
+        if territory_id:
+            # Include organizations in the specified territory or its child territories
+            child_territories = Territory.objects.filter(
+                Q(id=territory_id) | Q(parent_territory__id=territory_id)
+            ).values_list('id', flat=True)
+            queryset = queryset.filter(territory__id__in=child_territories)
+
         if has_capacities_known is not None:
             if has_capacities_known.lower() == 'true':
                 queryset = queryset.filter(known_capacities__isnull=False).distinct()
