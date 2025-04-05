@@ -41,6 +41,12 @@ from drf_spectacular.utils import extend_schema, extend_schema_view, OpenApiPara
                 required=False,
                 type=OpenApiTypes.BOOL,
             ),
+            OpenApiParameter(
+                name='territory',
+                description='Filter users by territory ID.',
+                required=False,
+                type=OpenApiTypes.INT,
+            ),
         ],
     ),
     retrieve=extend_schema(
@@ -55,7 +61,6 @@ class UsersViewSet(viewsets.ReadOnlyModelViewSet):
     filterset_fields = [
         'user__username',
         'about',
-        'territory',
         'wikimedia_project',
         'affiliation',
         'languageproficiency__language',
@@ -71,6 +76,15 @@ class UsersViewSet(viewsets.ReadOnlyModelViewSet):
         has_skills_available = self.request.query_params.get('has_skills_available')
         has_skills_wanted = self.request.query_params.get('has_skills_wanted')
         has_any_skills = self.request.query_params.get('has_any_skills')
+        territory_id = self.request.query_params.get('territory')
+
+        if territory_id:
+            # Include profiles in the specified territory or its child territories
+            child_territories = Territory.objects.filter(
+                models.Q(id=territory_id) | 
+                models.Q(parent_territory__id=territory_id)
+            ).values_list('id', flat=True)
+            queryset = queryset.filter(territory__id__in=child_territories)
 
         if has_skills_known is not None:
             if has_skills_known.lower() == 'true':

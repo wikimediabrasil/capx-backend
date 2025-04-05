@@ -507,6 +507,16 @@ class UsersFilterTestCase(TestCase):
         self.client = APIClient()
         self.client.force_authenticate(self.user)
 
+    def test_filter_by_territory(self):
+        self.territory = Territory.objects.create(territory_name='Territory 1')
+        self.child_territory = Territory.objects.create(territory_name='Child Territory 1')
+        self.child_territory.parent_territory.set([self.territory])
+        self.user.profile.territory.set([self.child_territory])
+
+        response = self.client.get(f'/users/?territory={self.territory.id}')
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(len(response.data['results']), 1)
+
     def test_get_queryset_has_skills_known_true(self):
         skill = Skill.objects.create(skill_wikidata_item="Q123456789")
         profile = Profile.objects.get(user=self.user)
