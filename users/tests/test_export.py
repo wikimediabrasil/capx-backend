@@ -13,7 +13,7 @@ class CommandTestCase(TestCase):
         self.command.verbosity = 2
         self.command.stdout = StringIO()
 
-    default_recognition = '[Capacity Exchange supporter§Capx-logo-redux.svg§https://meta.wikimedia.org/wiki/Capacity_Exchange/Network/]'
+    default_recognition = '[Capacity Exchange supporter§Capx-logo-redux.svg§https://meta.wikimedia.org/wiki/Capacity_Exchange/Network]'
 
     @patch('users.management.commands.export.requests.get')
     def test_get_meta_wiki_users(self, mock_get):
