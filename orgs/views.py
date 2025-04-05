@@ -36,6 +36,12 @@ from django.db import models
                 required=False,
                 type=OpenApiTypes.BOOL,
             ),
+            OpenApiParameter(
+                name='territory',
+                description='Filter organizations by territory ID.',
+                required=False,
+                type=OpenApiTypes.INT,
+            ),
         ]
     ),
     create=extend_schema(
@@ -55,7 +61,6 @@ class OrganizationViewSet(viewsets.ModelViewSet):
         'display_name',
         'acronym',
         'type',
-        'territory',
         'managers',
         'known_capacities',
         'available_capacities',

@@ -41,6 +41,12 @@ from drf_spectacular.utils import extend_schema, extend_schema_view, OpenApiPara
                 required=False,
                 type=OpenApiTypes.BOOL,
             ),
+            OpenApiParameter(
+                name='territory',
+                description='Filter users by territory ID.',
+                required=False,
+                type=OpenApiTypes.INT,
+            ),
         ],
     ),
     retrieve=extend_schema(
@@ -55,7 +61,6 @@ class UsersViewSet(viewsets.ReadOnlyModelViewSet):
     filterset_fields = [
         'user__username',
         'about',
-        'territory',
         'wikimedia_project',
         'affiliation',
         'languageproficiency__language',
