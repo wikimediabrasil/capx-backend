@@ -264,6 +264,17 @@ class OrganizationFilterViewSetTestCase(APITestCase):
         self.assertEqual(response.status_code, status.HTTP_200_OK)
         self.assertEqual(len(response.data['results']), Organization.objects.filter(managers__isnull=False).distinct().count())
 
+    def test_get_queryset_by_territory(self):
+        self.territory = Territory.objects.create(territory_name='Territory 1')
+        self.child_territory = Territory.objects.create(territory_name='Child Territory 1')
+        self.child_territory.parent_territory.set([self.territory])
+        self.organization.territory.set([self.child_territory])
+
+        self.client.force_authenticate(self.staff_user)
+        response = self.client.get('/organizations/', {'territory': self.territory.pk})
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(len(response.data['results']), 1)
+
     def test_get_queryset_has_capacities_known_true(self):
         self.client.force_authenticate(self.staff_user)
         self.organization.known_capacities.add(Skill.objects.create(skill_wikidata_item="Q123456789"))
