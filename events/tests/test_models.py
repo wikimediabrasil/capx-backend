@@ -15,6 +15,13 @@ class EventsModelTest(TestCase):
         # Create a user
         self.test_user = CustomUser.objects.create_user(username='testuser', password=str(secrets.randbits(16)))
         self.test_user.save()
+        
+        self.organization_type = OrganizationType.objects.create(type_name='Type 1', type_code='TYPE1')
+        self.organization = Organization.objects.create(
+            display_name='New Organization',
+            acronym='NO',
+            type=self.organization_type,
+        )
 
     def test_event_creation(self):
         # Create an event
@@ -23,10 +30,11 @@ class EventsModelTest(TestCase):
             type_of_location='virtual',
             time_begin='2021-10-10 10:00:00+00:00',
             time_end='2021-10-10 12:00:00+00:00',
+            organization=self.organization,
         )
 
         # Get the event
-        event = Events.objects.get(id=1)
+        event = Events.objects.get(name='Sample Event')
         expected_name = f'{event.name}'
         expected_type_of_location = f'{event.type_of_location}'
         expected_time_begin = f'{event.time_begin}'
