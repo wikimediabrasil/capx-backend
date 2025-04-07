@@ -73,8 +73,7 @@ class Events(models.Model):
     )
     organization = models.ForeignKey(
         Organization,
-        on_delete=models.SET_NULL,
-        null=True,
+        on_delete=models.CASCADE,
         related_name="events",
         verbose_name="Event Organization",
         help_text="Organization associated with the event."
