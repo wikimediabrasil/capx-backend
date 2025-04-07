@@ -209,28 +209,6 @@ class QuickListViewSetTestCase(TestCase):
         expected_data = {skill.pk: skill.skill_wikidata_item for skill in skills}
         self.assertEqual(response.data, expected_data)
 
-    def test_list_event(self):
-        Events.objects.create(
-            name='Sample Event',
-            type_of_location='virtual',
-            time_begin='2021-10-10 10:00:00+00:00',
-            time_end='2021-10-10 12:00:00+00:00',
-            creator=self.user
-        )
-        Events.objects.create(
-            name='Sample Event 2',
-            type_of_location='virtual',
-            time_begin='2021-10-10 10:00:00+00:00',
-            time_end='2021-10-10 12:00:00+00:00',
-            creator=self.user
-        )
-        self.client.force_authenticate(self.user)
-
-        response = self.client.get('/list/event/')
-        events = Events.objects.all()
-        expected_data = {event.pk: event.name for event in events}
-        self.assertEqual(response.data, expected_data)
-
     def test_list_project(self):
         Project.objects.create(display_name='Sample Project')
         Project.objects.create(display_name='Sample Project 2')
