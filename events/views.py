@@ -20,7 +20,7 @@ class EventViewSet(viewsets.ModelViewSet):
     queryset = Events.objects.all()
     serializer_class = EventSerializer
     filter_backends = [DjangoFilterBackend]
-    filterset_fields = ['organization', 'event_type', 'start_date', 'end_date']
+    filterset_fields = ['organization']
 
     @extend_schema(
         summary='Create an event.',
