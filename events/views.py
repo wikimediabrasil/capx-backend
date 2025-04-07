@@ -1,9 +1,10 @@
 from rest_framework import viewsets, status, permissions
 from rest_framework.response import Response
+from django_filters.rest_framework import DjangoFilterBackend
 from .models import Events
 from .serializers import EventSerializer
 from drf_spectacular.utils import extend_schema, extend_schema_view
-from Organization.models import Organization
+from orgs.models import Organization
 
 @extend_schema_view(
     list=extend_schema(
@@ -18,6 +19,8 @@ from Organization.models import Organization
 class EventViewSet(viewsets.ModelViewSet):
     queryset = Events.objects.all()
     serializer_class = EventSerializer
+    filter_backends = [DjangoFilterBackend]
+    filterset_fields = ['organization', 'event_type', 'start_date', 'end_date']
 
     @extend_schema(
         summary='Create an event.',
