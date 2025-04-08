@@ -36,6 +36,9 @@ class EventViewSet(viewsets.ModelViewSet):
             return Response({"detail": "You do not have permission to create an event for this organization."}, status=status.HTTP_403_FORBIDDEN)
         return super().create(request, *args, **kwargs)
 
+    def perform_create(self, serializer):
+        serializer.save(creator=self.request.user)
+
     @extend_schema(
         summary='Update an event.',
         description='This endpoint updates an event.'
