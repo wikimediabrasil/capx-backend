@@ -31,6 +31,7 @@ class EventsModelTest(TestCase):
             time_begin='2021-10-10 10:00:00+00:00',
             time_end='2021-10-10 12:00:00+00:00',
             organization=self.organization,
+            creator=self.test_user,
         )
 
         # Get the event

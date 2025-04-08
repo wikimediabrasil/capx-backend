@@ -222,6 +222,7 @@ class QuickListViewSetTestCase(TestCase):
             type_of_location='virtual',
             time_begin='2021-10-10 10:00:00+00:00',
             time_end='2021-10-10 12:00:00+00:00',
+            creator=self.user,
             organization=organization
         )
         Events.objects.create(
@@ -229,6 +230,7 @@ class QuickListViewSetTestCase(TestCase):
             type_of_location='virtual',
             time_begin='2021-10-10 10:00:00+00:00',
             time_end='2021-10-10 12:00:00+00:00',
+            creator=self.user,
             organization=organization
         )
         self.client.force_authenticate(self.user)
