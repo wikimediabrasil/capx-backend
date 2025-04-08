@@ -29,6 +29,8 @@ class EventViewSet(viewsets.ModelViewSet):
     def create(self, request, *args, **kwargs):
         # Check if user is a manager of the organization
         organization_id = request.data.get('organization')
+        if not organization_id or not Organization.objects.filter(id=organization_id).exists():
+            return Response({"detail": "The organization is blank or does not exist."}, status=status.HTTP_400_BAD_REQUEST)
         is_manager = Organization.objects.filter(id=organization_id, managers__id=request.user.id).exists()
         if not is_manager:
             return Response({"detail": "You do not have permission to create an event for this organization."}, status=status.HTTP_403_FORBIDDEN)

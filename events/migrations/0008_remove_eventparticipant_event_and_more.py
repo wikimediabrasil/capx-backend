@@ -66,10 +66,6 @@ class Migration(migrations.Migration):
             model_name='events',
             name='organizations',
         ),
-        migrations.RemoveField(
-            model_name='events',
-            name='creator',
-        ),
         migrations.DeleteModel(
             name='EventOrganizations',
         ),

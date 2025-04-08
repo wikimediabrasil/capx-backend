@@ -54,6 +54,17 @@ class EventViewSetTestCase(TestCase):
         response = self.client.post('/events/', data, format='json')
         self.assertEqual(response.status_code, status.HTTP_403_FORBIDDEN)
 
+    def test_create_event_invalid_organization(self):
+        data = {
+            'name': 'New Event',
+            'type_of_location': 'virtual',
+            'time_begin': '2023-11-10 10:00:00+00:00',
+            'time_end': '2023-11-10 12:00:00+00:00',
+            'organization': '9999'  # Invalid organization ID
+        }
+        response = self.client.post('/events/', data, format='json')
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+
     def test_update_event_as_manager(self):
         data = {
             'name': 'Updated Event',

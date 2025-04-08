@@ -71,6 +71,14 @@ class Events(models.Model):
         help_text="End time of the event.",
         blank=True
     )
+    creator = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.SET_NULL,
+        null=True,
+        related_name="events_created",
+        verbose_name="Event Creator",
+        help_text="Creator of the event."
+    )
     organization = models.ForeignKey(
         Organization,
         on_delete=models.CASCADE,
