@@ -210,19 +210,28 @@ class QuickListViewSetTestCase(TestCase):
         self.assertEqual(response.data, expected_data)
 
     def test_list_event(self):
+        test_org_type = OrganizationType.objects.create(type_name='Type 1', type_code='TYPE1')
+        organization = Organization.objects.create(
+            display_name='New Organization',
+            acronym='NO',
+            type=test_org_type,
+        )
+
         Events.objects.create(
             name='Sample Event',
             type_of_location='virtual',
             time_begin='2021-10-10 10:00:00+00:00',
             time_end='2021-10-10 12:00:00+00:00',
-            creator=self.user
+            creator=self.user,
+            organization=organization
         )
         Events.objects.create(
             name='Sample Event 2',
             type_of_location='virtual',
             time_begin='2021-10-10 10:00:00+00:00',
             time_end='2021-10-10 12:00:00+00:00',
-            creator=self.user
+            creator=self.user,
+            organization=organization
         )
         self.client.force_authenticate(self.user)
 

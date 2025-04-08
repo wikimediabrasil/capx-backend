@@ -2,6 +2,7 @@ from unittest.mock import patch, MagicMock
 from django.core.management import call_command
 from django.test import TestCase
 from events.models import Events
+from orgs.models import Organization, OrganizationType
 
 class TestSyncCommand(TestCase):
 
@@ -9,12 +10,19 @@ class TestSyncCommand(TestCase):
     @patch('events.management.commands.sync.requests.get')
     def test_handle_successful_sync(self, mock_get, mock_stdout):
         # Setup mock data
+        test_org_type = OrganizationType.objects.create(type_name='Type 1', type_code='TYPE1')
+        organization = Organization.objects.create(
+            display_name='New Organization',
+            acronym='NO',
+            type=test_org_type,
+        )
         event = Events.objects.create(
             url="https://learn.wiki/courses/course-123",
             name="Old Event Name",
             time_begin="2023-01-01T00:00:00Z",
             time_end="2023-01-02T00:00:00Z",
-            image_url="https://old.image.url"
+            image_url="https://old.image.url",
+            organization=organization,
         )
         mock_response = MagicMock()
         mock_response.status_code = 200
@@ -44,11 +52,18 @@ class TestSyncCommand(TestCase):
     @patch('events.management.commands.sync.requests.get')
     def test_handle_invalid_response(self, mock_get):
         # Setup mock data
+        test_org_type = OrganizationType.objects.create(type_name='Type 1', type_code='TYPE1')
+        organization = Organization.objects.create(
+            display_name='New Organization',
+            acronym='NO',
+            type=test_org_type,
+        )
         event = Events.objects.create(
             url="https://learn.wiki/courses/course-123",
             name="Old Event Name",
             time_begin="2023-01-01T00:00:00Z",
             time_end="2023-01-02T00:00:00Z",
+            organization=organization,
         )
         mock_response = MagicMock()
         mock_response.status_code = 200
@@ -66,10 +81,17 @@ class TestSyncCommand(TestCase):
     @patch('events.management.commands.sync.requests.get')
     def test_handle_connection_error(self, mock_get):
         # Setup mock data
+        test_org_type = OrganizationType.objects.create(type_name='Type 1', type_code='TYPE1')
+        organization = Organization.objects.create(
+            display_name='New Organization',
+            acronym='NO',
+            type=test_org_type,
+        )
         Events.objects.create(
             url="https://learn.wiki/courses/course-123",
             time_begin="2023-01-01T00:00:00Z",
             time_end="2023-01-02T00:00:00Z",
+            organization=organization,
         )
         mock_get.return_value.status_code = 500
 

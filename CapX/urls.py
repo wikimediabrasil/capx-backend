@@ -27,7 +27,7 @@ from users.views import (
 )
 from bugs.views import BugViewSet, AttachmentViewSet
 from orgs.views import OrganizationViewSet, OrganizationTypeViewSet, TagDiffViewSet, DocumentViewSet
-from events.views import EventViewSet, EventParticipantViewSet, EventOrganizationsViewSet
+from events.views import EventViewSet
 from message.views import MessageViewSet
 from projects.views import ProjectViewSet, ProjectMemberViewSet, ProjectMemberAcceptanceViewSet
 from drf_spectacular.views import SpectacularAPIView, SpectacularSwaggerView
@@ -51,8 +51,6 @@ router.register('attachment', AttachmentViewSet, basename='attachment')
 router.register('users_by_skill', UsersBySkillViewSet, basename='users_by_skill')
 router.register('skills_by_type', SkillByTypeViewSet, basename='skills_by_type')
 router.register('events', EventViewSet)
-router.register('events_participants', EventParticipantViewSet)
-router.register('events_organizations', EventOrganizationsViewSet)
 router.register('messages', MessageViewSet, basename='messages')
 router.register('projects', ProjectViewSet, basename='projects')
 router.register('project_members', ProjectMemberViewSet, basename='project_members')
