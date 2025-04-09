@@ -1,6 +1,6 @@
-from .models import Profile, Territory, Language, WikimediaProject, Avatar, SavedItem
+from .models import Profile, Territory, Language, WikimediaProject, Avatar, SavedItem, Badge, UserBadge
 from orgs.models import Organization
-from .serializers import ProfileSerializer, TerritorySerializer, LanguageSerializer, WikimediaProjectSerializer, UsersBySkillSerializer, UsersByTagSerializer, AvatarSerializer, SavedItemSerializer
+from .serializers import ProfileSerializer, TerritorySerializer, LanguageSerializer, WikimediaProjectSerializer, UsersBySkillSerializer, UsersByTagSerializer, AvatarSerializer, SavedItemSerializer, BadgeSerializer, UserBadgeSerializer
 from skills.models import Skill
 from events.models import Events
 from projects.models import Project
@@ -497,3 +497,47 @@ class SavedItemViewSet(viewsets.ModelViewSet):
     def update(self, request, *args, **kwargs):
         response = {'message': 'Updates are not allowed for saved items.'}
         return Response(response, status=status.HTTP_405_METHOD_NOT_ALLOWED)
+
+
+@extend_schema_view(
+    list=extend_schema(
+        summary='List all badges.',
+        description='This endpoint lists all badges.',
+    ),
+    retrieve=extend_schema(
+        summary='Retrieve a badge by ID.',
+        description='This endpoint retrieves a badge by its ID.',
+    ),
+)
+class BadgeViewSet(viewsets.ReadOnlyModelViewSet):
+    queryset = Badge.objects.all()
+    serializer_class = BadgeSerializer
+
+
+@extend_schema_view(
+    list=extend_schema(
+        summary='List all user badges.',
+        description='This endpoint lists all user badges.',
+    ),
+    retrieve=extend_schema(
+        summary='Retrieve a user badge by ID.',
+        description='This endpoint retrieves a user badge by its ID.',
+    ),
+    update=extend_schema(
+        summary='Update a user badge.',
+        description='This endpoint updates a user badge.',
+    ),
+)
+class UserBadgeViewSet(viewsets.ModelViewSet):
+    queryset = UserBadge.objects.all()
+    serializer_class = UserBadgeSerializer
+
+    def get_queryset(self):
+        return UserBadge.objects.filter(profile__user=self.request.user)
+
+    def update(self, request, *args, **kwargs):
+        instance = self.get_object()
+        if instance.profile.user == request.user:
+            return super().update(request, *args, **kwargs)
+        else:
+            return Response({'message': 'You do not have permission to update this badge.'}, status=status.HTTP_403_FORBIDDEN)

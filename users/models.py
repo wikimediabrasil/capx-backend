@@ -309,6 +309,28 @@ class SavedItem(models.Model):
             return f"{self.user.username}: {self.relation} - Organization - {self.related_org.display_name}"
         elif self.related_user:
             return f"{self.user.username}: {self.relation} - User - {self.related_user.username}"
+
+
+class Badge(models.Model):
+    name = models.CharField(max_length=255)
+    picture = models.ImageField(upload_to='badges/')
+    description = models.TextField()
+    users = models.ManyToManyField(Profile, through='UserBadge')
+
+    def __str__(self):
+        return self.name
+
+
+class UserBadge(models.Model):
+    profile = models.ForeignKey(Profile, on_delete=models.CASCADE)
+    badge = models.ForeignKey(Badge, on_delete=models.CASCADE)
+    is_displayed = models.BooleanField(default=True)
+
+    class Meta:
+        unique_together = ('profile', 'badge')
+
+    def __str__(self):
+        return f"{self.profile.user.username} - {self.badge.name}"
     
 
 class LetsConnectLog(models.Model):

@@ -1,5 +1,5 @@
 from rest_framework import serializers
-from .models import Profile, CustomUser, LanguageProficiency, SavedItem, LetsConnectLog
+from .models import Profile, CustomUser, LanguageProficiency, SavedItem, LetsConnectLog, Badge, UserBadge
 from .submodels import Territory, Language, WikimediaProject, Avatar
 from orgs.models import Organization
 from drf_spectacular.utils import extend_schema_field, extend_schema_serializer
@@ -248,3 +248,22 @@ class LetsConnectLogSerializer(serializers.ModelSerializer):
             'confirmation': {'read_only': True},
             'timestamp': {'read_only': True},
         }
+
+        
+class BadgeSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = Badge
+        fields = ['id', 'name', 'picture', 'description']
+
+
+class UserBadgeSerializer(serializers.ModelSerializer):
+    badge = BadgeSerializer(read_only=True)
+
+    class Meta:
+        model = UserBadge
+        fields = ['badge', 'is_displayed']
+
+    def update(self, instance, validated_data):
+        instance.is_displayed = validated_data.get('is_displayed', instance.is_displayed)
+        instance.save()
+        return instance
