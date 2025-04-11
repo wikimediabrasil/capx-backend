@@ -1,5 +1,5 @@
 from rest_framework import serializers
-from .models import Profile, CustomUser, LanguageProficiency, SavedItem
+from .models import Profile, CustomUser, LanguageProficiency, SavedItem, LetsConnectLog
 from .submodels import Territory, Language, WikimediaProject, Avatar
 from orgs.models import Organization
 from drf_spectacular.utils import extend_schema_field, extend_schema_serializer
@@ -214,3 +214,29 @@ class SavedItemSerializer(serializers.ModelSerializer):
             validated_data['related_user'] = CustomUser.objects.get(id=entity_id)
 
         return super().create(validated_data)
+
+
+class LetsConnectLogSerializer(serializers.ModelSerializer):
+    full_name = serializers.CharField(write_only=True)
+    email = serializers.CharField(write_only=True)
+    role = serializers.CharField(write_only=True)
+    area = serializers.CharField(write_only=True)
+    gender = serializers.CharField(write_only=True)
+    age = serializers.IntegerField(write_only=True)
+
+    class Meta:
+        model = LetsConnectLog
+        fields = [
+            'full_name',
+            'email',
+            'role',
+            'area',
+            'gender',
+            'age',
+            'user',
+            'confirmation',
+        ]
+        extra_kwargs = {
+            'user': {'read_only': True},
+            'confirmation': {'read_only': True},
+        }

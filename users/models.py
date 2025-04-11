@@ -291,6 +291,11 @@ class SavedItem(models.Model):
             return f"{self.user.username}: {self.relation} - User - {self.related_user.username}"
     
 
+class LetsConnectLog(models.Model):
+    user = models.ForeignKey(CustomUser, on_delete=models.CASCADE)
+    confirmation = models.CharField(max_length=64)
+
+
 @receiver(post_save, sender=CustomUser)
 def create_user_profile(sender, instance, created, **kwargs):
     if created:
