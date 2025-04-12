@@ -6,6 +6,7 @@ from users.models import LetsConnectLog
 from cryptography.hazmat.primitives.asymmetric import rsa
 from cryptography.hazmat.backends import default_backend
 import json
+from json.decoder import JSONDecodeError
 
 class TestLetsConnectViewSet(APITestCase):
     def setUp(self):
@@ -58,7 +59,7 @@ class TestLetsConnectViewSet(APITestCase):
 
         self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
         self.assertEqual(response.data["success"], False)
-        self.assertEqual(response.data["error"], "External server failure with code 400")
+        self.assertEqual(response.data["error"], "Invalid data")
 
     def test_create_invalid_payload(self):
         response = self.client.post("/letsconnect/", self.invalid_payload, format="json")
@@ -75,3 +76,17 @@ class TestLetsConnectViewSet(APITestCase):
         self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
         self.assertEqual(response.data["success"], False)
         self.assertEqual(response.data["error"], "Private key not found")
+
+    @patch("users.letsconnect.requests.post")
+    def test_process_response_json_decode_error(self, mock_post):
+        mock_response = MagicMock()
+        mock_response.status_code = 500
+        mock_response.text = "Invalid JSON response"
+        mock_response.json.side_effect = JSONDecodeError("Expecting value", "Invalid JSON response", 0)
+        mock_post.return_value = mock_response
+
+        response = self.client.post("/letsconnect/", self.valid_payload, format="json")
+
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+        self.assertEqual(response.data["success"], False)
+        self.assertEqual(response.data["error"], "Invalid JSON response")

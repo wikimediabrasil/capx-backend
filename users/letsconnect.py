@@ -63,4 +63,8 @@ class LetsConnectViewSet(viewsets.GenericViewSet):
             )
             return {'success': True, 'confirmation': response.json().get("confirmation")}
         else:
-            return {'success': False, 'error': f'External server failure with code {response.status_code}'}
+            try:
+                error_message = response.json().get("error", "Unknown error")
+            except json.JSONDecodeError:
+                error_message = response.text if response.text else "Unknown error"
+            return {'success': False, 'error': error_message, 'code': response.status_code}
