@@ -54,7 +54,7 @@ jobs:
     - name: Coverage report
       run: |
         pip install coverage
-        coverage run manage.py test --keepdb
+        coverage run manage.py test --keepdb --verbosity=2
         coverage report
         coverage xml
     - name: SonarCloud Scan
