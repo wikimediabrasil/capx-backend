@@ -3,6 +3,7 @@ import json
 import time
 import jwt
 import uuid
+import os
 from cryptography.hazmat.primitives import serialization
 from rest_framework import viewsets
 from django.conf import settings
@@ -33,7 +34,7 @@ class LetsConnectViewSet(viewsets.GenericViewSet):
 
     def _send_form(self, data, request):
         try:
-            private_key = serialization.load_pem_private_key(open(settings.HOME + '/private_key.pem', 'rb').read(), password=None)
+            private_key = serialization.load_pem_private_key(open(os.path.join(settings.HOME, 'private_key.pem'), 'rb').read(), password=None)
         except FileNotFoundError:
             return {'success': False, 'error': 'Private key not found'}
 
