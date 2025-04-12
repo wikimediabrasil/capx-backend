@@ -10,8 +10,8 @@ from json.decoder import JSONDecodeError
 
 class TestLetsConnectViewSet(APITestCase):
     def setUp(self):
-        User = get_user_model()
-        self.user = User.objects.create_user(username="testuser", password="testpassword")
+        usermodel = get_user_model()
+        self.user = usermodel.objects.create_user(username="testuser", password="testpassword")
         self.client.force_authenticate(user=self.user)
         self.valid_payload = {
             "full_name": "John Doe",
