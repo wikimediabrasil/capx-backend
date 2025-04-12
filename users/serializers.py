@@ -222,7 +222,7 @@ class LetsConnectLogSerializer(serializers.ModelSerializer):
     role = serializers.CharField(write_only=True)
     area = serializers.CharField(write_only=True)
     gender = serializers.CharField(write_only=True)
-    age = serializers.IntegerField(write_only=True)
+    age = serializers.CharField(write_only=True)
 
     class Meta:
         model = LetsConnectLog

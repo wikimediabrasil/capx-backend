@@ -44,17 +44,15 @@ class LetsConnectViewSet(viewsets.GenericViewSet):
         return self._process_response(response, request)
 
     def _build_payload(self, data, request):
-        return {
+        payload = {
             "user": request.user.username,
-            "full_name": data.get("full_name"),
-            "email": data.get("email"),
-            "role": data.get("role"),
-            "area": data.get("area"),
-            "gender": data.get("gender"),
-            "age": data.get("age"),
             "timestamp": int(time.time()),
             "nonce": str(uuid.uuid4()),
         }
+        for field in LetsConnectLogSerializer.Meta.fields:
+            if field not in ["user", "confirmation"]:  # Exclude read-only fields
+                payload[field] = data.get(field)
+        return payload
 
     def _process_response(self, response, request):
         if response.status_code == 200 and response.json().get("confirmation"):
