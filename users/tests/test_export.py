@@ -13,6 +13,8 @@ class CommandTestCase(TestCase):
         self.command.verbosity = 2
         self.command.stdout = StringIO()
 
+    default_recognition = '[Capacity Exchange supporter§Capx-logo-redux.svg§https://meta.wikimedia.org/wiki/Capacity_Exchange/Network]'
+
     @patch('users.management.commands.export.requests.get')
     def test_get_meta_wiki_users(self, mock_get):
         mock_response = MagicMock()
@@ -42,8 +44,8 @@ class CommandTestCase(TestCase):
         meta_wiki_users = ['TestUser1', 'AltUser2']
         formatted_data, skills = self.command.process_profiles(mock_profiles.return_value, meta_wiki_users)
         self.assertEqual(formatted_data, [
-            ['TestUser1', '[1]', '[2]', ''],
-            ['AltUser2', '[4]', '[5]', '']
+            ['TestUser1', '[1]', '[2]', self.default_recognition],
+            ['AltUser2', '[4]', '[5]', self.default_recognition]
         ])
         self.assertEqual(set(skills), {1, 2, 4, 5})
 
@@ -66,7 +68,7 @@ class CommandTestCase(TestCase):
         ]
         meta_wiki_users = ['TestUser1']
         formatted_data, skills = self.command.process_profiles(mock_profiles.return_value, meta_wiki_users)
-        self.assertEqual(formatted_data, [['TestUser1', '[1]', '[2]', '']])
+        self.assertEqual(formatted_data, [['TestUser1', '[1]', '[2]', self.default_recognition]])
         self.assertEqual(set(skills), {1, 2})
 
     @patch('users.management.commands.export.Skill.objects.get')
@@ -250,8 +252,8 @@ class CommandTestCase(TestCase):
         formatted_data, skills = self.command.process_profiles(profiles, meta_wiki_users)
 
         expected_data = [
-            ['TestUser1', '[1]', '[2]', ['Badge1§Course1§URL1', 'Badge2§Course2§URL2']],
-            ['AltUser2', '[3]', '[4]', ['Badge3§Course3§URL3']]
+            ['TestUser1', '[1]', '[2]', '[Badge1§Course1§URL1, Badge2§Course2§URL2]'],
+            ['AltUser2', '[3]', '[4]', '[Badge3§Course3§URL3]']
         ]
         expected_skills = [1, 2, 3, 4]
 
@@ -279,8 +281,8 @@ class CommandTestCase(TestCase):
         formatted_data, skills = self.command.process_profiles(profiles, meta_wiki_users)
 
         expected_data = [
-            ['TestUser1', '[1]', '[2]', ['Badge1§Course1§URL1']],
-            ['AltUser2', '[3]', '[4]', '']
+            ['TestUser1', '[1]', '[2]', '[Badge1§Course1§URL1]'],
+            ['AltUser2', '[3]', '[4]', self.default_recognition]
         ]
         expected_skills = [1, 2, 3, 4]
 

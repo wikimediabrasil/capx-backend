@@ -28,8 +28,8 @@ class OrganizationSerializer(serializers.ModelSerializer):
         'items': {'type': 'integer'}
     })
     def get_events(self, obj):
-        from events.models import EventOrganizations
-        return EventOrganizations.objects.filter(organization=obj).values_list('event', flat=True)
+        from events.models import Events
+        return Events.objects.filter(organization=obj).values_list('id', flat=True)
     
     def validate_choose_events(self, choose_events):
         from events.models import EventOrganizations

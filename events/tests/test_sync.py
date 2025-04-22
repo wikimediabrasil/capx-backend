@@ -2,17 +2,27 @@ from unittest.mock import patch, MagicMock
 from django.core.management import call_command
 from django.test import TestCase
 from events.models import Events
+from orgs.models import Organization, OrganizationType
 
 class TestSyncCommand(TestCase):
+
+    @patch('sys.stdout.write')
     @patch('events.management.commands.sync.requests.get')
-    def test_handle_successful_sync(self, mock_get):
+    def test_handle_successful_sync(self, mock_get, mock_stdout):
         # Setup mock data
+        test_org_type = OrganizationType.objects.create(type_name='Type 1', type_code='TYPE1')
+        organization = Organization.objects.create(
+            display_name='New Organization',
+            acronym='NO',
+            type=test_org_type,
+        )
         event = Events.objects.create(
             url="https://learn.wiki/courses/course-123",
             name="Old Event Name",
             time_begin="2023-01-01T00:00:00Z",
             time_end="2023-01-02T00:00:00Z",
-            image_url="https://old.image.url"
+            image_url="https://old.image.url",
+            organization=organization,
         )
         mock_response = MagicMock()
         mock_response.status_code = 200
@@ -26,7 +36,7 @@ class TestSyncCommand(TestCase):
         mock_get.return_value = mock_response
 
         # Call the command
-        call_command('sync')
+        call_command('sync', verbosity=2)
 
         # Refresh the event from the database
         event.refresh_from_db()
@@ -36,15 +46,24 @@ class TestSyncCommand(TestCase):
         self.assertEqual(event.time_begin.isoformat(timespec='seconds').replace('+00:00', 'Z'), "2023-01-01T12:00:00Z")
         self.assertEqual(event.time_end.isoformat(timespec='seconds').replace('+00:00', 'Z'), "2023-01-02T12:00:00Z")
         self.assertEqual(event.image_url, "https://new.image.url")
+        mock_stdout.assert_called_with("Successfully synced event New Event Name\n")
+
 
     @patch('events.management.commands.sync.requests.get')
     def test_handle_invalid_response(self, mock_get):
         # Setup mock data
+        test_org_type = OrganizationType.objects.create(type_name='Type 1', type_code='TYPE1')
+        organization = Organization.objects.create(
+            display_name='New Organization',
+            acronym='NO',
+            type=test_org_type,
+        )
         event = Events.objects.create(
             url="https://learn.wiki/courses/course-123",
             name="Old Event Name",
             time_begin="2023-01-01T00:00:00Z",
             time_end="2023-01-02T00:00:00Z",
+            organization=organization,
         )
         mock_response = MagicMock()
         mock_response.status_code = 200
@@ -62,13 +81,22 @@ class TestSyncCommand(TestCase):
     @patch('events.management.commands.sync.requests.get')
     def test_handle_connection_error(self, mock_get):
         # Setup mock data
+        test_org_type = OrganizationType.objects.create(type_name='Type 1', type_code='TYPE1')
+        organization = Organization.objects.create(
+            display_name='New Organization',
+            acronym='NO',
+            type=test_org_type,
+        )
         Events.objects.create(
             url="https://learn.wiki/courses/course-123",
             time_begin="2023-01-01T00:00:00Z",
             time_end="2023-01-02T00:00:00Z",
+            organization=organization,
         )
         mock_get.return_value.status_code = 500
 
         # Call the command and assert it raises ConnectionError
         with self.assertRaises(ConnectionError):
             call_command('sync')
+
+

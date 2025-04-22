@@ -38,6 +38,11 @@ class Events(models.Model):
         verbose_name="Event URL",
         help_text="URL of the event."
     )
+    description = models.TextField(
+        blank=True,
+        verbose_name="Event Description",
+        help_text="Description of the event."
+    )
     wikidata_qid = models.CharField(
         max_length=10,
         blank=True,
@@ -74,18 +79,12 @@ class Events(models.Model):
         verbose_name="Event Creator",
         help_text="Creator of the event."
     )
-    team = models.ManyToManyField(
-        settings.AUTH_USER_MODEL,
-        through="EventParticipant",
-        related_name="team_members",
-        verbose_name="Event Team",
-        help_text="Team members of the event."
-    )
-    organizations = models.ManyToManyField(
+    organization = models.ForeignKey(
         Organization,
-        through="EventOrganizations",
-        verbose_name="Event Organizations",
-        help_text="Organizations of the event."
+        on_delete=models.CASCADE,
+        related_name="events",
+        verbose_name="Event Organization",
+        help_text="Organization associated with the event."
     )
     related_skills = models.ManyToManyField(
         "skills.Skill",
@@ -106,86 +105,3 @@ class Events(models.Model):
 
     def __str__(self):
         return self.name
-
-    
-class EventParticipant(models.Model):
-    ROLE_TYPES = [
-        ("organizer", "Organizer"),
-        ("committee", "Committee"),
-        ("volunteer", "Volunteer"),
-    ]
-    event = models.ForeignKey(
-        Events,
-        on_delete=models.CASCADE,
-        help_text="Event of the participant."
-    )
-    participant = models.ForeignKey(
-        settings.AUTH_USER_MODEL,
-        on_delete=models.CASCADE,
-        help_text="Account of the participant."
-    )
-    role = models.CharField(
-        choices=ROLE_TYPES,
-        max_length=20,
-        help_text="Role of the participant."
-    )
-    confirmed_organizer = models.BooleanField(
-        default=False,
-        help_text="Is the participation confirmed by the organizer?"
-    )
-    confirmed_participant = models.BooleanField(
-        default=False,
-        help_text="Is the participation confirmed by the participant?"
-    )
-    created_at = models.DateTimeField(
-        auto_now_add=True,
-        help_text="Time when the participation was created."
-    )
-    updated_at = models.DateTimeField(
-        auto_now=True,
-        help_text="Time when the participation was last updated."
-    )
-
-    def __str__(self):
-        return f"{self.participant} - {self.event}"
-    
-class EventOrganizations(models.Model):
-    ROLE_TYPES = [
-        ("organizer", "Organizer"),
-        ("sponsor", "Sponsor"),
-        ("supporter", "Supporter"),
-    ]
-    event = models.ForeignKey(
-        Events,
-        on_delete=models.CASCADE,
-        help_text="Event where the organization is part of."
-    )
-    organization = models.ForeignKey(
-        Organization,
-        on_delete=models.CASCADE,
-        help_text="Organization which is part of the event."
-    )
-    role = models.CharField(
-        choices=ROLE_TYPES,
-        max_length=20,
-        help_text="Role of the organization."
-    )
-    confirmed_organizer = models.BooleanField(
-        default=False,
-        help_text="Is the participation confirmed by the organizer?"
-    )
-    confirmed_organization = models.BooleanField(
-        default=False,
-        help_text="Is the participation confirmed by the organization?"
-    )
-    created_at = models.DateTimeField(
-        auto_now_add=True,
-        help_text="Time when the participation was created."
-    )
-    updated_at = models.DateTimeField(
-        auto_now=True,
-        help_text="Time when the participation was last updated."
-    )
-
-    def __str__(self):
-        return f"{self.organization} - {self.event}"

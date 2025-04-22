@@ -4,9 +4,9 @@ from django.urls import reverse
 from django.test import TestCase
 from rest_framework import status
 from rest_framework.test import APIClient
-from users.models import Profile, CustomUser, LanguageProficiency
+from users.models import Profile, CustomUser, LanguageProficiency, SavedItem
 from users.submodels import Territory, Language, WikimediaProject
-from users.serializers import ProfileSerializer, TerritorySerializer, LanguageSerializer, WikimediaProjectSerializer
+from users.serializers import ProfileSerializer, TerritorySerializer, LanguageSerializer, WikimediaProjectSerializer, SavedItemSerializer
 from skills.models import Skill
 from orgs.models import Organization, OrganizationType
 from events.models import Events
@@ -148,22 +148,22 @@ class QuickListViewSetTestCase(TestCase):
         self.assertEqual(response.data, {})
         
     def test_list_orgs(self):
-        OrganizationType.objects.create(type_name='Type 1', type_code='TYPE1')
-        Territory.objects.create(territory_name='Territory 1')
+        test_org_type = OrganizationType.objects.create(type_name='Type 1', type_code='TYPE1')
+        test_territory = Territory.objects.create(territory_name='Territory 1')
         self.client.force_authenticate(self.user)
 
         organization = Organization.objects.create(
             display_name='New Organization',
             acronym='NO',
-            type=OrganizationType.objects.get(pk=1),
+            type=test_org_type,
         )
-        organization.territory.set([Territory.objects.get(pk=1)])
+        organization.territory.set([test_territory])
         Organization.objects.create(
             display_name='New Organization 2',
             acronym='NO2', 
-            type=OrganizationType.objects.get(pk=1),
+            type=test_org_type,
         )
-        organization.territory.set([Territory.objects.get(pk=1)])
+        organization.territory.set([test_territory])
         organizations = Organization.objects.all()
         expected_data = {organization.pk: organization.display_name + ' (' + organization.acronym + ')' for organization in organizations}
         response = self.client.get('/list/affiliation/')
@@ -210,19 +210,28 @@ class QuickListViewSetTestCase(TestCase):
         self.assertEqual(response.data, expected_data)
 
     def test_list_event(self):
+        test_org_type = OrganizationType.objects.create(type_name='Type 1', type_code='TYPE1')
+        organization = Organization.objects.create(
+            display_name='New Organization',
+            acronym='NO',
+            type=test_org_type,
+        )
+
         Events.objects.create(
             name='Sample Event',
             type_of_location='virtual',
             time_begin='2021-10-10 10:00:00+00:00',
             time_end='2021-10-10 12:00:00+00:00',
-            creator=CustomUser.objects.get(id=1)
+            creator=self.user,
+            organization=organization
         )
         Events.objects.create(
             name='Sample Event 2',
             type_of_location='virtual',
             time_begin='2021-10-10 10:00:00+00:00',
             time_end='2021-10-10 12:00:00+00:00',
-            creator=CustomUser.objects.get(id=1)
+            creator=self.user,
+            organization=organization
         )
         self.client.force_authenticate(self.user)
 
@@ -507,6 +516,16 @@ class UsersFilterTestCase(TestCase):
         self.client = APIClient()
         self.client.force_authenticate(self.user)
 
+    def test_filter_by_territory(self):
+        self.territory = Territory.objects.create(territory_name='Territory 1')
+        self.child_territory = Territory.objects.create(territory_name='Child Territory 1')
+        self.child_territory.parent_territory.set([self.territory])
+        self.user.profile.territory.set([self.child_territory])
+
+        response = self.client.get(f'/users/?territory={self.territory.id}')
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(len(response.data['results']), 1)
+
     def test_get_queryset_has_skills_known_true(self):
         skill = Skill.objects.create(skill_wikidata_item="Q123456789")
         profile = Profile.objects.get(user=self.user)
@@ -562,3 +581,104 @@ class UsersFilterTestCase(TestCase):
         response = self.client.get('/users/', {'has_any_skills': 'false'})
         self.assertEqual(response.status_code, status.HTTP_200_OK)
         self.assertEqual(len(response.data['results']), 1)
+
+
+class SavedItemViewSetTestCase(TestCase):
+    def setUp(self):
+        self.user = CustomUser.objects.create_user(username='test', password=str(secrets.randbits(16)))
+        CustomUser.objects.create_user(username='test2', password=str(secrets.randbits(16)))
+        Organization.objects.create(display_name='Test Org', acronym='TO', type=OrganizationType.objects.create(type_name='Type 1', type_code='TYPE1'))
+        self.client = APIClient()
+        self.client.force_authenticate(self.user)
+
+    def test_list_saved_items(self):
+        SavedItem.objects.create(user=self.user, relation='sharer', entity='user', related_user=CustomUser.objects.get(username='test2'))
+        SavedItem.objects.create(user=self.user, relation='learner', entity='org', related_org=Organization.objects.get(display_name='Test Org'))
+
+        response = self.client.get('/saved_item/')
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+
+        saved_items = SavedItem.objects.filter(user=self.user)
+        serializer = SavedItemSerializer(saved_items, many=True)
+        self.assertEqual(response.data['results'], serializer.data)
+
+    def test_retrieve_saved_item(self):
+        saved_item = SavedItem.objects.create(user=self.user, relation='sharer', entity='user', related_user=CustomUser.objects.get(username='test2'))
+
+        response = self.client.get(f'/saved_item/{saved_item.pk}/')
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+
+        serializer = SavedItemSerializer(saved_item)
+        self.assertEqual(response.data, serializer.data)
+
+    def test_create_saved_item(self):
+        data = {'relation': 'sharer', 'entity': 'user', 'entity_id': CustomUser.objects.get(username='test2').pk}
+        response = self.client.post('/saved_item/', data, format='json')
+        self.assertEqual(response.status_code, status.HTTP_201_CREATED)
+
+        saved_item = SavedItem.objects.get(user=self.user, relation='sharer', entity='user', related_user=CustomUser.objects.get(username='test2'))
+        self.assertIsNotNone(saved_item)
+
+        data = {'relation': 'learner', 'entity': 'org', 'entity_id': Organization.objects.get(display_name='Test Org').pk}
+        response = self.client.post('/saved_item/', data, format='json')
+        self.assertEqual(response.status_code, status.HTTP_201_CREATED)
+
+        saved_item = SavedItem.objects.get(user=self.user, relation='learner', entity='org', related_org=Organization.objects.get(display_name='Test Org'))
+        self.assertIsNotNone(saved_item)
+
+    def test_create_saved_item_not_existing_entity(self):
+        data = {'relation': 'sharer', 'entity': 'user', 'entity_id': 999}
+        response = self.client.post('/saved_item/', data, format='json')
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+
+        data = {'relation': 'sharer', 'entity': 'org', 'entity_id': 999}
+        response = self.client.post('/saved_item/', data, format='json')
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+
+    def test_create_saved_item_already_exists(self):
+        SavedItem.objects.create(user=self.user, relation='sharer', entity='user', related_user=CustomUser.objects.get(username='test2'))
+        data = {'relation': 'sharer', 'entity': 'user', 'entity_id': CustomUser.objects.get(username='test2').pk}
+        response = self.client.post('/saved_item/', data, format='json')
+        self.assertEqual(response.status_code, status.HTTP_208_ALREADY_REPORTED)
+
+    def test_create_saved_item_invalid_entity(self):
+        data = {'relation': 'sharer', 'entity': 'invalid', 'entity_id': 1}
+        response = self.client.post('/saved_item/', data, format='json')
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+        self.assertEqual(response.data['message'], 'Invalid entity type.')
+
+    def test_delete_saved_item(self):
+        saved_item = SavedItem.objects.create(user=self.user, relation='sharer', entity='user', related_user=CustomUser.objects.get(username='test2'))
+
+        response = self.client.delete(f'/saved_item/{saved_item.pk}/')
+        self.assertEqual(response.status_code, status.HTTP_204_NO_CONTENT)
+
+        with self.assertRaises(SavedItem.DoesNotExist):
+            SavedItem.objects.get(pk=saved_item.pk)
+
+    def test_update_saved_item(self):
+        saved_item = SavedItem.objects.create(user=self.user, relation='sharer', entity='user', related_user=CustomUser.objects.get(username='test2'))
+        data = {'relation': 'learner', 'entity': 'org', 'entity_id': Organization.objects.get(display_name='Test Org').pk}
+
+        response = self.client.put(f'/saved_item/{saved_item.pk}/', data, format='json')
+        self.assertEqual(response.status_code, status.HTTP_405_METHOD_NOT_ALLOWED)
+        self.assertEqual(response.data['message'], 'Updates are not allowed for saved items.')
+
+    def test_partial_update_saved_item_not_allowed(self):
+        saved_item = SavedItem.objects.create(user=self.user, relation='sharer', entity='user', related_user=CustomUser.objects.get(username='test2'))
+        data = {'entity': 'org'}
+
+        response = self.client.patch(f'/saved_item/{saved_item.pk}/', data, format='json')
+        self.assertEqual(response.status_code, status.HTTP_405_METHOD_NOT_ALLOWED)
+        self.assertEqual(response.data['message'], 'Partial updates are not allowed for saved items.')
+
+    def test_list_saved_items_unauthenticated(self):
+        self.client.force_authenticate(user=None)
+        response = self.client.get('/saved_item/')
+        self.assertEqual(response.status_code, status.HTTP_401_UNAUTHORIZED)
+
+    def test_create_saved_item_unauthenticated(self):
+        self.client.force_authenticate(user=None)
+        data = {'item_type': 'type1', 'item_id': 1}
+        response = self.client.post('/saved_item/', data, format='json')
+        self.assertEqual(response.status_code, status.HTTP_401_UNAUTHORIZED)

@@ -1,5 +1,6 @@
 from rest_social_auth.views import SocialKnoxUserAuthView, SocialKnoxOnlyAuthView
 from rest_framework.response import Response
+from rest_framework import status
 from datetime import timedelta
 from django.utils.timezone import now
 from drf_spectacular.utils import extend_schema

@@ -6,6 +6,7 @@ class Command(BaseCommand):
     help = 'Sync WikiLearn events with CapX events'
 
     def handle(self, *args, **options):
+        self.verbosity = options.get('verbosity', 1)
         wikilearn_events = Events.objects.filter(url__contains='https://learn.wiki/courses/')
         for event in wikilearn_events:
             api_url = f"https://learn.wiki/api/courses/v1/courses/{event.url.split('/')[4]}"

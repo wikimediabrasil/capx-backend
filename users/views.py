@@ -1,6 +1,6 @@
-from .models import Profile, Territory, Language, WikimediaProject, Avatar
+from .models import Profile, Territory, Language, WikimediaProject, Avatar, SavedItem
 from orgs.models import Organization
-from .serializers import ProfileSerializer, TerritorySerializer, LanguageSerializer, WikimediaProjectSerializer, UsersBySkillSerializer, UsersByTagSerializer, AvatarSerializer
+from .serializers import ProfileSerializer, TerritorySerializer, LanguageSerializer, WikimediaProjectSerializer, UsersBySkillSerializer, UsersByTagSerializer, AvatarSerializer, SavedItemSerializer
 from skills.models import Skill
 from events.models import Events
 from projects.models import Project
@@ -41,6 +41,12 @@ from drf_spectacular.utils import extend_schema, extend_schema_view, OpenApiPara
                 required=False,
                 type=OpenApiTypes.BOOL,
             ),
+            OpenApiParameter(
+                name='territory',
+                description='Filter users by territory ID.',
+                required=False,
+                type=OpenApiTypes.INT,
+            ),
         ],
     ),
     retrieve=extend_schema(
@@ -55,7 +61,6 @@ class UsersViewSet(viewsets.ReadOnlyModelViewSet):
     filterset_fields = [
         'user__username',
         'about',
-        'territory',
         'wikimedia_project',
         'affiliation',
         'languageproficiency__language',
@@ -71,6 +76,15 @@ class UsersViewSet(viewsets.ReadOnlyModelViewSet):
         has_skills_available = self.request.query_params.get('has_skills_available')
         has_skills_wanted = self.request.query_params.get('has_skills_wanted')
         has_any_skills = self.request.query_params.get('has_any_skills')
+        territory_id = self.request.query_params.get('territory')
+
+        if territory_id:
+            # Include profiles in the specified territory or its child territories
+            child_territories = Territory.objects.filter(
+                models.Q(id=territory_id) | 
+                models.Q(parent_territory__id=territory_id)
+            ).values_list('id', flat=True)
+            queryset = queryset.filter(territory__id__in=child_territories)
 
         if has_skills_known is not None:
             if has_skills_known.lower() == 'true':
@@ -402,3 +416,81 @@ class UsersByTagViewSet(viewsets.ReadOnlyModelViewSet):
             return Response({'message': 'Invalid tag type. Options are: skill_known, skill_available, skill_wanted, language, territory, wikimedia_project, affiliation.'}, status=status.HTTP_400_BAD_REQUEST)
 
         return Response(self.get_serializer(queryset, many=True).data)
+
+@extend_schema_view(
+    list=extend_schema(
+        summary='List all items saved by the logged-in user.',
+        description='This endpoint lists all items saved by the logged-in user.',
+    ),
+    create=extend_schema(
+        summary='Create a new saved item.',
+        description='This endpoint creates a new saved item.',
+    ),
+    retrieve=extend_schema(
+        summary='Retrieve a saved item by ID.',
+        description='This endpoint retrieves a saved item by its ID.',
+        parameters=[
+            OpenApiParameter(
+                "id",
+                OpenApiTypes.INT,
+                OpenApiParameter.PATH,
+                required=True,
+                description='The ID of the saved item to retrieve.',
+            ),
+        ],
+    ),
+    destroy=extend_schema(
+        summary='Delete a saved item by ID.',
+        description='This endpoint deletes a saved item by its ID.',
+        parameters=[
+            OpenApiParameter(
+                "id",
+                OpenApiTypes.INT,
+                OpenApiParameter.PATH,
+                required=True,
+                description='The ID of the saved item to retrieve.',
+            ),
+        ],
+    ),
+)
+class SavedItemViewSet(viewsets.ModelViewSet):
+    serializer_class = SavedItemSerializer
+
+    def get_queryset(self):
+        return SavedItem.objects.filter(user=self.request.user)
+
+    def perform_create(self, serializer):
+        serializer.save(user=self.request.user)
+
+    def create(self, request, *args, **kwargs):
+        user = request.user
+        relation = request.data.get('relation')
+        entity = request.data.get('entity')
+        entity_id = request.data.get('entity_id')
+
+        if entity == 'org':
+            existing_item = SavedItem.objects.filter(
+                user=user, relation=relation, entity='org', related_org_id=entity_id
+            ).first()
+        elif entity == 'user':
+            existing_item = SavedItem.objects.filter(
+                user=user, relation=relation, entity='user', related_user_id=entity_id
+            ).first()
+        else:
+            return Response({'message': 'Invalid entity type.'}, status=status.HTTP_400_BAD_REQUEST)
+
+        if existing_item:
+            serializer = self.get_serializer(existing_item)
+            return Response(serializer.data, status=status.HTTP_208_ALREADY_REPORTED)
+
+        return super().create(request, *args, **kwargs)
+
+    @extend_schema(exclude=True)
+    def partial_update(self, request, *args, **kwargs):
+        response = {'message': 'Partial updates are not allowed for saved items.'}
+        return Response(response, status=status.HTTP_405_METHOD_NOT_ALLOWED)
+
+    @extend_schema(exclude=True)
+    def update(self, request, *args, **kwargs):
+        response = {'message': 'Updates are not allowed for saved items.'}
+        return Response(response, status=status.HTTP_405_METHOD_NOT_ALLOWED)

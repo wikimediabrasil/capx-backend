@@ -90,7 +90,7 @@ class ProjectViewSetTests(BaseTestCase):
             'creator': self.user.id,
             'related_skills': [self.skill.id]
         }
-        response = self.client.put('/projects/1/', data)
+        response = self.client.put(f'/projects/{project.pk}/', data)
         self.assertEqual(response.status_code, status.HTTP_200_OK)
         self.assertEqual(Project.objects.get().display_name, 'Updated Project')
 
@@ -120,7 +120,7 @@ class ProjectViewSetTests(BaseTestCase):
             'creator': self.user.id,
             'related_skills': [self.skill.id]
         }
-        response = self.client.put('/projects/1/', data)
+        response = self.client.put(f'/projects/{project.pk}/', data)
         self.assertEqual(response.status_code, status.HTTP_403_FORBIDDEN)
 
     def test_delete_project(self):
@@ -135,7 +135,7 @@ class ProjectViewSetTests(BaseTestCase):
         project_member = ProjectMember.objects.create(project=project, organization=self.organization)
         ProjectMemberAcceptance.objects.create(project_member=project_member, accepted=True)
 
-        response = self.client.delete('/projects/1/')
+        response = self.client.delete(f'/projects/{project.pk}/')
         self.assertEqual(response.status_code, status.HTTP_204_NO_CONTENT)
         self.assertEqual(Project.objects.count(), 0)
 
@@ -156,7 +156,7 @@ class ProjectViewSetTests(BaseTestCase):
         project_member = ProjectMember.objects.create(project=project, organization=organization2)
         ProjectMemberAcceptance.objects.create(project_member=project_member, accepted=True)
 
-        response = self.client.delete('/projects/1/')
+        response = self.client.delete(f'/projects/{project.pk}/')
         self.assertEqual(response.status_code, status.HTTP_403_FORBIDDEN)
 
     def test_partial_update_project(self):
@@ -174,7 +174,7 @@ class ProjectViewSetTests(BaseTestCase):
         data = {
             'display_name': 'Updated Project'
         }
-        response = self.client.patch('/projects/1/', data)
+        response = self.client.patch(f'/projects/{project.pk}/', data)
         self.assertEqual(response.status_code, status.HTTP_405_METHOD_NOT_ALLOWED)
 
 
@@ -220,7 +220,7 @@ class ProjectMemberViewSetTests(BaseTestCase):
 
     def test_delete_project_member(self):
         project_member = ProjectMember.objects.create(project=self.project, organization=self.organization)
-        response = self.client.delete('/project_members/1/')
+        response = self.client.delete(f'/project_members/{project_member.pk}/')
         self.assertEqual(response.status_code, status.HTTP_403_FORBIDDEN)
 
     def test_delete_project_member_another_organization(self):
@@ -235,7 +235,7 @@ class ProjectMemberViewSetTests(BaseTestCase):
         project_member2 = ProjectMember.objects.create(project=self.project, organization=organization2)
         ProjectMemberAcceptance.objects.create(project_member=project_member2, accepted=True)
 
-        response = self.client.delete('/project_members/2/')
+        response = self.client.delete(f'/project_members/{project_member2.pk}/')
         self.assertEqual(response.status_code, status.HTTP_204_NO_CONTENT)
 
     def test_update_project_member(self):
