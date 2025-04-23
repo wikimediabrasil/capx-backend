@@ -33,10 +33,18 @@ class MessageService:
                 success = MessageService._send_email(oauth, url, instance, token)
             else:
                 success = MessageService._send_talk_page(oauth, url, instance, token)
+                instance.method = 'talkpage'
             
             # Step 4: Update the instance status
-            instance.status = 'sent' if success else 'failed'
+            if success:
+                instance.status = 'sent'
+                instance.message = ''
+                instance.subject = ''
+            else:
+                instance.status = 'failed'
+            
             instance.save()
+      
 
         except Exception:
             instance.status = 'failed'
