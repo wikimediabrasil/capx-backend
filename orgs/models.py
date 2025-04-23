@@ -74,6 +74,12 @@ class Organization(models.Model):
         'orgs.Document', related_name='documents', blank=True,
         help_text='The documents related to the organization.',
     )
+    choose_events = models.ManyToManyField(
+        'events.Events', 
+        related_name='highlighted_by_organizations',
+        blank=True,
+        help_text='Highlighted events chosen by the organization.',
+    )
     home_project = models.URLField(
         blank=True, null=True, 
         help_text='The URL of the home project of the organization on Wikimedia (e.g. https://xx.wikimedia.org/).',
