@@ -6,6 +6,7 @@ from users.models import CustomUser as User, Territory
 from django_filters.rest_framework import DjangoFilterBackend
 from drf_spectacular.utils import extend_schema, extend_schema_view, OpenApiParameter, OpenApiTypes
 from django.db import models
+from events.models import Events
 
 @extend_schema_view(
     list=extend_schema(
@@ -124,22 +125,48 @@ class OrganizationViewSet(viewsets.ModelViewSet):
 
         return queryset
 
+    def _validate_choose_events(self, organization, choose_events):
+        """
+        Validates the 'choose_events' field to ensure all events are associated with the given organization.
+        """
+        valid_events = Events.objects.filter(organization_id=organization.id if organization else None).values_list('id', flat=True)
+        valid_events_set = set(valid_events)
+
+        for event in choose_events:
+            if event not in valid_events_set:
+                raise ValueError(
+                    f"Event with ID {event} is not associated with this organization. "
+                    f"It must be in the organization's 'events' field."
+                )
 
     @extend_schema(
         summary='Create a new organization.',
         description='This endpoint creates a new organization. Only staff members can create organizations.',
     )
     def create(self, request, *args, **kwargs):
-        if request.user.is_staff:
-            return super().create(request, *args, **kwargs)
-        return Response("You do not have permission to create an organization.", status=status.HTTP_403_FORBIDDEN)
-
+        if request.user.is_staff is False:
+            return Response("You do not have permission to create an organization.", status=status.HTTP_403_FORBIDDEN)
+        if 'choose_events' in request.data:
+            try:
+                self._validate_choose_events(None, request.data['choose_events'])
+            except ValueError as e:
+                return Response(str(e), status=status.HTTP_400_BAD_REQUEST)
+        return super().create(request, *args, **kwargs)
+        
     @extend_schema(
-        summary='Updates a organization.',
+        summary='Updates an organization.',
         description='This endpoint updates an organization by its ID. Only staff members and managers of the organization can update it.',
     )
     def update(self, request, *args, **kwargs):
         instance = self.get_object()
+        choose_events = request.data.get('choose_events', [])
+
+        if choose_events:
+            try:
+                self._validate_choose_events(instance, choose_events)
+            except ValueError as e:
+                return Response(str(e), status=status.HTTP_400_BAD_REQUEST)
+
         if request.user.is_staff or request.user in instance.managers.all():
             return super().update(request, *args, **kwargs)
         return Response("You do not have permission to update this organization.", status=status.HTTP_403_FORBIDDEN)

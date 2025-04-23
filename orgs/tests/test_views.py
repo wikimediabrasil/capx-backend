@@ -6,6 +6,7 @@ from users.models import CustomUser
 from users.submodels import Territory
 from skills.models import Skill
 from django.db import models
+from events.models import Events
 
 
 class OrganizationViewSetTestCase(APITestCase):
@@ -54,6 +55,38 @@ class OrganizationViewSetTestCase(APITestCase):
         self.client.force_authenticate(self.user)
         response = self.client.post('/organizations/', org_data)
         self.assertEqual(response.status_code, status.HTTP_201_CREATED)
+
+    def test_create_org_event(self):
+        self.user.is_staff = True
+        self.client.force_authenticate(self.user)
+
+        organization = Organization.objects.create(
+            display_name='New Organization',
+            acronym='NO',
+            type=self.organization_type,
+        )
+        event = Events.objects.create(
+            name='Test Event', 
+            organization=organization,
+            time_begin='2023-01-01T00:00:00Z',
+            time_end='2023-01-02T00:00:00Z',
+        )
+        new_data = {
+            'display_name': 'New Organization',
+            'acronym': 'UO',
+            'choose_events': [event.pk],
+        }
+        response = self.client.post('/organizations/', new_data, format='json')
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+
+        new_data = {
+            'display_name': 'New Organization',
+            'acronym': 'UO',
+            'choose_events': [],
+        }
+        response = self.client.post('/organizations/', new_data, format='json')
+        self.assertEqual(response.status_code, status.HTTP_201_CREATED)
+
 
     def test_list_orgs_authenticated(self):
         self.client.force_authenticate(self.user)
@@ -156,6 +189,40 @@ class OrganizationViewSetTestCase(APITestCase):
         organization.managers.set([self.user])
         response = self.client.put(f'/organizations/{organization.pk}/', {'display_name': 'Other New Name','acronym': 'ONN'})
         self.assertEqual(response.status_code, status.HTTP_200_OK)
+
+    def test_update_org_event(self):
+        self.user.is_staff = True
+        self.client.force_authenticate(self.user)
+
+        organization = Organization.objects.create(
+            display_name='New Organization',
+            acronym='NO',
+            type=self.organization_type,
+        )
+        organization2 = Organization.objects.create(
+            display_name='New Organization 2',
+            acronym='NO2',
+            type=self.organization_type,
+        )
+        event = Events.objects.create(
+            name='Test Event', 
+            organization=organization2,
+            time_begin='2023-01-01T00:00:00Z',
+            time_end='2023-01-02T00:00:00Z',
+        )
+        updated_data = {
+            'display_name': 'Updated Organization',
+            'acronym': 'UO',
+            'choose_events': [event.pk],
+        }
+        response = self.client.put(f'/organizations/{organization.pk}/', updated_data, format='json')
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+
+        event.organization = organization
+        event.save()
+        response = self.client.put(f'/organizations/{organization.pk}/', updated_data, format='json')
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+
 
     def test_partial_update_org(self):
         self.client.force_authenticate(self.user)
