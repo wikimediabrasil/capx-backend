@@ -6,6 +6,7 @@ from users.models import CustomUser as User, Territory
 from django_filters.rest_framework import DjangoFilterBackend
 from drf_spectacular.utils import extend_schema, extend_schema_view, OpenApiParameter, OpenApiTypes
 from django.db import models
+from events.models import Events
 
 @extend_schema_view(
     list=extend_schema(
@@ -131,6 +132,8 @@ class OrganizationViewSet(viewsets.ModelViewSet):
     )
     def create(self, request, *args, **kwargs):
         if request.user.is_staff:
+            if 'choose_events' in request.data:
+                request.data['choose_events'] = []
             return super().create(request, *args, **kwargs)
         return Response("You do not have permission to create an organization.", status=status.HTTP_403_FORBIDDEN)
 
@@ -140,6 +143,21 @@ class OrganizationViewSet(viewsets.ModelViewSet):
     )
     def update(self, request, *args, **kwargs):
         instance = self.get_object()
+        choose_events = request.data.get('choose_events', [])
+        
+        # Validation for update
+        if choose_events:
+            org_id = instance.id
+            valid_events = Events.objects.filter(organization_id=org_id).values_list('event', flat=True)
+            valid_events_set = set(valid_events)
+            for event in choose_events:
+                if event not in valid_events_set:
+                    return Response(
+                        f"Event with ID {event} is not associated with this organization. "
+                        f"It must be in the organization's 'events' field.",
+                        status=status.HTTP_400_BAD_REQUEST
+                    )
+        
         if request.user.is_staff or request.user in instance.managers.all():
             return super().update(request, *args, **kwargs)
         return Response("You do not have permission to update this organization.", status=status.HTTP_403_FORBIDDEN)
