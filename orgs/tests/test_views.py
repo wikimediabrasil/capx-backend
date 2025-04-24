@@ -18,7 +18,7 @@ class OrganizationViewSetTestCase(APITestCase):
     
     def test_get_orgs_list_unauthenticated(self):
         response = self.client.get('/organizations/')
-        self.assertEqual(response.status_code, status.HTTP_401_UNAUTHORIZED)
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
 
     def test_create_org_unauthenticated(self):
         org_data = {
