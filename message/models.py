@@ -8,12 +8,17 @@ class Message(models.Model):
         ('email', 'Email'),
         ('talkpage', 'Talkpage'),
     )
+    STATUS_CHOICES = (
+        ('pending', 'Pending'),
+        ('sent', 'Sent'),
+        ('failed', 'Failed'),
+    )
     message = models.CharField(max_length=2000)
     subject = models.CharField(max_length=200)
     sender = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name='sender')
     receiver = models.CharField(max_length=100)
     method = models.CharField(max_length=10, choices=MESSAGE_METHOD)
-    status = models.CharField(max_length=10, default='pending')
+    status = models.CharField(max_length=10, choices=STATUS_CHOICES, default='pending')
     date = models.DateTimeField(auto_now_add=True)
 
     def save(self, *args, **kwargs):
