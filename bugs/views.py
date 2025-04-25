@@ -2,6 +2,7 @@ from .models import Bug, Attachment
 from .serializers import BugSerializer, AttachmentSerializer
 from rest_framework import viewsets, status, filters
 from rest_framework.response import Response
+from rest_framework.permissions import IsAuthenticated
 from drf_spectacular.utils import extend_schema, extend_schema_view, OpenApiParameter, OpenApiTypes, OpenApiResponse
 
 @extend_schema_view(
@@ -23,6 +24,7 @@ from drf_spectacular.utils import extend_schema, extend_schema_view, OpenApiPara
 )
 class BugViewSet(viewsets.ModelViewSet):
     serializer_class = BugSerializer
+    permission_classes = [IsAuthenticated]
     filter_backends = [filters.OrderingFilter]
     ordering_fields = ['created_at']
     ordering = ['-created_at']
@@ -108,6 +110,7 @@ class BugViewSet(viewsets.ModelViewSet):
 )
 class AttachmentViewSet(viewsets.ModelViewSet):
     serializer_class = AttachmentSerializer
+    permission_classes = [IsAuthenticated]
 
     def get_queryset(self):
         user = self.request.user
