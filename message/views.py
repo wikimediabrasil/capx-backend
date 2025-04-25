@@ -2,6 +2,7 @@ from .models import Message
 from .serializers import MessageSerializer
 from rest_framework import status, viewsets, filters
 from rest_framework.response import Response
+from rest_framework.permissions import IsAuthenticated
 from drf_spectacular.utils import extend_schema, extend_schema_view, OpenApiParameter, OpenApiTypes
 
 @extend_schema_view(
@@ -21,6 +22,7 @@ from drf_spectacular.utils import extend_schema, extend_schema_view, OpenApiPara
 )
 class MessageViewSet(viewsets.ModelViewSet):
     serializer_class = MessageSerializer
+    permission_classes = [IsAuthenticated]
 
     def get_queryset(self):
         user = self.request.user

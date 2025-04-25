@@ -6,6 +6,7 @@ from events.models import Events
 from projects.models import Project
 from rest_framework import status, viewsets, filters
 from rest_framework.response import Response
+from rest_framework.permissions import IsAuthenticated
 from django.db import models
 from django.shortcuts import get_object_or_404
 from django_filters.rest_framework import DjangoFilterBackend
@@ -133,6 +134,7 @@ class UsersViewSet(viewsets.ReadOnlyModelViewSet):
 class ProfileViewSet(viewsets.ModelViewSet):
     serializer_class = ProfileSerializer
     queryset = Profile.objects.all()
+    permission_classes = [IsAuthenticated]
     http_method_names = ['get', 'put', 'head', 'delete', 'options']
 
     def get_queryset(self):
@@ -455,6 +457,7 @@ class UsersByTagViewSet(viewsets.ReadOnlyModelViewSet):
 )
 class SavedItemViewSet(viewsets.ModelViewSet):
     serializer_class = SavedItemSerializer
+    permission_classes = [IsAuthenticated]
 
     def get_queryset(self):
         return SavedItem.objects.filter(user=self.request.user)
