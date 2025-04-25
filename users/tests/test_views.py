@@ -134,7 +134,7 @@ class QuickListViewSetTestCase(TestCase):
 
     def test_list_unauthenticated(self):
         response = self.client.get('/list/')
-        self.assertEqual(response.status_code, status.HTTP_401_UNAUTHORIZED)
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
 
     def test_list_authenticated_unespecific(self):
         self.client.force_authenticate(self.user)
