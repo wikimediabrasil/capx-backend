@@ -23,6 +23,9 @@ from drf_spectacular.utils import extend_schema, extend_schema_view, OpenApiPara
 class MessageViewSet(viewsets.ModelViewSet):
     serializer_class = MessageSerializer
     permission_classes = [IsAuthenticated]
+    filter_backends = [filters.OrderingFilter]
+    ordering_fields = ['date']
+    ordering = ['-date']
 
     def get_queryset(self):
         user = self.request.user
