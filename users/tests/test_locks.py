@@ -5,8 +5,7 @@ from users.models import CustomUser
 
 class LocksCommandTestCase(TestCase):
     def setUp(self):
-        self.user_active = CustomUser.objects.create_user(username='activeuser', password='password', is_active=True)
-        self.user_locked = CustomUser.objects.create_user(username='lockeduser', password='password', is_active=True)
+        self.user = CustomUser.objects.create_user(username='activeuser', password='password', is_active=True)
 
     @patch('sys.stdout.write')
     @patch('users.management.commands.locks.requests.get')
@@ -25,9 +24,9 @@ class LocksCommandTestCase(TestCase):
 
         call_command('locks', verbosity=2)
 
-        self.user_locked.refresh_from_db()
-        self.assertFalse(self.user_locked.is_active)
-        mock_stdout.assert_called_with('User lockeduser is locked.\n')
+        self.user.refresh_from_db()
+        self.assertFalse(self.user.is_active)
+        mock_stdout.assert_called_with('User activeuser is locked and has been deactivated.\n')
 
     @patch('sys.stdout.write')
     @patch('users.management.commands.locks.requests.get')
@@ -45,8 +44,8 @@ class LocksCommandTestCase(TestCase):
 
         call_command('locks', verbosity=2)
 
-        self.user_active.refresh_from_db()
-        self.assertTrue(self.user_active.is_active)
+        self.user.refresh_from_db()
+        self.assertTrue(self.user.is_active)
         mock_stdout.assert_called_with('User activeuser is not locked.\n')
 
     @patch('sys.stdout.write')
@@ -56,8 +55,5 @@ class LocksCommandTestCase(TestCase):
 
         call_command('locks', verbosity=2)
 
-        self.user_active.refresh_from_db()
-        self.user_locked.refresh_from_db()
-
-        self.assertTrue(self.user_active.is_active)
-        self.assertTrue(self.user_locked.is_active)
+        self.user.refresh_from_db()
+        self.assertTrue(self.user.is_active)
