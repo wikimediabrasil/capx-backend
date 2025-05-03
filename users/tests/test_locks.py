@@ -23,10 +23,11 @@ class LocksCommandTestCase(TestCase):
         mock_response.raise_for_status = MagicMock()
         mock_get.return_value = mock_response
 
-        call_command('locks')
+        call_command('locks', verbosity=2)
 
         self.user_locked.refresh_from_db()
         self.assertFalse(self.user_locked.is_active)
+        mock_stdout.assert_called_with('User lockeduser is locked.\n')
 
     @patch('sys.stdout.write')
     @patch('users.management.commands.locks.requests.get')
@@ -42,10 +43,11 @@ class LocksCommandTestCase(TestCase):
         mock_response.raise_for_status = MagicMock()
         mock_get.return_value = mock_response
 
-        call_command('locks')
+        call_command('locks', verbosity=2)
 
         self.user_active.refresh_from_db()
         self.assertTrue(self.user_active.is_active)
+        mock_stdout.assert_called_with('User activeuser is not locked.\n')
 
     @patch('sys.stdout.write')
     @patch('users.management.commands.locks.requests.get')
