@@ -24,14 +24,11 @@ class Command(BaseCommand):
                 continue
             
             data = response.json()
-            if 'globaluserinfo' in data['query']:
-                user_info = data['query']['globaluserinfo']
-                if 'locked' in user_info and user_info['locked']:
-                    user.is_active = False
-                    user.save()
-                    self.stdout.write(self.style.SUCCESS(f'User {user.username} is locked and has been deactivated.'))
-                else:
-                    self.stdout.write(self.style.NOTICE(f'User {user.username} is not locked.'))
+            user_info = data['query']['globaluserinfo']
+            if 'locked' in user_info and user_info['locked']:
+                user.is_active = False
+                user.save()
+                self.stdout.write(self.style.SUCCESS(f'User {user.username} is locked and has been deactivated.'))
             else:
-                self.stdout.write(self.style.WARNING(f'User {user.username} not found in Wikimedia.'))
+                self.stdout.write(self.style.NOTICE(f'User {user.username} is not locked.'))
         self.stdout.write(self.style.SUCCESS('All users have been checked.'))
