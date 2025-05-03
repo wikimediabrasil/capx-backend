@@ -8,8 +8,9 @@ class LocksCommandTestCase(TestCase):
         self.user_active = CustomUser.objects.create_user(username='activeuser', password='password', is_active=True)
         self.user_locked = CustomUser.objects.create_user(username='lockeduser', password='password', is_active=True)
 
+    @patch('sys.stdout.write')
     @patch('users.management.commands.locks.requests.get')
-    def test_handle_locked_user(self, mock_get):
+    def test_handle_locked_user(self, mock_get, mock_stdout):
         mock_response = MagicMock()
         mock_response.json.return_value = {
             'query': {
@@ -27,8 +28,9 @@ class LocksCommandTestCase(TestCase):
         self.user_locked.refresh_from_db()
         self.assertFalse(self.user_locked.is_active)
 
+    @patch('sys.stdout.write')
     @patch('users.management.commands.locks.requests.get')
-    def test_handle_active_user(self, mock_get):
+    def test_handle_active_user(self, mock_get, mock_stdout):
         mock_response = MagicMock()
         mock_response.json.return_value = {
             'query': {
@@ -45,11 +47,12 @@ class LocksCommandTestCase(TestCase):
         self.user_active.refresh_from_db()
         self.assertTrue(self.user_active.is_active)
 
+    @patch('sys.stdout.write')
     @patch('users.management.commands.locks.requests.get')
-    def test_handle_request_error(self, mock_get):
+    def test_handle_request_error(self, mock_get, mock_stdout):
         mock_get.side_effect = Exception("Request failed")
 
-        call_command('locks')
+        call_command('locks', verbosity=2)
 
         self.user_active.refresh_from_db()
         self.user_locked.refresh_from_db()

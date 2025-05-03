@@ -5,7 +5,8 @@ import requests
 class Command(BaseCommand):
     help = 'Check if Wikimedia usernames are locked and deactivate them locally'
 
-    def handle(self, *args, **kwargs):
+    def handle(self, *args, **options):
+        self.verbosity = options.get('verbosity', 1)
         users = CustomUser.objects.all()
         for user in users:
             params = {
@@ -28,7 +29,8 @@ class Command(BaseCommand):
             if 'locked' in user_info and user_info['locked']:
                 user.is_active = False
                 user.save()
-                self.stdout.write(self.style.SUCCESS(f'User {user.username} is locked and has been deactivated.'))
+                if self.verbosity >= 2:
+                    self.stdout.write(self.style.SUCCESS(f'User {user.username} is locked and has been deactivated.'))
             else:
-                self.stdout.write(self.style.NOTICE(f'User {user.username} is not locked.'))
-        self.stdout.write(self.style.SUCCESS('All users have been checked.'))
+                if self.verbosity >= 2:
+                    self.stdout.write(self.style.NOTICE(f'User {user.username} is not locked.'))
