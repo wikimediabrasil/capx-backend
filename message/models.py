@@ -19,6 +19,7 @@ class Message(models.Model):
     receiver = models.CharField(max_length=100)
     method = models.CharField(max_length=10, choices=MESSAGE_METHOD)
     status = models.CharField(max_length=10, choices=STATUS_CHOICES, default='pending')
+    error_message = models.TextField(blank=True, default='')
     date = models.DateTimeField(auto_now_add=True)
 
     def save(self, *args, **kwargs):

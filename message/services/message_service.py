@@ -38,7 +38,7 @@ class MessageService:
             MessageService._update_instance_status(
                 instance,
                 'sent' if success else 'failed',
-                error_message if not success and error_message else 'Failed to send message.' if not success else ''
+                error_message if 'error_message' in locals() else ''
             )
 
         except Exception as e:
