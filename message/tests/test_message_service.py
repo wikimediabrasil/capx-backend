@@ -30,34 +30,6 @@ class MessageServiceTest(TestCase):
         )
 
     @patch('message.services.message_service.OAuth1Session')
-    def test_send_message_success_email(self, mock_oauth):
-        mock_oauth_instance = mock_oauth.return_value
-        mock_oauth_instance.get.side_effect = [
-            MagicMock(json=MagicMock(return_value={'query': {'tokens': {'csrftoken': 'test_token'}}})),
-            MagicMock(json=MagicMock(return_value={'query': {'users': [{'emailable': True}]}}))
-        ]
-        mock_oauth_instance.post.return_value = MagicMock(json=MagicMock(return_value={'emailuser': {'result': 'Success'}}))
-
-        MessageService.send_message(self.message)
-        self.message.refresh_from_db()
-        self.assertEqual(self.message.status, 'sent')
-
-    @patch('message.services.message_service.OAuth1Session')
-    def test_send_message_success_talk_page(self, mock_oauth):
-        self.message.method = 'talk_page'
-        self.message.save()
-
-        mock_oauth_instance = mock_oauth.return_value
-        mock_oauth_instance.get.side_effect = [
-            MagicMock(json=MagicMock(return_value={'query': {'tokens': {'csrftoken': 'test_token'}}}))
-        ]
-        mock_oauth_instance.post.return_value = MagicMock(json=MagicMock(return_value={'edit': {'result': 'Success'}}))
-
-        MessageService.send_message(self.message)
-        self.message.refresh_from_db()
-        self.assertEqual(self.message.status, 'sent')
-
-    @patch('message.services.message_service.OAuth1Session')
     def test_send_message_user_not_emailable(self, mock_oauth):
         mock_oauth_instance = mock_oauth.return_value
         mock_oauth_instance.get.side_effect = [
@@ -97,3 +69,63 @@ class MessageServiceTest(TestCase):
         MessageService.send_message(self.message)
         self.message.refresh_from_db()
         self.assertEqual(self.message.status, 'failed')
+
+    @patch('message.services.message_service.OAuth1Session')
+    def test_send_message_success_email(self, mock_oauth):
+        mock_oauth_instance = mock_oauth.return_value
+        mock_oauth_instance.get.side_effect = [
+            MagicMock(json=MagicMock(return_value={'query': {'tokens': {'csrftoken': 'test_token'}}})),
+            MagicMock(json=MagicMock(return_value={'query': {'users': [{'emailable': True}]}})),
+            MagicMock(json=MagicMock(return_value={'query': {'users': [{'emailable': True}]}}))
+        ]
+        mock_oauth_instance.post.return_value = MagicMock(json=MagicMock(return_value={'emailuser': {'result': 'Success'}}))
+
+        MessageService.send_message(self.message)
+        self.message.refresh_from_db()
+        self.assertEqual(self.message.status, 'sent')
+        self.assertEqual(self.message.error_message, '')
+
+    @patch('message.services.message_service.OAuth1Session')
+    def test_send_message_success_talk_page(self, mock_oauth):
+        self.message.method = 'talkpage'
+        self.message.save()
+
+        mock_oauth_instance = mock_oauth.return_value
+        mock_oauth_instance.get.side_effect = [
+            MagicMock(json=MagicMock(return_value={'query': {'tokens': {'csrftoken': 'test_token'}}}))
+        ]
+        mock_oauth_instance.post.return_value = MagicMock(json=MagicMock(return_value={'edit': {'result': 'Success'}}))
+
+        MessageService.send_message(self.message)
+        self.message.refresh_from_db()
+        self.assertEqual(self.message.status, 'sent')
+        self.assertEqual(self.message.error_message, '')
+
+    @patch('message.services.message_service.OAuth1Session')
+    def test_send_message_receiver_not_emailable_fallback_to_talk_page(self, mock_oauth):
+        mock_oauth_instance = mock_oauth.return_value
+        mock_oauth_instance.get.side_effect = [
+            MagicMock(json=MagicMock(return_value={'query': {'tokens': {'csrftoken': 'test_token'}}})),
+            MagicMock(json=MagicMock(return_value={'query': {'users': [{'emailable': False}]}}))
+        ]
+        mock_oauth_instance.post.return_value = MagicMock(json=MagicMock(return_value={'edit': {'result': 'Success'}}))
+
+        MessageService.send_message(self.message)
+        self.message.refresh_from_db()
+        self.assertEqual(self.message.status, 'sent')
+        self.assertEqual(self.message.error_message, 'Receiver is not emailable. Using talk page instead.')
+
+    @patch('message.services.message_service.OAuth1Session')
+    def test_send_message_sender_not_emailable_fallback_to_talk_page(self, mock_oauth):
+        mock_oauth_instance = mock_oauth.return_value
+        mock_oauth_instance.get.side_effect = [
+            MagicMock(json=MagicMock(return_value={'query': {'tokens': {'csrftoken': 'test_token'}}})),
+            MagicMock(json=MagicMock(return_value={'query': {'users': [{'emailable': True}]} })),
+            MagicMock(json=MagicMock(return_value={'query': {'users': [{'emailable': False}]}}))
+        ]
+        mock_oauth_instance.post.return_value = MagicMock(json=MagicMock(return_value={'edit': {'result': 'Success'}}))
+
+        MessageService.send_message(self.message)
+        self.message.refresh_from_db()
+        self.assertEqual(self.message.status, 'sent')
+        self.assertEqual(self.message.error_message, 'Sender is not emailable. Using talk page instead.')
