@@ -1,16 +1,13 @@
 from django.core.management.base import BaseCommand
+from users.models import CustomUser
 import requests
 
 class Command(BaseCommand):
-    help = 'Check if Wikimedia usernames are locked and unactivate them locally'
+    help = 'Check if Wikimedia usernames are locked and deactivate them locally'
 
     def handle(self, *args, **kwargs):
-        from users.models import CustomUser
-
-        # Get all users with a Wikimedia username
         users = CustomUser.objects.all()
         for user in users:
-            # Check if the username is locked
             params = {
                 'action': 'query',
                 'meta': 'globaluserinfo',
@@ -18,12 +15,18 @@ class Command(BaseCommand):
                 'format': 'json',
                 'formatversion': '2',
             }
-            response = requests.get('https://meta.wikimedia.org/w/api.php', params=params)
+
+            try:
+                response = requests.get('https://meta.wikimedia.org/w/api.php', params=params)
+                response.raise_for_status()  # Raise an error for bad responses
+            except Exception as e:
+                self.stdout.write(self.style.ERROR(f'Error fetching data for user {user.username}: {e}'))
+                continue
+            
             data = response.json()
             if 'globaluserinfo' in data['query']:
                 user_info = data['query']['globaluserinfo']
                 if 'locked' in user_info and user_info['locked']:
-                    # Unactivate the user locally
                     user.is_active = False
                     user.save()
                     self.stdout.write(self.style.SUCCESS(f'User {user.username} is locked and has been deactivated.'))
