@@ -313,9 +313,10 @@ class SavedItem(models.Model):
 
 class Badge(models.Model):
     name = models.CharField(max_length=255)
-    picture = models.ImageField(upload_to='badges/')
+    picture = models.URLField()
     description = models.TextField()
     users = models.ManyToManyField(Profile, through='UserBadge')
+    logic = models.JSONField(null=True, blank=True, help_text="Logic fields for badge criteria.")
 
     def __str__(self):
         return self.name
