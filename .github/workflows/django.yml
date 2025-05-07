@@ -49,6 +49,7 @@ jobs:
         echo "EMAIL_PORT = 25" >> CapX/settings_local.py
         echo "SERVER_EMAIL = 'root@localhost'" >> CapX/settings_local.py
         echo "ADMINS = []" >> CapX/settings_local.py
+        echo "HOME = '${GITHUB_WORKSPACE}'" >> CapX/settings_local.py
         echo "    CapX/tests/test_settings_local.py" >> .coveragerc
     - name: Coverage report
       run: |
