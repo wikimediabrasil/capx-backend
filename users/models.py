@@ -314,6 +314,7 @@ class SavedItem(models.Model):
 class LetsConnectLog(models.Model):
     user = models.ForeignKey(CustomUser, on_delete=models.CASCADE)
     confirmation = models.CharField(max_length=64)
+    timestamp = models.DateTimeField(auto_now_add=True)
 
 
 @receiver(post_save, sender=CustomUser)

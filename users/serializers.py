@@ -235,8 +235,10 @@ class LetsConnectLogSerializer(serializers.ModelSerializer):
             'age',
             'user',
             'confirmation',
+            'timestamp',
         ]
         extra_kwargs = {
             'user': {'read_only': True},
             'confirmation': {'read_only': True},
+            'timestamp': {'read_only': True},
         }

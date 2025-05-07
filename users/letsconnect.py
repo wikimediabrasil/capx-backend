@@ -7,6 +7,7 @@ import os
 from cryptography.hazmat.primitives import serialization
 from rest_framework import viewsets
 from django.conf import settings
+from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
 from rest_framework import status
 from .serializers import LetsConnectLogSerializer
@@ -15,7 +16,21 @@ from drf_spectacular.utils import extend_schema, OpenApiParameter, OpenApiTypes
 
 
 class LetsConnectViewSet(viewsets.GenericViewSet):
+    permission_classes = [IsAuthenticated]
     serializer_class = LetsConnectLogSerializer
+    
+    def get_queryset(self):
+        return LetsConnectLog.objects.filter(user=self.request.user)
+
+    def retrieve(self, request, *args, **kwargs):
+        instance = self.get_object()
+        serializer = self.get_serializer(instance)
+        return Response(serializer.data)
+
+    def list(self, request, *args, **kwargs):
+        queryset = self.get_queryset()
+        serializer = self.get_serializer(queryset, many=True)
+        return Response(serializer.data)
 
     def create(self, request):
         serializer = self.get_serializer(data=request.data)
