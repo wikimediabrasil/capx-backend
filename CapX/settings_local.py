@@ -6,7 +6,7 @@ import pymysql
 load_dotenv()
 
 BASE_DIR = Path(__file__).resolve().parent.parent
-HOME = os.environ.get('HOME') or ""
+HOME = os.environ.get('HOME') or str(Path.home())
 SECRET_KEY = os.environ.get("SECRET_KEY")
 SOCIAL_AUTH_MEDIAWIKI_URL = 'https://meta.wikimedia.org/w/index.php'
 SOCIAL_AUTH_MEDIAWIKI_KEY = os.environ.get("SOCIAL_AUTH_MEDIAWIKI_KEY")

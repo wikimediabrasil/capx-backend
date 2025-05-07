@@ -8,6 +8,15 @@ from skills.models import Skill
 from users.submodels import Territory, Language, WikimediaProject, Avatar, DataHash
 from django.core.validators import RegexValidator
 from django.core.exceptions import ValidationError
+from django.db.models import Manager
+
+
+class ActiveUserManager(UserManager):
+    """
+    Custom manager to filter out inactive users by default.
+    """
+    def get_queryset(self):
+        return super().get_queryset().filter(is_active=True)
 
 
 class CustomUser(AbstractBaseUser, PermissionsMixin):
@@ -39,10 +48,18 @@ class CustomUser(AbstractBaseUser, PermissionsMixin):
         blank=False
     )
 
-    objects = UserManager()
+    objects = ActiveUserManager()  # Use the custom manager
+    all_objects = UserManager()  # Add this to access all users if needed
     USERNAME_FIELD = 'username'
     EMAIL_FIELD = 'email'
 
+
+class ActiveProfileManager(Manager):
+    """
+    Custom manager to filter out profiles linked to inactive users.
+    """
+    def get_queryset(self):
+        return super().get_queryset().filter(user__is_active=True)
 
 class Profile(models.Model):
     PRONOUNS = (
@@ -189,6 +206,9 @@ class Profile(models.Model):
         help_text="Timestamp of the last update to the profile."
     )
 
+    objects = ActiveProfileManager()  # Use the custom manager
+    all_objects = Manager()  # Add this to access all profiles if needed
+
     def save(self, *args, **kwargs):
         """
         Overrides the save method to set the primary key (pk) of the instance to the
@@ -290,6 +310,11 @@ class SavedItem(models.Model):
         elif self.related_user:
             return f"{self.user.username}: {self.relation} - User - {self.related_user.username}"
     
+
+class LetsConnectLog(models.Model):
+    user = models.ForeignKey(CustomUser, on_delete=models.CASCADE)
+    confirmation = models.CharField(max_length=64)
+
 
 @receiver(post_save, sender=CustomUser)
 def create_user_profile(sender, instance, created, **kwargs):

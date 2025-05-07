@@ -25,6 +25,7 @@ from users.views import (
     ProfileViewSet, UsersViewSet, QuickListViewSet, AvatarViewSet, SavedItemViewSet,
     UsersBySkillViewSet, UsersByTagViewSet, TerritoryViewSet, WikimediaProjectViewSet
 )
+from users.letsconnect import LetsConnectViewSet
 from bugs.views import BugViewSet, AttachmentViewSet
 from orgs.views import OrganizationViewSet, OrganizationTypeViewSet, TagDiffViewSet, DocumentViewSet
 from events.views import EventViewSet
@@ -56,6 +57,7 @@ router.register('projects', ProjectViewSet, basename='projects')
 router.register('project_members', ProjectMemberViewSet, basename='project_members')
 router.register('project_member_acceptance', ProjectMemberAcceptanceViewSet, basename='project_member_acceptance')
 router.register('list', QuickListViewSet, basename='list')
+router.register('letsconnect', LetsConnectViewSet, basename='letsconnect')
 
 urlpatterns = [
     path('admin/', admin.site.urls),

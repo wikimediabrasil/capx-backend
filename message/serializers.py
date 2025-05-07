@@ -12,5 +12,6 @@ class MessageSerializer(serializers.ModelSerializer):
             'receiver',
             'method',
             'status',
+            'error_message',
             'date',
         ]

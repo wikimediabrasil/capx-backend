@@ -13,34 +13,54 @@ class MessageService:
         
         try:
             # Step 1: Get the OAuth credentials
-            user_social_auth = UserSocialAuth.objects.get(user=instance.sender)
-            oauth = OAuth1Session(
-                settings.SOCIAL_AUTH_MEDIAWIKI_KEY,
-                client_secret=settings.SOCIAL_AUTH_MEDIAWIKI_SECRET,
-                resource_owner_key=user_social_auth.extra_data['access_token']['oauth_token'],
-                resource_owner_secret=user_social_auth.extra_data['access_token']['oauth_token_secret']
-            )
+            oauth = MessageService._get_oauth_session(instance.sender)
 
             # Step 2: Fetch CSRF token
             token = MessageService._fetch_csrf_token(oauth, url)
             if not token:
-                instance.status = 'failed'
-                instance.save()
+                MessageService._update_instance_status(instance, 'failed', 'Failed to fetch CSRF token.')
                 return
 
             # Step 3: Decide method and send message
-            if instance.method == 'email' and MessageService._is_user_emailable(oauth, url, instance.receiver):
-                success = MessageService._send_email(oauth, url, instance, token)
-            else:
+            if instance.method == 'talkpage':
                 success = MessageService._send_talk_page(oauth, url, instance, token)
-            
-            # Step 4: Update the instance status
-            instance.status = 'sent' if success else 'failed'
-            instance.save()
+            elif instance.method == 'email':
+                if not MessageService._is_user_emailable(oauth, url, instance.receiver):
+                    error_message = 'Receiver is not emailable. Using talk page instead.'
+                    success = MessageService._send_talk_page(oauth, url, instance, token)
+                elif not MessageService._is_user_emailable(oauth, url, instance.sender):
+                    error_message = 'Sender is not emailable. Using talk page instead.'
+                    success = MessageService._send_talk_page(oauth, url, instance, token)
+                else:
+                    success = MessageService._send_email(oauth, url, instance, token)
 
-        except Exception:
-            instance.status = 'failed'
-            instance.save()
+            # Step 4: Update the instance status
+            MessageService._update_instance_status(
+                instance,
+                'sent' if success else 'failed',
+                error_message if 'error_message' in locals() else ''
+            )
+
+        except Exception as e:
+            MessageService._update_instance_status(instance, 'failed', f'An exception occurred: {str(e)}')
+
+    @staticmethod
+    def _get_oauth_session(sender):
+        user_social_auth = UserSocialAuth.objects.get(user=sender)
+        return OAuth1Session(
+            settings.SOCIAL_AUTH_MEDIAWIKI_KEY,
+            client_secret=settings.SOCIAL_AUTH_MEDIAWIKI_SECRET,
+            resource_owner_key=user_social_auth.extra_data['access_token']['oauth_token'],
+            resource_owner_secret=user_social_auth.extra_data['access_token']['oauth_token_secret']
+        )
+
+    @staticmethod
+    def _update_instance_status(instance, status, error_message):
+        instance.status = status
+        instance.error_message = error_message
+        instance.subject = ''
+        instance.message = ''
+        instance.save()
 
     @staticmethod
     def _fetch_csrf_token(oauth, url):
