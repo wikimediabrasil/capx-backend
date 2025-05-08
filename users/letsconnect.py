@@ -22,16 +22,28 @@ class LetsConnectViewSet(viewsets.GenericViewSet):
     def get_queryset(self):
         return LetsConnectLog.objects.filter(user=self.request.user)
 
+    @extend_schema(
+        summary="Retrieve a specific LetsConnectLog entry",
+        description="Retrieve a specific LetsConnectLog entry by ID.",
+    )
     def retrieve(self, request, *args, **kwargs):
         instance = self.get_object()
         serializer = self.get_serializer(instance)
         return Response(serializer.data)
 
+    @extend_schema(
+        summary="List all LetsConnectLog entries",
+        description="List all LetsConnectLog entries for the authenticated user.",
+    )
     def list(self, request, *args, **kwargs):
         queryset = self.get_queryset()
         serializer = self.get_serializer(queryset, many=True)
         return Response(serializer.data)
 
+    @extend_schema(
+        summary="Create a new LetsConnectLog entry",
+        description="Create a new LetsConnectLog entry, including sending the form to the LetsConnect API.",
+    )
     def create(self, request):
         serializer = self.get_serializer(data=request.data)
         if serializer.is_valid():
