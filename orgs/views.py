@@ -45,6 +45,10 @@ from events.models import Events
             ),
         ]
     ),
+    retrieve=extend_schema(
+        summary='Retrieve an organization by ID.',
+        description='This endpoint retrieves an organization by its ID.',
+    ),
     create=extend_schema(
         summary='Create a new organization.',
         description='This endpoint creates a new organization. Only staff members can create organizations.',
