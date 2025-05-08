@@ -25,6 +25,9 @@ class LetsConnectViewSet(viewsets.GenericViewSet):
     @extend_schema(
         summary="Retrieve a specific LetsConnectLog entry",
         description="Retrieve a specific LetsConnectLog entry by ID.",
+        parameters=[
+            OpenApiParameter('id', OpenApiTypes.INT, OpenApiParameter.PATH, description='ID of the LetsConnectLog entry to retrieve')
+        ],
     )
     def retrieve(self, request, *args, **kwargs):
         instance = self.get_object()
