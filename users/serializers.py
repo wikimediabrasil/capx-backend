@@ -5,6 +5,7 @@ from orgs.models import Organization
 from drf_spectacular.utils import extend_schema_field, extend_schema_serializer
 from drf_spectacular.types import OpenApiTypes
 from django.shortcuts import get_object_or_404
+from knox.models import AuthToken
 
    
 class UserSerializer(serializers.ModelSerializer):
@@ -18,14 +19,12 @@ class UserSerializer(serializers.ModelSerializer):
             'is_staff',
             'is_active',
             'date_joined',
-            'last_login',
         ]
         read_only_fields = [
             'username',
             'is_staff',
             'is_active',
             'date_joined',
-            'last_login',
         ]
 
 class TerritorySerializer(serializers.ModelSerializer):
@@ -71,12 +70,15 @@ class AvatarSerializer(serializers.ModelSerializer):
 class ProfileSerializer(serializers.ModelSerializer):
     user = UserSerializer()
     is_manager = serializers.SerializerMethodField()
+    last_login = serializers.SerializerMethodField()
     language = LanguageProficiencySerializer(source='languageproficiency_set', many=True)
     
     class Meta:
         model = Profile
         fields = [
             'user',
+            'last_update',
+            'last_login',
             'profile_image',
             'avatar',
             'display_name',
@@ -107,6 +109,10 @@ class ProfileSerializer(serializers.ModelSerializer):
     })
     def get_is_manager(self, obj):
         return list(Organization.objects.filter(managers=obj.user).values_list('id', flat=True))
+
+    @extend_schema_field(OpenApiTypes.DATETIME)
+    def get_last_login(self, obj):
+        return AuthToken.objects.filter(user=obj.user).order_by('-created').first().created if AuthToken.objects.filter(user=obj.user).exists() else None
 
     # Override the update method to allow write access to the nested user object
     def update(self, instance, validated_data):
