@@ -30,6 +30,26 @@ class TestLetsConnectViewSet(APITestCase):
             backend=default_backend()
         )
 
+    def test_retrieve_success(self):
+        log = LetsConnectLog.objects.create(user=self.user, confirmation="12345")
+        response = self.client.get(f"/letsconnect/{log.id}/", format="json")
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(response.data["confirmation"], "12345")
+        self.assertEqual(response.data["user"], self.user.id)
+        self.assertIn("timestamp", response.data)
+
+    def test_list_logs(self):
+        LetsConnectLog.objects.create(user=self.user, confirmation="12345")
+        LetsConnectLog.objects.create(user=self.user, confirmation="67890")
+
+        response = self.client.get("/letsconnect/", format="json")
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(len(response.data), 2)
+        self.assertEqual(response.data[0]["confirmation"], "12345")
+        self.assertEqual(response.data[1]["confirmation"], "67890")
+
     @patch("users.letsconnect.open", new_callable=mock_open, read_data="mocked_private_key_data")
     @patch("users.letsconnect.serialization.load_pem_private_key")
     @patch("users.letsconnect.requests.post")
