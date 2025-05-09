@@ -13,12 +13,16 @@ from rest_framework import status
 from .serializers import LetsConnectLogSerializer
 from .models import LetsConnectLog
 from drf_spectacular.utils import extend_schema, OpenApiParameter, OpenApiTypes
+from rest_framework import filters
 
 
 class LetsConnectViewSet(viewsets.GenericViewSet):
     permission_classes = [IsAuthenticated]
     serializer_class = LetsConnectLogSerializer
-    
+    filter_backends = [filters.OrderingFilter]
+    ordering_fields = ['timestamp']
+    ordering = ['-timestamp']
+
     def get_queryset(self):
         return LetsConnectLog.objects.filter(user=self.request.user)
 
