@@ -22,7 +22,7 @@ class TestLetsConnectViewSet(APITestCase):
             "age": 30,
         }
         self.invalid_payload = {
-            "full_name": "",
+            "role": "",
         }
         self.private_key = rsa.generate_private_key(
             public_exponent=65537,
@@ -70,6 +70,30 @@ class TestLetsConnectViewSet(APITestCase):
     @patch("users.letsconnect.open", new_callable=mock_open, read_data="mocked_private_key_data")
     @patch("users.letsconnect.serialization.load_pem_private_key")
     @patch("users.letsconnect.requests.post")
+    def test_create_empty_values_optional(self, mock_post, mock_load_key, mock_open_file):
+        mock_load_key.return_value = self.private_key
+        mock_post.return_value = MagicMock(
+            status_code=200,
+            json=MagicMock(return_value={"confirmation": "12345"})
+        )
+        payload = {
+            "full_name": "",
+            "email": "",
+            "role": "This field is mandatory",
+            "area": "",
+            "gender": "",
+            "age": "",
+        }
+        response = self.client.post("/letsconnect/", payload, format="json")
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(response.data["user"], self.user.id)
+        self.assertEqual(response.data["confirmation"], "12345")
+        self.assertTrue(LetsConnectLog.objects.filter(user=self.user, confirmation="12345").exists())
+        
+
+    @patch("users.letsconnect.open", new_callable=mock_open, read_data="mocked_private_key_data")
+    @patch("users.letsconnect.serialization.load_pem_private_key")
+    @patch("users.letsconnect.requests.post")
     def test_create_failure(self, mock_post, mock_load_key, mock_open_file):
         mock_load_key.return_value = self.private_key
         mock_post.return_value = MagicMock(
@@ -87,7 +111,7 @@ class TestLetsConnectViewSet(APITestCase):
         response = self.client.post("/letsconnect/", self.invalid_payload, format="json")
 
         self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
-        self.assertIn("full_name", response.data)
+        self.assertIn("role", response.data)
 
     @patch("users.letsconnect.serialization.load_pem_private_key")
     def test_create_private_key_missing(self, mock_load_key):
