@@ -225,7 +225,7 @@ class SavedItemSerializer(serializers.ModelSerializer):
 class LetsConnectLogSerializer(serializers.ModelSerializer):
     full_name = serializers.CharField(write_only=True, required=False)
     email = serializers.CharField(write_only=True, required=False)
-    role = serializers.CharField(write_only=True, required=False)
+    role = serializers.CharField(write_only=True, required=True)
     area = serializers.CharField(write_only=True, required=False)
     gender = serializers.CharField(write_only=True, required=False)
     age = serializers.CharField(write_only=True, required=False)
