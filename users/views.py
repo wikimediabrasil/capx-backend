@@ -541,3 +541,9 @@ class UserBadgeViewSet(viewsets.ModelViewSet):
             return super().update(request, *args, **kwargs)
         else:
             return Response({'message': 'You do not have permission to update this badge.'}, status=status.HTTP_403_FORBIDDEN)
+
+    def destroy(self, request, *args, **kwargs):
+        return Response({'message': 'Deleting user badges is not allowed.'}, status=status.HTTP_405_METHOD_NOT_ALLOWED)
+
+    def partial_update(self, request, *args, **kwargs):
+        return Response({'message': 'Partial updates are not allowed for user badges.'}, status=status.HTTP_405_METHOD_NOT_ALLOWED)

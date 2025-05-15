@@ -751,3 +751,15 @@ class UserBadgeViewSetTestCase(TestCase):
         }
         response = self.client.put(url, updated_data, format='json')
         self.assertEqual(response.status_code, status.HTTP_404_NOT_FOUND)
+
+    def test_delete_user_badge(self):
+        response = self.client.delete(f'/user_badge/{self.user_badge.pk}/')
+        self.assertEqual(response.status_code, status.HTTP_405_METHOD_NOT_ALLOWED)
+    
+    def test_partial_update_user_badge(self):
+        url = f'/user_badge/{self.user_badge.pk}/'
+        updated_data = {
+            'is_displayed': False
+        }
+        response = self.client.patch(url, updated_data, format='json')
+        self.assertEqual(response.status_code, status.HTTP_405_METHOD_NOT_ALLOWED)

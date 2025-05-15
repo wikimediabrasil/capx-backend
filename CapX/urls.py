@@ -59,7 +59,7 @@ router.register('project_members', ProjectMemberViewSet, basename='project_membe
 router.register('project_member_acceptance', ProjectMemberAcceptanceViewSet, basename='project_member_acceptance')
 router.register('list', QuickListViewSet, basename='list')
 router.register('letsconnect', LetsConnectViewSet, basename='letsconnect')
-router.register('badge', BadgeViewSet, basename='badge')
+router.register('badges', BadgeViewSet, basename='badges')
 router.register('user_badge', UserBadgeViewSet, basename='user_badge')
 
 urlpatterns = [
