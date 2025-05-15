@@ -331,6 +331,7 @@ class Badge(models.Model):
 class UserBadge(models.Model):
     profile = models.ForeignKey(Profile, on_delete=models.CASCADE)
     badge = models.ForeignKey(Badge, on_delete=models.CASCADE)
+    progress = models.IntegerField(default=0, help_text="Progress towards the badge.")
     is_displayed = models.BooleanField(default=True)
 
     class Meta:
