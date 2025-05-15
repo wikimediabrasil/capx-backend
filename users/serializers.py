@@ -253,17 +253,22 @@ class LetsConnectLogSerializer(serializers.ModelSerializer):
 class BadgeSerializer(serializers.ModelSerializer):
     class Meta:
         model = Badge
-        fields = ['id', 'name', 'picture', 'description']
+        fields = [ '__all__']
 
 
 class UserBadgeSerializer(serializers.ModelSerializer):
     badge = BadgeSerializer(read_only=True)
+    progress = serializers.IntegerField(source='get_progress', read_only=True)
 
     class Meta:
         model = UserBadge
-        fields = ['badge', 'is_displayed']
+        fields = ['id', 'badge', 'is_displayed', 'progress']
 
     def update(self, instance, validated_data):
         instance.is_displayed = validated_data.get('is_displayed', instance.is_displayed)
         instance.save()
         return instance
+
+    def get_progress(self, obj):
+        #TODO: Implement the logic to calculate the progress of the badge
+        return 0

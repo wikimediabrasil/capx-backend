@@ -23,7 +23,8 @@ from rest_framework.routers import DefaultRouter
 from skills.views import SkillViewSet, SkillByTypeViewSet
 from users.views import (
     ProfileViewSet, UsersViewSet, QuickListViewSet, AvatarViewSet, SavedItemViewSet,
-    UsersBySkillViewSet, UsersByTagViewSet, TerritoryViewSet, WikimediaProjectViewSet
+    UsersBySkillViewSet, UsersByTagViewSet, TerritoryViewSet, WikimediaProjectViewSet,
+    BadgeViewSet, UserBadgeViewSet
 )
 from users.letsconnect import LetsConnectViewSet
 from bugs.views import BugViewSet, AttachmentViewSet
@@ -58,6 +59,8 @@ router.register('project_members', ProjectMemberViewSet, basename='project_membe
 router.register('project_member_acceptance', ProjectMemberAcceptanceViewSet, basename='project_member_acceptance')
 router.register('list', QuickListViewSet, basename='list')
 router.register('letsconnect', LetsConnectViewSet, basename='letsconnect')
+router.register('badge', BadgeViewSet, basename='badge')
+router.register('user_badge', UserBadgeViewSet, basename='user_badge')
 
 urlpatterns = [
     path('admin/', admin.site.urls),

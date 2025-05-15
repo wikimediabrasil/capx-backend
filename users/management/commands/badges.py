@@ -25,51 +25,34 @@ class Command(BaseCommand):
                     UserBadge.objects.filter(profile=profile, badge=badge).delete()
 
     def evaluate_logic(self, logic, profile):
-        """
-        Evaluate the structured JSON logic for a badge against a user's profile.
-        """
-        app_label = logic.get("app")
-        filters = logic.get("filters", [])
+        
+        target = logic.get('target')
+        value = logic.get('value')
 
-        try:
-            # Dynamically get the model class
-            model = apps.get_model(app_label)
-
-            # Build the query
-            queryset = model.objects.all()
-            for filter_item in filters:
-                name = filter_item.get("name")
-                lookup = filter_item.get("lookup")
-                target = filter_item.get("target")
-
-                # Resolve the target value dynamically for query expressions
-                target_value = self.resolve_target_for_query(target)
-
-                if name == "filter":
-                    queryset = queryset.filter(**{lookup: target_value})
-                elif name == "exists":
-                    return queryset.exists()
-
+        if target == 'sent_messages':
+            sent = Message.objects.filter(sender=profile.user).count()
+            return min((sent / value) * 100, 100) if value else 0
+        elif target == 'received_messages':
+            received = Message.objects.filter(receiver=profile.user).count()
+            return min((received / value) * 100, 100) if value else 0
+        elif target == 'updated_profile':
+            updated_at = profile.updated_at
+            if updated_at:
+                return (now() - updated_at).days <= value
             return False
-        except Exception as e:
-            self.stderr.write(f"Error evaluating logic for profile {profile.id}: {e}")
+        elif target == 'is_manager':
+            return profile.is_manager.exists()
+        elif target == 'complete_profile':
+            return all([
+                profile.territory.exists(),
+                profile.affiliation.exists(),
+                profile.wikimedia_project.exists(),
+                profile.skills_known.exists(),
+                profile.skills_available.exists(),
+                profile.skills_wanted.exists()
+            ])
+        elif target == 'account_age':
+            created_at = profile.user.date_joined
+            if created_at:
+                return (now() - created_at).days >= value
             return False
-
-    def resolve_target_for_query(self, target):
-        """
-        Resolve the target string for use in Django ORM queries.
-        """
-        if not target:
-            return None
-
-        # Handle special cases for dynamic expressions
-        if target == "now()":
-            return now()
-        elif target.startswith("now() - timedelta"):
-            # Parse timedelta from the target string
-            days = int(target.split("days=")[1].split(")")[0])
-            return now() - timedelta(days=days)
-
-        # For static values, return as-is
-        return target
-

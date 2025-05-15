@@ -312,11 +312,17 @@ class SavedItem(models.Model):
 
 
 class Badge(models.Model):
+    BADGE_TYPE_CHOICES = [
+        ("internal", "Internal"),
+        ("external", "External"),
+    ]
     name = models.CharField(max_length=255)
     picture = models.URLField()
     description = models.TextField()
     users = models.ManyToManyField(Profile, through='UserBadge')
     logic = models.JSONField(null=True, blank=True, help_text="Logic fields for badge criteria.")
+    type = models.CharField(max_length=10, choices=BADGE_TYPE_CHOICES, default="internal")
+    external_id = models.CharField(max_length=255, null=True, blank=True, help_text="ID from external badge provider, if applicable.")
 
     def __str__(self):
         return self.name
@@ -332,7 +338,7 @@ class UserBadge(models.Model):
 
     def __str__(self):
         return f"{self.profile.user.username} - {self.badge.name}"
-    
+
 
 class LetsConnectLog(models.Model):
     user = models.ForeignKey(CustomUser, on_delete=models.CASCADE)
