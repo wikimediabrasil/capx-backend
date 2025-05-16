@@ -319,7 +319,6 @@ class Badge(models.Model):
     name = models.CharField(max_length=255)
     picture = models.URLField()
     description = models.TextField()
-    users = models.ManyToManyField(Profile, through='UserBadge')
     logic = models.JSONField(null=True, blank=True, help_text="Logic fields for badge criteria.")
     type = models.CharField(max_length=10, choices=BADGE_TYPE_CHOICES, default="internal")
     external_id = models.CharField(max_length=255, null=True, blank=True, help_text="ID from external badge provider, if applicable.")
