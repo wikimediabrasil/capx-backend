@@ -4,9 +4,9 @@ from django.urls import reverse
 from django.test import TestCase
 from rest_framework import status
 from rest_framework.test import APIClient
-from users.models import Profile, CustomUser, LanguageProficiency, SavedItem
+from users.models import Profile, CustomUser, LanguageProficiency, SavedItem, Badge, UserBadge
 from users.submodels import Territory, Language, WikimediaProject
-from users.serializers import ProfileSerializer, TerritorySerializer, LanguageSerializer, WikimediaProjectSerializer, SavedItemSerializer
+from users.serializers import ProfileSerializer, TerritorySerializer, LanguageSerializer, WikimediaProjectSerializer, SavedItemSerializer, BadgeSerializer, UserBadgeSerializer
 from skills.models import Skill
 from orgs.models import Organization, OrganizationType
 from events.models import Events
@@ -682,3 +682,84 @@ class SavedItemViewSetTestCase(TestCase):
         data = {'item_type': 'type1', 'item_id': 1}
         response = self.client.post('/saved_item/', data, format='json')
         self.assertEqual(response.status_code, status.HTTP_401_UNAUTHORIZED)
+
+
+class BadgeViewSetTestCase(TestCase):
+    def setUp(self):
+        self.user = CustomUser.objects.create_user(username='test', password=str(secrets.randbits(16)))
+        self.client = APIClient()
+        self.client.force_authenticate(self.user)
+        self.badge = Badge.objects.create(name='Test Badge', picture='test.png', description='Test Description')
+
+    def test_list_badges(self):
+        response = self.client.get('/badges/')
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+
+        badges = Badge.objects.all()
+        serializer = BadgeSerializer(badges, many=True)
+        self.assertEqual(response.data['results'], serializer.data)
+
+    def test_retrieve_badge(self):
+        response = self.client.get(f'/badges/{self.badge.pk}/')
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+
+        serializer = BadgeSerializer(self.badge)
+        self.assertEqual(response.data, serializer.data)
+
+
+class UserBadgeViewSetTestCase(TestCase):
+    def setUp(self):
+        self.user = CustomUser.objects.create_user(username='test', password=str(secrets.randbits(16)))
+        self.client = APIClient()
+        self.client.force_authenticate(self.user)
+        self.badge = Badge.objects.create(name='Test Badge', picture='test.png', description='Test Description')
+        self.user_badge = UserBadge.objects.create(profile=self.user.profile, badge=self.badge, is_displayed=True)
+
+    def test_list_user_badges(self):
+        response = self.client.get('/user_badge/')
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+
+        user_badges = UserBadge.objects.filter(profile__user=self.user)
+        serializer = UserBadgeSerializer(user_badges, many=True)
+        self.assertEqual(response.data['results'], serializer.data)
+
+    def test_retrieve_user_badge(self):
+        response = self.client.get(f'/user_badge/{self.user_badge.pk}/')
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+
+        serializer = UserBadgeSerializer(self.user_badge)
+        self.assertEqual(response.data, serializer.data)
+
+    def test_update_user_badge(self):
+        url = f'/user_badge/{self.user_badge.pk}/'
+        updated_data = {
+            'is_displayed': False
+        }
+        response = self.client.put(url, updated_data, format='json')
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+
+        self.user_badge.refresh_from_db()
+        self.assertEqual(self.user_badge.is_displayed, updated_data['is_displayed'])
+
+    def test_update_user_badge_no_permission(self):
+        other_user = CustomUser.objects.create_user(username='other_user', password=str(secrets.randbits(16)))
+        other_user_badge = UserBadge.objects.create(profile=other_user.profile, badge=self.badge, is_displayed=True)
+
+        url = f'/user_badge/{other_user_badge.pk}/'
+        updated_data = {
+            'is_displayed': False
+        }
+        response = self.client.put(url, updated_data, format='json')
+        self.assertEqual(response.status_code, status.HTTP_404_NOT_FOUND)
+
+    def test_delete_user_badge(self):
+        response = self.client.delete(f'/user_badge/{self.user_badge.pk}/')
+        self.assertEqual(response.status_code, status.HTTP_405_METHOD_NOT_ALLOWED)
+    
+    def test_partial_update_user_badge(self):
+        url = f'/user_badge/{self.user_badge.pk}/'
+        updated_data = {
+            'is_displayed': False
+        }
+        response = self.client.patch(url, updated_data, format='json')
+        self.assertEqual(response.status_code, status.HTTP_405_METHOD_NOT_ALLOWED)

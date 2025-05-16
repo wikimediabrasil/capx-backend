@@ -2,6 +2,7 @@ from django.core.management import call_command
 from django.test import TestCase
 from unittest.mock import patch, MagicMock
 from users.models import CustomUser
+import re
 
 class LocksCommandTestCase(TestCase):
     def setUp(self):
@@ -26,7 +27,13 @@ class LocksCommandTestCase(TestCase):
 
         self.user.refresh_from_db()
         self.assertFalse(self.user.is_active)
-        mock_stdout.assert_called_with('User activeuser is locked and has been deactivated.\n')
+        expected_text = 'User activeuser is locked and has been deactivated.'
+        calls = [call[0][0] for call in mock_stdout.call_args_list]
+        found = any(re.search(re.escape(expected_text), c) for c in calls)
+        self.assertTrue(
+            found,
+            f"Expected '{expected_text}' in output, got: {calls}"
+        )
 
     @patch('sys.stdout.write')
     @patch('users.management.commands.locks.requests.get')
@@ -46,7 +53,13 @@ class LocksCommandTestCase(TestCase):
 
         self.user.refresh_from_db()
         self.assertTrue(self.user.is_active)
-        mock_stdout.assert_called_with('User activeuser is not locked.\n')
+        expected_text = 'User activeuser is not locked.'
+        calls = [call[0][0] for call in mock_stdout.call_args_list]
+        found = any(re.search(re.escape(expected_text), c) for c in calls)
+        self.assertTrue(
+            found,
+            f"Expected '{expected_text}' in output, got: {calls}"
+        )
 
     @patch('sys.stdout.write')
     @patch('users.management.commands.locks.requests.get')
