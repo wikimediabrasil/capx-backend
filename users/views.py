@@ -540,7 +540,11 @@ class UserBadgeViewSet(viewsets.ModelViewSet):
         instance = self.get_object()
         if instance.profile.user == request.user:
             return super().update(request, *args, **kwargs)
-    
+
+    @extend_schema(exclude=True)
+    def create(self, request, *args, **kwargs):
+        return Response({'message': 'Creating user badges is not allowed.'}, status=status.HTTP_405_METHOD_NOT_ALLOWED)
+
     @extend_schema(exclude=True)
     def destroy(self, request, *args, **kwargs):
         return Response({'message': 'Deleting user badges is not allowed.'}, status=status.HTTP_405_METHOD_NOT_ALLOWED)
