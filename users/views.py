@@ -539,9 +539,7 @@ class UserBadgeViewSet(viewsets.ModelViewSet):
         instance = self.get_object()
         if instance.profile.user == request.user:
             return super().update(request, *args, **kwargs)
-        else:
-            return Response({'message': 'You do not have permission to update this badge.'}, status=status.HTTP_403_FORBIDDEN)
-
+        
     def destroy(self, request, *args, **kwargs):
         return Response({'message': 'Deleting user badges is not allowed.'}, status=status.HTTP_405_METHOD_NOT_ALLOWED)
 
