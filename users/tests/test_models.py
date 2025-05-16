@@ -5,7 +5,8 @@ from django.core.exceptions import ValidationError
 from django.db.models.signals import post_save
 from orgs.models import Organization, OrganizationType
 from ..models import Territory, Language, WikimediaProject, CustomUser, \
-    Profile, LanguageProficiency, Avatar, create_user_profile, DataHash, SavedItem
+    Profile, LanguageProficiency, Avatar, create_user_profile, DataHash, \
+    SavedItem, Badge, UserBadge
 
 
 class TerritoryModelTest(TestCase):
@@ -337,3 +338,45 @@ class SavedItemModelTest(TestCase):
                 entity="invalid",
                 related_user=self.other_user,
             )
+
+class BadgeModelTest(TestCase):
+    @classmethod
+    def setUpTestData(cls):
+        cls.badge = Badge.objects.create(
+            name="Test Badge",
+            description="This is a test badge.",
+        )
+
+    def test_badge_creation(self):
+        self.assertEqual(self.badge.name, "Test Badge")
+        self.assertEqual(self.badge.description, "This is a test badge.")
+
+    def test_badge_str_method(self):
+        self.assertEqual(str(self.badge), "Test Badge")
+
+class UserBadgeModelTest(TestCase):
+    @classmethod
+    def setUpTestData(cls):
+        cls.user = CustomUser.objects._create_user(
+            username="TestUser",
+            email="testuser@example.com",
+            password="password"
+        )
+        cls.badge = Badge.objects.create(
+            name="Test Badge",
+            description="This is a test badge.",
+        )
+        cls.user_badge = UserBadge.objects.create(
+            profile=cls.user.profile,
+            badge=cls.badge
+        )
+
+    def test_user_badge_creation(self):
+        self.assertEqual(self.user_badge.profile, self.user.profile)
+        self.assertEqual(self.user_badge.badge, self.badge)
+
+    def test_user_badge_str_method(self):
+        self.assertEqual(
+            str(self.user_badge),
+            f"{self.user.username} - {self.badge.name}"
+        )
