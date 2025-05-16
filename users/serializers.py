@@ -71,6 +71,7 @@ class ProfileSerializer(serializers.ModelSerializer):
     user = UserSerializer()
     is_manager = serializers.SerializerMethodField()
     last_login = serializers.SerializerMethodField()
+    badges = serializers.SerializerMethodField()
     language = LanguageProficiencySerializer(source='languageproficiency_set', many=True)
     
     class Meta:
@@ -97,9 +98,11 @@ class ProfileSerializer(serializers.ModelSerializer):
             'contact',
             'social',
             'is_manager',
+            'badges',
         ]
         read_only_fields = [
             'is_manager',
+            'badges',
         ]
 
     @extend_schema_field({
@@ -109,6 +112,14 @@ class ProfileSerializer(serializers.ModelSerializer):
     })
     def get_is_manager(self, obj):
         return list(Organization.objects.filter(managers=obj.user).values_list('id', flat=True))
+
+    @extend_schema_field({
+        'type': 'array',
+        'description': 'List of badge IDs associated with the user',
+        'items': {'type': 'integer'}
+    })
+    def get_badges(self, obj):
+        return list(UserBadge.objects.filter(user=obj.user, is_displayed=True).values_list('badge__id', flat=True))
 
     @extend_schema_field(OpenApiTypes.DATETIME)
     def get_last_login(self, obj):
@@ -251,13 +262,13 @@ class LetsConnectLogSerializer(serializers.ModelSerializer):
 
         
 class BadgeSerializer(serializers.ModelSerializer):
+    
     class Meta:
         model = Badge
         fields = '__all__'
 
 
 class UserBadgeSerializer(serializers.ModelSerializer):
-    badge = BadgeSerializer(read_only=True)
 
     class Meta:
         model = UserBadge
