@@ -531,6 +531,7 @@ class BadgeViewSet(viewsets.ReadOnlyModelViewSet):
 class UserBadgeViewSet(viewsets.ModelViewSet):
     queryset = UserBadge.objects.all()
     serializer_class = UserBadgeSerializer
+    permission_classes = [IsAuthenticated]
 
     def get_queryset(self):
         return UserBadge.objects.filter(profile__user=self.request.user)
