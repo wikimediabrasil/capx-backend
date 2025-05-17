@@ -713,13 +713,13 @@ class UserBadgeViewSetTestCase(TestCase):
         self.client = APIClient()
         self.client.force_authenticate(self.user)
         self.badge = Badge.objects.create(name='Test Badge', picture='test.png', description='Test Description')
-        self.user_badge = UserBadge.objects.create(profile=self.user.profile, badge=self.badge, is_displayed=True)
+        self.user_badge = UserBadge.objects.create(user=self.user, badge=self.badge, is_displayed=True)
 
     def test_list_user_badges(self):
         response = self.client.get('/user_badge/')
         self.assertEqual(response.status_code, status.HTTP_200_OK)
 
-        user_badges = UserBadge.objects.filter(profile__user=self.user)
+        user_badges = UserBadge.objects.filter(user=self.user)
         serializer = UserBadgeSerializer(user_badges, many=True)
         self.assertEqual(response.data['results'], serializer.data)
 
@@ -729,6 +729,14 @@ class UserBadgeViewSetTestCase(TestCase):
 
         serializer = UserBadgeSerializer(self.user_badge)
         self.assertEqual(response.data, serializer.data)
+
+    def test_create_user_badge(self):
+        data = {
+            'user': self.user.pk,
+            'badge': self.badge.pk,
+        }
+        response = self.client.post('/user_badge/', data, format='json')
+        self.assertEqual(response.status_code, status.HTTP_405_METHOD_NOT_ALLOWED)
 
     def test_update_user_badge(self):
         url = f'/user_badge/{self.user_badge.pk}/'
@@ -743,7 +751,7 @@ class UserBadgeViewSetTestCase(TestCase):
 
     def test_update_user_badge_no_permission(self):
         other_user = CustomUser.objects.create_user(username='other_user', password=str(secrets.randbits(16)))
-        other_user_badge = UserBadge.objects.create(profile=other_user.profile, badge=self.badge, is_displayed=True)
+        other_user_badge = UserBadge.objects.create(user=other_user, badge=self.badge, is_displayed=True)
 
         url = f'/user_badge/{other_user_badge.pk}/'
         updated_data = {
