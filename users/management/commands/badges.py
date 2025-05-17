@@ -46,7 +46,7 @@ class Command(BaseCommand):
             diff = last_update > deadline
             return 100 if diff else 0
         elif target == 'is_manager':
-            return 100 if Organization.objects.filter(manager=user).exists() else 0
+            return 100 if Organization.objects.filter(managers=user).exists() else 0
         elif target == 'complete_profile':
             fields = sum([
                 user.profile.territory.exists(),
