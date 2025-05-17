@@ -119,7 +119,7 @@ class ProfileSerializer(serializers.ModelSerializer):
         'items': {'type': 'integer'}
     })
     def get_badges(self, obj):
-        return list(UserBadge.objects.filter(user=obj.user, is_displayed=True).values_list('badge__id', flat=True))
+        return list(UserBadge.objects.filter(user=obj.user, is_displayed=True, progress=100).values_list('badge__id', flat=True))
 
     @extend_schema_field(OpenApiTypes.DATETIME)
     def get_last_login(self, obj):
