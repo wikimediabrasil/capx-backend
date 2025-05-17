@@ -367,12 +367,12 @@ class UserBadgeModelTest(TestCase):
             description="This is a test badge.",
         )
         cls.user_badge = UserBadge.objects.create(
-            profile=cls.user.profile,
+            user=cls.user,
             badge=cls.badge
         )
 
     def test_user_badge_creation(self):
-        self.assertEqual(self.user_badge.profile, self.user.profile)
+        self.assertEqual(self.user_badge.user, self.user)
         self.assertEqual(self.user_badge.badge, self.badge)
 
     def test_user_badge_str_method(self):

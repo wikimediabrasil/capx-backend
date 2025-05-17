@@ -534,11 +534,11 @@ class UserBadgeViewSet(viewsets.ModelViewSet):
     permission_classes = [IsAuthenticated]
 
     def get_queryset(self):
-        return UserBadge.objects.filter(profile__user=self.request.user)
+        return UserBadge.objects.filter(user=self.request.user)
 
     def update(self, request, *args, **kwargs):
         instance = self.get_object()
-        if instance.profile.user == request.user:
+        if instance.user == request.user:
             return super().update(request, *args, **kwargs)
 
     @extend_schema(exclude=True)
