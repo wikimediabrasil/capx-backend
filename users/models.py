@@ -319,7 +319,6 @@ class Badge(models.Model):
     name = models.CharField(max_length=255)
     picture = models.URLField()
     description = models.TextField()
-    users = models.ManyToManyField(Profile, through='UserBadge')
     logic = models.JSONField(null=True, blank=True, help_text="Logic fields for badge criteria.")
     type = models.CharField(max_length=10, choices=BADGE_TYPE_CHOICES, default="internal")
     external_id = models.CharField(max_length=255, null=True, blank=True, help_text="ID from external badge provider, if applicable.")
@@ -329,16 +328,16 @@ class Badge(models.Model):
 
 
 class UserBadge(models.Model):
-    profile = models.ForeignKey(Profile, on_delete=models.CASCADE)
+    user = models.ForeignKey(CustomUser, on_delete=models.CASCADE)
     badge = models.ForeignKey(Badge, on_delete=models.CASCADE)
     progress = models.IntegerField(default=0, help_text="Progress towards the badge.")
     is_displayed = models.BooleanField(default=True)
 
     class Meta:
-        unique_together = ('profile', 'badge')
+        unique_together = ('user', 'badge')
 
     def __str__(self):
-        return f"{self.profile.user.username} - {self.badge.name}"
+        return f"{self.user.username} - {self.badge.name}"
 
 
 class LetsConnectLog(models.Model):

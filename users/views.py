@@ -531,17 +531,24 @@ class BadgeViewSet(viewsets.ReadOnlyModelViewSet):
 class UserBadgeViewSet(viewsets.ModelViewSet):
     queryset = UserBadge.objects.all()
     serializer_class = UserBadgeSerializer
+    permission_classes = [IsAuthenticated]
 
     def get_queryset(self):
-        return UserBadge.objects.filter(profile__user=self.request.user)
+        return UserBadge.objects.filter(user=self.request.user)
 
     def update(self, request, *args, **kwargs):
         instance = self.get_object()
-        if instance.profile.user == request.user:
+        if instance.user == request.user:
             return super().update(request, *args, **kwargs)
-        
+
+    @extend_schema(exclude=True)
+    def create(self, request, *args, **kwargs):
+        return Response({'message': 'Creating user badges is not allowed.'}, status=status.HTTP_405_METHOD_NOT_ALLOWED)
+
+    @extend_schema(exclude=True)
     def destroy(self, request, *args, **kwargs):
         return Response({'message': 'Deleting user badges is not allowed.'}, status=status.HTTP_405_METHOD_NOT_ALLOWED)
 
+    @extend_schema(exclude=True)
     def partial_update(self, request, *args, **kwargs):
         return Response({'message': 'Partial updates are not allowed for user badges.'}, status=status.HTTP_405_METHOD_NOT_ALLOWED)
