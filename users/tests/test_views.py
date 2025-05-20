@@ -11,6 +11,10 @@ from skills.models import Skill
 from orgs.models import Organization, OrganizationType
 from events.models import Events
 from projects.models import Project
+from django.utils import timezone
+from users.models import Profile, CustomUser
+from message.models import Message
+from unittest.mock import patch
 
 class ProfileViewSetTestCase(TestCase):
     def setUp(self):
@@ -771,3 +775,41 @@ class UserBadgeViewSetTestCase(TestCase):
         }
         response = self.client.patch(url, updated_data, format='json')
         self.assertEqual(response.status_code, status.HTTP_405_METHOD_NOT_ALLOWED)
+
+class StatisticsViewTestCase(TestCase):
+    def setUp(self):
+        self.client = APIClient()
+        self.user = CustomUser.objects.create_user(username='test', password=str(secrets.randbits(16)))
+        self.client.force_authenticate(self.user)
+
+    def test_statistics_view_empty(self):
+        response = self.client.get('/statistics/')
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        expected_keys = [
+            "total_users", "new_users", "total_capacities", "new_capacities",
+            "total_messages", "new_messages", "total_organizations", "new_organizations"
+        ]
+        for key in expected_keys:
+            self.assertIn(key, response.data)
+            self.assertIsInstance(response.data[key], int)
+
+    @patch('message.models.MessageService.send_message', return_value=None)
+    def test_statistics_view_counts(self, mock_send_message):
+        # Create a skill with creation date this month
+        Skill.objects.create(skill_wikidata_item="Q1")
+
+        # Create a message with date this month
+        Message.objects.create(sender=self.user, receiver=self.user, message="test", subject="test", method="email")
+
+        # Create an organization with managers and management joined this month
+        org_type = OrganizationType.objects.create(type_name='Type', type_code='T')
+        org = Organization.objects.create(display_name='Org', acronym='O', type=org_type)
+        org.managers.add(self.user)
+        org.save()
+
+        response = self.client.get('/statistics/')
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertGreaterEqual(response.data['total_users'], 1)
+        self.assertGreaterEqual(response.data['total_capacities'], 1)
+        self.assertGreaterEqual(response.data['total_messages'], 1)
+        self.assertGreaterEqual(response.data['total_organizations'], 1)
