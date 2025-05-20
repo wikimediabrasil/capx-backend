@@ -1,5 +1,7 @@
 from django.test import TestCase
-from ..models import Organization, OrganizationType, TagDiff, Document
+from ..models import Organization, OrganizationType, TagDiff, Document, Management
+from users.models import CustomUser
+import secrets
 
 
 class OrganizationTypeModelTest(TestCase):
@@ -27,6 +29,7 @@ class OrganizationModelTest(TestCase):
             acronym='SO',
             type=self.organization_type,
         )
+        self.user = CustomUser.objects.create_user(username='test', password=str(secrets.randbits(16)))
 
     def test_organization_creation(self):
         organization = self.organization
@@ -55,3 +58,12 @@ class OrganizationModelTest(TestCase):
     def test_documents(self):
         url = Document.objects.create(url="https://commons.wikimedia.org/wiki/File:filename.ext")
         self.assertEqual(str(url), "File:filename.ext")
+
+    def test_management_creation(self):
+        management = Management.objects.create(
+            organization=self.organization,
+            user=self.user
+        )
+        self.assertEqual(management.organization, self.organization)
+        self.assertEqual(management.user, self.user)
+        self.assertEqual(str(management), f"{self.user.username} manages {self.organization.display_name} ({self.organization.acronym})")
