@@ -4,6 +4,7 @@ from .serializers import ProfileSerializer, TerritorySerializer, LanguageSeriali
 from skills.models import Skill
 from events.models import Events
 from projects.models import Project
+from message.models import Message
 from rest_framework import status, viewsets, filters
 from rest_framework.response import Response
 from rest_framework.permissions import IsAuthenticated
@@ -11,6 +12,8 @@ from django.db import models
 from django.shortcuts import get_object_or_404
 from django_filters.rest_framework import DjangoFilterBackend
 from drf_spectacular.utils import extend_schema, extend_schema_view, OpenApiParameter, OpenApiTypes, OpenApiExample, OpenApiResponse
+from rest_framework.views import APIView
+from datetime import datetime
 
 
 @extend_schema_view(
@@ -215,7 +218,7 @@ class ProfileViewSet(viewsets.ModelViewSet):
             else:
                 return super().update(request, *args, **kwargs)
 
-    
+
     @extend_schema(
         summary='Delete the profile of the logged-in user.',
         description='This endpoint deletes the profile of the logged-in user.',
@@ -552,3 +555,66 @@ class UserBadgeViewSet(viewsets.ModelViewSet):
     @extend_schema(exclude=True)
     def partial_update(self, request, *args, **kwargs):
         return Response({'message': 'Partial updates are not allowed for user badges.'}, status=status.HTTP_405_METHOD_NOT_ALLOWED)
+
+
+class StatisticsView(APIView):
+
+    @extend_schema(
+        summary='Get statistics about users, capacities, messages, and organizations.',
+        description='This endpoint retrieves statistics about users, capacities, messages, and organizations.',
+        responses={(200, 'application/json'): {
+            'description': 'Statistics retrieved successfully',
+            'type': 'object',
+            'properties': {
+                'total_users': {'type': 'integer', 'description': 'Total number of users'},
+                'new_users': {'type': 'integer', 'description': 'Number of new users this month'},
+                'total_capacities': {'type': 'integer', 'description': 'Total number of capacities'},
+                'new_capacities': {'type': 'integer', 'description': 'Number of new capacities this month'},
+                'total_messages': {'type': 'integer', 'description': 'Total number of messages'},
+                'new_messages': {'type': 'integer', 'description': 'Number of new messages this month'},
+                'total_organizations': {'type': 'integer', 'description': 'Total number of active organizations'},
+                'new_organizations': {'type': 'integer', 'description': 'Number of organizations activated this month'},
+            },
+        }},
+    )
+    def get(self, request, *args, **kwargs):
+        # Calculate total users and percentage change
+        total_users = Profile.objects.count()
+        new_users = Profile.objects.filter(
+            user__date_joined__month=datetime.now().month - 1,
+            user__date_joined__year=datetime.now().year
+        ).count()
+
+        # Calculate total capacities and new capacities this month
+        total_capacities = Skill.objects.count()
+        new_capacities = Skill.objects.filter(
+            skill_date_of_creation__month=datetime.now().month,
+            skill_date_of_creation__year=datetime.now().year
+        ).count()
+
+        # Calculate total messages and new messages this month
+        total_messages = Message.objects.count()
+        new_messages = Message.objects.filter(
+            date__month=datetime.now().month,
+            date__year=datetime.now().year
+        ).count()
+
+        # Calculate total of organizations with managers and within this month
+        total_organizations = Organization.objects.filter(managers__isnull=False).count()
+        new_organizations = Organization.objects.filter(
+            managers__isnull=False,
+            management__joined_at__month=datetime.now().month,
+            management__joined_at__year=datetime.now().year
+        ).count()
+
+
+        return Response({
+            "total_users": total_users,
+            "new_users": new_users,
+            "total_capacities": total_capacities,
+            "new_capacities": new_capacities,
+            "total_messages": total_messages,
+            "new_messages": new_messages,
+            "total_organizations": total_organizations,
+            "new_organizations": new_organizations
+        })
