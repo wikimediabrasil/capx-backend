@@ -1,4 +1,4 @@
-django==5.1
+django>=5.1.9,<5.2
 social-auth-app-django
 whitenoise
 pymysql
