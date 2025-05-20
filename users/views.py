@@ -215,8 +215,28 @@ class ProfileViewSet(viewsets.ModelViewSet):
             if skills_available - skills_known:
                 response = {'message': 'You cannot add a skill to skills_available that is not in skills_known.'}
                 return Response(response, status=status.HTTP_409_CONFLICT)
-            else:
-                return super().update(request, *args, **kwargs)
+            
+            # Establish limits for the number of territories, languages, and affiliations
+            max_languages = 20
+            max_territories = 10
+            max_affiliations = 10
+
+            territories = len(request.data.get('territory', []) or [])
+            languages = len(request.data.get('language', {}) or {})
+            affiliations = len(request.data.get('affiliation', []) or [])
+
+            if territories > max_territories:
+                response = {'message': f'You cannot add more than {max_territories} territories.'}
+                return Response(response, status=status.HTTP_409_CONFLICT)
+            if languages > max_languages:
+                response = {'message': f'You cannot add more than {max_languages} languages.'}
+                return Response(response, status=status.HTTP_409_CONFLICT)
+            if affiliations > max_affiliations:
+                response = {'message': f'You cannot add more than {max_affiliations} affiliations.'}
+                return Response(response, status=status.HTTP_409_CONFLICT)
+
+            # If all checks pass, proceed with the update
+            return super().update(request, *args, **kwargs)
 
 
     @extend_schema(

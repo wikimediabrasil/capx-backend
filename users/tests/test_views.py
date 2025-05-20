@@ -131,6 +131,37 @@ class ProfileViewSetTestCase(TestCase):
         lang_prof = LanguageProficiency.objects.get(profile=self.user.profile, language=language)
         self.assertEqual(lang_prof.proficiency, '3')
 
+    def test_update_too_many_language_proficiency(self):
+        # Create 21 languages
+        languages = [Language.objects.create(language_name=f"Language {i}", language_code=f"lang{i}") for i in range(21)]
+        url = '/profile/' + str(self.user.pk) + '/'
+        data = self.client.get(url).data
+        self.assertEqual(data['language'], [])
+        data['language'] = [{'id': lang.id, 'proficiency': '3'} for lang in languages]
+        response = self.client.put(url, data, format='json')
+        self.assertEqual(response.status_code, status.HTTP_409_CONFLICT)
+
+    def test_update_too_many_territory(self):
+        # Create 11 territories
+        territories = [Territory.objects.create(territory_name=f"Territory {i}") for i in range(11)]
+        url = '/profile/' + str(self.user.pk) + '/'
+        data = self.client.get(url).data
+        self.assertEqual(data['territory'], [])
+        data['territory'] = [territory.id for territory in territories]
+        response = self.client.put(url, data, format='json')
+        self.assertEqual(response.status_code, status.HTTP_409_CONFLICT)
+
+    def test_update_too_many_affiliation(self):
+        # Create 11 organizations
+        organizations = [Organization.objects.create(display_name=f"Organization {i}", acronym=f"Org{i}") for i in range(11)]
+        url = '/profile/' + str(self.user.pk) + '/'
+        data = self.client.get(url).data
+        self.assertEqual(data['affiliation'], [])
+        data['affiliation'] = [organization.id for organization in organizations]
+        response = self.client.put(url, data, format='json')
+        self.assertEqual(response.status_code, status.HTTP_409_CONFLICT)
+
+
 class QuickListViewSetTestCase(TestCase):
     def setUp(self):
         self.user = CustomUser.objects.create_user(username='test', password=str(secrets.randbits(16)))
