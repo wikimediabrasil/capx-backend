@@ -19,7 +19,7 @@ jobs:
         fetch-depth: 0 # Shallow clones should be disabled for a better relevancy of analysis
     - uses: getong/mariadb-action@v1.11
       with:
-        mariadb version: '10.6.20'
+        mariadb version: '10.6.21'
         mysql user: 'runner'
         mysql password: 'runner'
         mysql database: 'test'

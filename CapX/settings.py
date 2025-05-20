@@ -36,7 +36,6 @@ INSTALLED_APPS = [
     'django.contrib.messages',
     'django.contrib.staticfiles',
     'social_django',
-    'modeltranslation',
     'rest_framework',
     'rest_framework.authtoken',
     'rest_social_auth',

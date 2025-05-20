@@ -39,7 +39,7 @@ class Organization(models.Model):
         help_text='The territories where the organization is active.'
     )
     managers = models.ManyToManyField(
-        'users.CustomUser', related_name='managers', blank=True,
+        'users.CustomUser', related_name='managers', blank=True, through='Management',
         help_text='ID of users who are managers of the organization on the platform.'
     )
     meta_page = models.URLField(
@@ -115,6 +115,20 @@ class Organization(models.Model):
             return self.display_name + " (" + self.acronym + ")"
         else:
             return self.display_name
+
+class Management(models.Model):
+    organization = models.ForeignKey(
+        Organization, on_delete=models.CASCADE,
+        help_text='The organization managed by the user.'
+    )
+    user = models.ForeignKey(
+        'users.CustomUser', on_delete=models.CASCADE,
+        help_text='The user who manages the organization.'
+    )
+    joined_at = models.DateTimeField(default=timezone.now)
+
+    def __str__(self):
+        return f"{self.user} manages {self.organization}"
 
 class TagDiff(models.Model):
     tag = models.CharField(max_length=255, unique=True)
