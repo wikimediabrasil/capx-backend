@@ -483,7 +483,7 @@ class SavedItemViewSet(viewsets.ModelViewSet):
     permission_classes = [IsAuthenticated]
 
     def get_queryset(self):
-        return SavedItem.objects.filter(user=self.request.user)
+        return SavedItem.objects.filter(user=self.request.user).exclude(related_user__is_active=False)
 
     def perform_create(self, serializer):
         serializer.save(user=self.request.user)
