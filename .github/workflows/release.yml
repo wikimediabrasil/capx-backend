@@ -1,0 +1,80 @@
+name: Release on Version Change
+
+on:
+  push:
+    branches:
+      - dev
+    paths:
+      - 'CapX/settings.py'
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v3
+        with:
+          fetch-depth: 0
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v3
+        with:
+          node-version: '18'
+
+      - name: Check if version field changed
+        id: check_version_change
+        run: |
+          git fetch origin stable
+          PREV_VERSION=$(git show origin/stable:CapX/settings.py | grep -oP "'VERSION': '\K[0-9]+\.[0-9]+\.[0-9]+(?=')")
+          NEW_VERSION=$(grep -oP "'VERSION': '\K[0-9]+\.[0-9]+\.[0-9]+(?=')" CapX/settings.py)
+          if [ "$PREV_VERSION" = "$NEW_VERSION" ]; then
+            echo "No version change detected. Exiting."
+            exit 0
+          fi
+          echo "version=$NEW_VERSION" >> $GITHUB_ENV
+
+      - name: Configure Git
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+
+      - name: Merge dev into stable
+        run: |
+          git fetch origin stable
+          git checkout stable
+          git merge --no-ff -m "Release ${{ env.version }}" dev
+          git checkout dev
+          git merge stable
+          git push origin dev
+          git push origin stable
+        env:
+          version: ${{ env.version }}
+  
+  deploy:
+    name: Deploy to SSH Server
+    runs-on: ubuntu-latest
+    needs: release
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v3
+
+      - name: Run deployment script
+        uses: appleboy/ssh-action@v1.0.3
+        with:
+          host: ${{ secrets.HOST }}
+          username: ${{ secrets.USERNAME }}
+          key: ${{ secrets.KEY }}
+          port: ${{ secrets.PORT }}
+          request_pty: true
+          script_stop: true
+          script: |
+            become capx-backend git -C '$HOME/www/python/src' fetch origin
+            become capx-backend git -C '$HOME/www/python/src' reset --hard origin/stable
+            become capx-backend git -C '$HOME/www/python/src' pull origin stable
+            become capx-backend webservice python3.11 shell -- webservice-python-bootstrap
+            become capx-backend webservice python3.11 shell -- '$HOME/www/python/venv/bin/python' '$HOME/www/python/src/manage.py' migrate
+            become capx-backend webservice python3.11 shell -- '$HOME/www/python/venv/bin/python' '$HOME/www/python/src/manage.py' collectstatic --noinput
+            become capx-backend webservice python3.11 restart
+            become capx-backend webservice python3.11 status
