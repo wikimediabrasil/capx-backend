@@ -125,7 +125,9 @@ class CheckView(SocialKnoxOnlyAuthView):
             'type': 'object',
             'properties': {
                 'exists': {'type': 'boolean', 'description': 'Whether the OAuth token exists or not'},
-                'extra': {'type': 'string', 'description': 'The extra information stored with the token'}
+                'extra': {'type': 'string', 'description': 'The extra information stored with the token'},
+                'expired': {'type': 'boolean', 'description': 'Whether the OAuth token has expired'},
+                'status': {'type': 'string', 'description': 'Status of the token: active, expired, or not_found'}
             }
         }}
     )
@@ -134,6 +136,37 @@ class CheckView(SocialKnoxOnlyAuthView):
         if not token:
             return Response({'error': 'oauth_token is required'}, status=status.HTTP_400_BAD_REQUEST)
         
+        # First, check if the token exists
         exists = AuthExtraInfo.objects.filter(token=token).exists()
-        extra = AuthExtraInfo.objects.get(token=token).extra if exists else None
-        return Response({'exists': exists, 'extra': extra})
+        
+        if exists:
+            # Token exists, check if it is still valid (less than 5 minutes)
+            token_info = AuthExtraInfo.objects.get(token=token)
+            time_threshold = now() - timedelta(minutes=5)
+            is_expired = token_info.created_at < time_threshold
+            
+            if is_expired:
+                # Token expired, remove it from the database
+                token_info.delete()
+                return Response({
+                    'exists': False, 
+                    'extra': None, 
+                    'expired': True,
+                    'status': 'expired'
+                })
+            else:
+                # Token is still valid
+                return Response({
+                    'exists': True, 
+                    'extra': token_info.extra, 
+                    'expired': False,
+                    'status': 'active'
+                })
+        else:
+            # Token not found
+            return Response({
+                'exists': False, 
+                'extra': None, 
+                'expired': False,
+                'status': 'not_found'
+            })
