@@ -161,6 +161,20 @@ class ProfileViewSetTestCase(TestCase):
         response = self.client.put(url, data, format='json')
         self.assertEqual(response.status_code, status.HTTP_409_CONFLICT)
 
+    def test_update_profile_automated_lets_connect_cannot_be_false(self):
+        profile = Profile.objects.get(user=self.user)
+        profile.automated_lets_connect = True
+        profile.save()
+        url = '/profile/' + str(self.user.pk) + '/'
+        data = {
+            'user': {},
+            'language': [],
+            'automated_lets_connect': False,
+        }
+        response = self.client.put(url, data, format='json')
+        self.assertEqual(response.status_code, status.HTTP_409_CONFLICT)
+        self.assertIn('automated_lets_connect cannot be set to False', response.data['message'])
+
 
 class QuickListViewSetTestCase(TestCase):
     def setUp(self):

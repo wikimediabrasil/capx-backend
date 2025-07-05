@@ -99,6 +99,7 @@ class ProfileSerializer(serializers.ModelSerializer):
             'social',
             'is_manager',
             'badges',
+            'automated_lets_connect',
         ]
         read_only_fields = [
             'is_manager',
