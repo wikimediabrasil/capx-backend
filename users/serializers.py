@@ -128,15 +128,6 @@ class ProfileSerializer(serializers.ModelSerializer):
 
     # Override the update method to allow write access to the nested user object
     def update(self, instance, validated_data):
-        # Check if trying to disable automated_lets_connect when it's already enabled
-        # TODO: Remove this once lets connect integration is complete
-        if (instance.automated_lets_connect and 
-            'automated_lets_connect' in validated_data and 
-            not validated_data['automated_lets_connect']):
-            raise serializers.ValidationError({
-                'automated_lets_connect': 'Cannot set automated_lets_connect as false once it is true.'
-            })
-        
         user_data = validated_data.pop('user', None)
         if user_data is not None:
             user = instance.user

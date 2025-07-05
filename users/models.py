@@ -223,8 +223,6 @@ class Profile(models.Model):
         Overrides the save method to set the primary key (pk) of the instance to the
         primary key of the associated user to ensure that both the user and profile
         have the same primary key.
-        
-        Also, temporarily prevents automated_lets_connect from being set to False once it's True.
 
         Args:
             *args: Variable length argument list.
@@ -232,16 +230,6 @@ class Profile(models.Model):
         """
         if not self.pk and self.user:
             self.pk = self.user.pk
-            
-        # Temporarily prevents automated_lets_connect from being set to False once it's True
-        # TODO: Remove this once lets connect integration is complete
-        if self.pk:  # Only check for existing records
-            try:
-                old_instance = Profile.objects.get(pk=self.pk)
-                if old_instance.automated_lets_connect and not self.automated_lets_connect:
-                    self.automated_lets_connect = True  # Keep it True
-            except Profile.DoesNotExist:
-                pass  # New record, no need to check
                 
         super().save(*args, **kwargs)
 

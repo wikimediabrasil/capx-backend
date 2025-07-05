@@ -235,6 +235,12 @@ class ProfileViewSet(viewsets.ModelViewSet):
                 response = {'message': f'You cannot add more than {max_affiliations} affiliations.'}
                 return Response(response, status=status.HTTP_409_CONFLICT)
 
+            # Temporarily prevents automated_lets_connect from being set to False once it's True
+            # TODO: Remove this once lets connect integration is complete
+            if instance.automated_lets_connect and not request.data.get('automated_lets_connect', True):
+                response = {'message': 'automated_lets_connect cannot be set to False once it has been True.'}
+                return Response(response, status=status.HTTP_409_CONFLICT)
+
             # If all checks pass, proceed with the update
             return super().update(request, *args, **kwargs)
 
