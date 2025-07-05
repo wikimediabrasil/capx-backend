@@ -206,6 +206,15 @@ class Profile(models.Model):
         help_text="Timestamp of the last update to the profile."
     )
 
+    # TEMPORARY FOR LETS CONNECT INTEGRATION
+    automated_lets_connect = models.BooleanField(
+        "Automated lets connect",
+        null=True,
+        blank=True,
+        default=None,
+        help_text="Temporary field indicating whether the user has automated lets connect integration."
+    )
+
     objects = ActiveProfileManager()  # Use the custom manager
     all_objects = Manager()  # Add this to access all profiles if needed
 
