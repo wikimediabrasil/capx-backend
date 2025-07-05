@@ -868,5 +868,3 @@ class StatisticsViewTestCase(TestCase):
         self.assertGreaterEqual(response.data['total_capacities'], 1)
         self.assertGreaterEqual(response.data['total_messages'], 1)
         self.assertGreaterEqual(response.data['total_organizations'], 1)
-
-

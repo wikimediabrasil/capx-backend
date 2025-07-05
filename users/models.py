@@ -230,7 +230,6 @@ class Profile(models.Model):
         """
         if not self.pk and self.user:
             self.pk = self.user.pk
-                
         super().save(*args, **kwargs)
 
     def __str__(self):
