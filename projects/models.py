@@ -9,6 +9,7 @@ class Project(models.Model):
     )
     profile_image = models.URLField(
         blank=True, null=True,
+        max_length=512,
         help_text='The URL of the project profile image on Wikimedia Commons.',
         validators=[RegexValidator(
             regex=r'^https:\/\/commons\.wikimedia\.org\/wiki\/File:.*?\.[\w]+$',
@@ -21,6 +22,7 @@ class Project(models.Model):
     )
     url = models.URLField(
         blank=True, null=True,
+        max_length=512,
         help_text='The URL of the project.',
     )
     related_skills = models.ManyToManyField(

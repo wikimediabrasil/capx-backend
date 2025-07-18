@@ -57,7 +57,7 @@ class WikimediaProject(models.Model):
     )
     wikimedia_project_picture = models.URLField(
         verbose_name="Wikimedia project picture",
-        max_length=255,
+        max_length=512,
         blank=True,
         help_text="Picture of the Wikimedia project"
     )
@@ -69,6 +69,7 @@ class WikimediaProject(models.Model):
 class Avatar(models.Model):
     avatar_url = models.URLField(
         verbose_name="Avatar URL",
+        max_length=512,
         help_text="URL of the avatar"
     )
 
