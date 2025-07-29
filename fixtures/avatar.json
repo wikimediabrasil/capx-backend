@@ -2,7 +2,7 @@
     {
         "model": "users.avatar",
         "fields": {
-            "avatar_url": "https://commons.wikimedia.org/wiki/Special:Redirect/file/Wikidata.svg"
+            "avatar_url": "https://commons.wikimedia.org/wiki/File:CapX_-_No_avatar.svg"
         }
     },
     {
