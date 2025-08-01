@@ -84,6 +84,7 @@ class Profile(models.Model):
     )
     profile_image = models.URLField(
         verbose_name="Profile image",
+        max_length=512,
         null=True,
         help_text="URL of the profile image from Commons.",
         blank=True
@@ -326,7 +327,7 @@ class Badge(models.Model):
         ("external", "External"),
     ]
     name = models.CharField(max_length=255)
-    picture = models.URLField()
+    picture = models.URLField(max_length=512)
     description = models.TextField()
     logic = models.JSONField(null=True, blank=True, help_text="Logic fields for badge criteria.")
     type = models.CharField(max_length=10, choices=BADGE_TYPE_CHOICES, default="internal")

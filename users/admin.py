@@ -1,6 +1,6 @@
 from django.contrib import admin
 from django.contrib.auth.admin import UserAdmin as AuthUserAdmin
-from users.models import Territory, Language, WikimediaProject, CustomUser, Profile, Badge, UserBadge
+from users.models import Territory, Language, WikimediaProject, CustomUser, Profile, Badge, UserBadge, LetsConnectLog, SavedItem, LanguageProficiency
 
 
 class ProfileInline(admin.StackedInline):
@@ -51,3 +51,6 @@ admin.site.register(WikimediaProject)
 admin.site.register(Profile)
 admin.site.register(Badge)
 admin.site.register(UserBadge)
+admin.site.register(LetsConnectLog)
+admin.site.register(SavedItem)
+admin.site.register(LanguageProficiency)

@@ -20,6 +20,7 @@ class Organization(models.Model):
     )
     profile_image = models.URLField(
         blank=True, null=True,
+        max_length=512,
         help_text='The URL of the organization profile image on Wikimedia Commons.',
         validators=[RegexValidator(
             regex=r'^https:\/\/commons\.wikimedia\.org\/wiki\/File:.*?\.[\w]+$',
@@ -44,6 +45,7 @@ class Organization(models.Model):
     )
     meta_page = models.URLField(
         blank=True, null=True,
+        max_length=512,
         help_text='The URL of the organization page on Meta-Wiki.',
         validators=[RegexValidator(
             regex=r'^https:\/\/meta\.wikimedia\.org\/wiki\/.*?$',
@@ -56,14 +58,17 @@ class Organization(models.Model):
     )
     website = models.URLField(
         blank=True, null=True,
+        max_length=512,
         help_text='The URL of the organization website.',
     )
     report = models.URLField(
         blank=True, null=True,
+        max_length=512,
         help_text='The URL of the organization report.',
     )
     mastodon = models.URLField(
         blank=True, null=True,
+        max_length=512,
         help_text='The URL of the organization Mastodon account.',
     )
     tag_diff = models.ManyToManyField(
@@ -82,6 +87,7 @@ class Organization(models.Model):
     )
     home_project = models.URLField(
         blank=True, null=True, 
+        max_length=512,
         help_text='The URL of the home project of the organization on Wikimedia (e.g. https://xx.wikimedia.org/).',
         validators=[RegexValidator(
         regex=r'^https:\/\/[\w-]+\.wikimedia\.org\/$',
@@ -140,6 +146,7 @@ class TagDiff(models.Model):
 class Document(models.Model):
     url = models.URLField(
         help_text='The URL of the document on Wikimedia Commons.',
+        max_length=512,
         validators=[RegexValidator(
             regex=r'^https:\/\/commons\.wikimedia\.org\/wiki\/File:.*?\.[\w]+$',
             message='Invalid URL format. The format should be https://commons.wikimedia.org/wiki/File:filename.ext'

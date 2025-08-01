@@ -25,7 +25,8 @@ class Events(models.Model):
         help_text="Type of location of the event."
     )
     openstreetmap_id = models.URLField(
-        blank=True, 
+        blank=True,
+        max_length=512,
         verbose_name="OpenStreetMap ID",
         help_text="OpenStreetMap ID of the event location.",
         validators=[RegexValidator(
@@ -35,6 +36,7 @@ class Events(models.Model):
     )
     url = models.URLField(
         blank=True,
+        max_length=512,
         verbose_name="Event URL",
         help_text="URL of the event."
     )
@@ -54,7 +56,8 @@ class Events(models.Model):
         )]
     )
     image_url = models.URLField(
-        blank=True, 
+        blank=True,
+        max_length=512,
         verbose_name="Image URL",
         help_text="URL of the event image on Wikimedia Commons or Learn Wiki.",
         validators=[RegexValidator(
