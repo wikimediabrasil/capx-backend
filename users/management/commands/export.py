@@ -78,7 +78,7 @@ class Command(BaseCommand):
             api = f"https://learn.wiki/api/badges/v1/assertions/user/{profile[0]}/"
             response = requests.get(api)
             if response.status_code == 200 and response.json().get('results', None):
-                data = [f"{badge['badge_class']['display_name']}§{badge['badge_class']['course_id']}§{badge['assertion_url']}" for badge in response.json().get('results')]
+                data = [f"{badge['badge_class']['display_name']}§Open Badges - Logo.png§{badge['assertion_url']}" for badge in response.json().get('results')]
             else:
                 data = ['Capacity Exchange supporter§Capx-logo-redux.svg§https://meta.wikimedia.org/wiki/Capacity_Exchange/Network']
             
