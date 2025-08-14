@@ -281,7 +281,7 @@ class CommandTestCase(TestCase):
         formatted_data, skills = self.command.process_profiles(profiles, meta_wiki_users)
 
         expected_data = [
-            ['TestUser1', '[1]', '[2]', '[Badge1§Course1§URL1]'],
+            ['TestUser1', '[1]', '[2]', '[Badge1§Open Badges - Logo.png§URL1]'],
             ['AltUser2', '[3]', '[4]', self.default_recognition]
         ]
         expected_skills = [1, 2, 3, 4]
