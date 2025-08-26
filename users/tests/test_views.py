@@ -309,6 +309,14 @@ class QuickListViewSetTestCase(TestCase):
         expected_data = {badge.pk: badge.name for badge in badges}
         self.assertEqual(response.data, expected_data)
 
+    def test_list_users(self):
+        self.client.force_authenticate(self.user)
+
+        response = self.client.get('/list/users/')
+        users = CustomUser.objects.all()
+        expected_data = {user.pk: user.username for user in users}
+        self.assertEqual(response.data, expected_data)
+
 
 class UsersBySkillTestCase(TestCase):
     def setUp(self):
