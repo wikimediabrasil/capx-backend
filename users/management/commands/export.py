@@ -32,7 +32,11 @@ class Command(BaseCommand):
             'format': 'json',
             'formatversion': '2',
         }
-        response = requests.get('https://meta.wikimedia.org/w/api.php', params=query_params)
+        response = requests.get(
+            'https://meta.wikimedia.org/w/api.php',
+            params=query_params,
+            headers={'User-Agent': 'CapacityExchangeBot/1.0'}
+        )
         if self.verbosity >= 2:
             self.stdout.write(f"Meta wiki users response: {response.json()}")
         return [page['title'][5:] for page in response.json()['query']['pages'][0]['transcludedin']]
