@@ -354,6 +354,8 @@ class QuickListViewSet(viewsets.ReadOnlyModelViewSet):
             return Skill.objects.all()
         elif list_type == 'badges':
             return Badge.objects.all()
+        elif list_type == 'users':
+            return Profile.objects.all()
         else:
             # Dummy empty queryset to avoid errors in the schema generation
             return Profile.objects.none()
@@ -372,7 +374,7 @@ class QuickListViewSet(viewsets.ReadOnlyModelViewSet):
                 OpenApiParameter.PATH,
                 required=True,
                 description='The type of list to retrieve.',
-                enum=['language', 'wikimedia_project', 'affiliation', 'territory', 'skills', 'event', 'project', 'badges'],
+                enum=['language', 'wikimedia_project', 'affiliation', 'territory', 'skills', 'event', 'project', 'badges', 'users'],
             ),
         ],
         responses={(200, 'application/json'): {
