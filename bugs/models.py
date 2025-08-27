@@ -1,5 +1,8 @@
 from django.db import models
 from django.conf import settings
+from django.db.models.signals import post_save
+from django.core.mail import send_mail
+from django.dispatch import receiver
 
 
 class Bug(models.Model):
@@ -51,3 +54,14 @@ class Attachment(models.Model):
 
     def __str__(self):
         return f"Attachment for {self.bug.bug_type} - {self.uploaded_at.strftime('%Y-%m-%d')}"
+
+@receiver(post_save, sender=Bug)
+def send_bug_report_email(sender, instance, created, **kwargs):
+    if created:
+        subject = f"New Bug Report: {instance.title}"
+        message = f"Description: {instance.description}\n\nType: {instance.bug_type}\nStatus: {instance.status}"
+        send_to = [admin[1] for admin in settings.ADMINS]
+        if send_to:
+            sent = send_mail(subject, message, settings.SERVER_EMAIL, send_to)
+            if sent:
+                return sent
