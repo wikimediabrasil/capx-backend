@@ -4,6 +4,9 @@ from django.test import TestCase
 from ..models import Bug, Attachment
 from users.models import CustomUser
 from django.core.files.uploadedfile import SimpleUploadedFile
+from unittest.mock import patch
+from django.test import override_settings
+from django.core import mail
 
 
 class BugModelTest(TestCase):
@@ -76,4 +79,24 @@ class AttachmentModelTest(TestCase):
         os.remove(self.attachment.file.path)
 
 
+class BugModelSignalTest(TestCase):
+    def setUp(self):
+        # Create a user
+        self.test_user = CustomUser.objects.create_user(username='testuser', password=str(secrets.randbits(16)))
+        self.test_user.save()
 
+    @override_settings(ADMINS=[('Admin', 'admin@example.com')])
+    def test_send_bug_report_email_signal_on_bug_creation(self):
+        Bug.objects.create(
+            user=self.test_user,
+            title="Test Bug",
+            description="Bug description",
+            bug_type="error",
+            status="to_do"
+        )
+        # Assert if is a email in the outbox
+        self.assertEqual(len(mail.outbox), 1)
+        self.assertIn("New Bug Report: Test Bug", mail.outbox[0].subject)
+        self.assertIn("Bug description", mail.outbox[0].body)
+        self.assertIn("error", mail.outbox[0].body)
+        self.assertIn("to_do", mail.outbox[0].body)
