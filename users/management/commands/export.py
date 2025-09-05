@@ -3,6 +3,7 @@ from users.serializers import ProfileSerializer
 from users.models import Profile, DataHash
 from skills.models import Skill
 from django.conf import settings
+from users.models import CustomUser, UserBadge
 import json
 import requests
 import hashlib
@@ -19,7 +20,9 @@ class Command(BaseCommand):
         )
 
     def format_list(self, data_list):
-        return '[' + ', '.join(str(item) for item in data_list) + ']'
+        def escape_commas(item):
+            return item.replace(',', '&#44;') if isinstance(item, str) else item
+        return '[' + ', '.join(str(escape_commas(item)) for item in data_list) + ']'
 
     def get_meta_wiki_users(self):
         query_params = {
@@ -77,14 +80,22 @@ class Command(BaseCommand):
                     skills.extend(profile['skills_known'])
                     skills.extend(profile['skills_available'])
 
-        # Get badges from Wikilearn
+        # Get badges from UserBadges and Wikilearn
         for profile in formatted_data:
+            data = []
+            user = CustomUser.objects.get(username=profile[0])
+            user_badges = UserBadge.objects.filter(user=user, progress=100, is_displayed=True)
+            for badge in user_badges:
+                image = badge.badge.picture.split('/')[-1]
+                badge_data = f"{badge.badge.name}§{image}§https://meta.wikimedia.org/wiki/Capacity_Exchange/User_Guide#Badges"
+                data.append(badge_data)
+
             api = f"https://learn.wiki/api/badges/v1/assertions/user/{profile[0]}/"
             response = requests.get(api)
             if response.status_code == 200 and response.json().get('results', None):
-                data = [f"{badge['badge_class']['display_name']}§Open Badges - Logo.png§{badge['assertion_url']}" for badge in response.json().get('results')]
-            else:
-                data = ['Capacity Exchange supporter§Capx-logo-redux.svg§https://meta.wikimedia.org/wiki/Capacity_Exchange/Network']
+                for badge in response.json().get('results'):
+                    badge_data = f"{badge['badge_class']['display_name']}§Open Badges - Logo.png§{badge['assertion_url']}"
+                    data.append(badge_data)
             
             profile.append(self.format_list(data))
         
