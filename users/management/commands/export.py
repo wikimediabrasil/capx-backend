@@ -48,7 +48,8 @@ class Command(BaseCommand):
         formatted_data = []
         skills = []
         processed_usernames = set()
-        
+        export_rows = []
+
         # First pass - process regular usernames
         for profile in profiles:
             username = profile['user']['username']
@@ -58,7 +59,7 @@ class Command(BaseCommand):
                     self.format_list(profile['skills_known']),
                     self.format_list(profile['skills_available']),
                 ]
-                formatted_data.append(data)
+                export_rows.append((data, username))  # (dados, username_principal)
                 processed_usernames.add(username)
 
                 skills.extend(profile['skills_known'])
@@ -74,30 +75,31 @@ class Command(BaseCommand):
                         self.format_list(profile['skills_known']),
                         self.format_list(profile['skills_available']),
                     ]
-                    formatted_data.append(data)
+                    export_rows.append((data, profile['user']['username']))  # (dados, username_principal)
                     processed_usernames.add(alt_username)
 
                     skills.extend(profile['skills_known'])
                     skills.extend(profile['skills_available'])
 
         # Get badges from UserBadges and Wikilearn
-        for profile in formatted_data:
-            data = []
-            user = CustomUser.objects.get(username=profile[0])
+        for data, main_username in export_rows:
+            badges = []
+            user = CustomUser.objects.get(username=main_username)
             user_badges = UserBadge.objects.filter(user=user, progress=100, is_displayed=True)
             for badge in user_badges:
                 image = badge.badge.picture.split('/')[-1]
                 badge_data = f"{badge.badge.name}§{image}§https://meta.wikimedia.org/wiki/Capacity_Exchange/User_Guide#Badges"
-                data.append(badge_data)
+                badges.append(badge_data)
 
-            api = f"https://learn.wiki/api/badges/v1/assertions/user/{profile[0]}/"
+            api = f"https://learn.wiki/api/badges/v1/assertions/user/{main_username}/"
             response = requests.get(api)
             if response.status_code == 200 and response.json().get('results', None):
                 for badge in response.json().get('results'):
                     badge_data = f"{badge['badge_class']['display_name']}§Open Badges - Logo.png§{badge['assertion_url']}"
-                    data.append(badge_data)
+                    badges.append(badge_data)
             
-            profile.append(self.format_list(data))
+            data.append(self.format_list(badges))
+            formatted_data.append(data)
         
         if self.verbosity >= 2:
             self.stdout.write(f"Processed profiles: {formatted_data}")
