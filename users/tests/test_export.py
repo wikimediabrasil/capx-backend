@@ -285,6 +285,18 @@ class CommandTestCase(TestCase):
         self.assertEqual(set(skills), set(expected_skills))
 
     @patch('users.management.commands.export.requests.get')
+    def test_process_profiles_with_too_many_badges(self, mock_requests_get):
+        meta_wiki_users = ['TestUser1']
+        mock_requests_get.side_effect = [
+            MagicMock(status_code=200, json=MagicMock(return_value={
+                'results': [{'badge_class': {'display_name': f'B{i}', 'course_id': f'C{i}'}, 'assertion_url': f'U{i}'} for i in range(30)]
+            }))
+        ]
+
+        formatted_data, _ = self.command.process_profiles(self.profile_serializer.data, meta_wiki_users)
+        self.assertTrue(len(formatted_data[0][3]) <= 400)
+
+    @patch('users.management.commands.export.requests.get')
     def test_process_profiles_with_missing_badges(self, mock_requests_get):
         meta_wiki_users = ['TestUser1', 'AltUser2']
 
@@ -308,6 +320,7 @@ class CommandTestCase(TestCase):
 
         self.assertEqual(formatted_data, expected_data)
         self.assertEqual(set(skills), set(expected_skills))
+
 
     @patch('users.management.commands.export.requests.Session')
     def test_handle(self, mock_session):
@@ -364,3 +377,5 @@ class AddArgumentsTestCase(TestCase):
         out = StringIO()
         call_command('export', '--dry-run', stdout=out)
         self.assertIn("Dry run mode enabled", out.getvalue())
+
+
