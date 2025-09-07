@@ -24,6 +24,10 @@ class Command(BaseCommand):
             return item.replace(',', '&#44;') if isinstance(item, str) else item
         return '[' + ', '.join(str(escape_commas(item)) for item in data_list) + ']'
 
+    def get_user_agent(self):
+        version = getattr(settings, "SPECTACULAR_SETTINGS", {}).get("VERSION", "dev")
+        return f"CapacityExchangeBot/{version}"
+
     def get_meta_wiki_users(self):
         query_params = {
             'action': 'query',
@@ -38,7 +42,7 @@ class Command(BaseCommand):
         response = requests.get(
             'https://meta.wikimedia.org/w/api.php',
             params=query_params,
-            headers={'User-Agent': 'CapacityExchangeBot/1.0'}
+            headers={'User-Agent': self.get_user_agent()}
         )
         if self.verbosity >= 2:
             self.stdout.write(f"Meta wiki users response: {response.json()}")
@@ -92,7 +96,7 @@ class Command(BaseCommand):
                 badges.append(badge_data)
 
             api = f"https://learn.wiki/api/badges/v1/assertions/user/{main_username}/"
-            response = requests.get(api)
+            response = requests.get(api, headers={'User-Agent': self.get_user_agent()})
             if response.status_code == 200 and response.json().get('results', None):
                 for badge in response.json().get('results'):
                     badge_data = f"{badge['badge_class']['display_name']}§Open Badges - Logo.png§{badge['assertion_url']}"
@@ -184,7 +188,7 @@ class Command(BaseCommand):
             "type": "login",
             "format": "json"
         }
-        response = session.get(url=url, params=params)
+        response = session.get(url=url, params=params, headers={'User-Agent': self.get_user_agent()})
         data = response.json()
         if self.verbosity >= 2:
             self.stdout.write(f"Login token response: {data}")
@@ -198,7 +202,7 @@ class Command(BaseCommand):
             "lgtoken": login_token,
             "format": "json"
         }
-        response = session.post(url, data=params).json()
+        response = session.post(url, data=params, headers={'User-Agent': self.get_user_agent()}).json()
         if response['login']['result'] != 'Success':
             raise requests.exceptions.RequestException("Login failed")
         if self.verbosity >= 2:
@@ -211,7 +215,7 @@ class Command(BaseCommand):
             "meta": "tokens",
             "format": "json"
         }
-        response = session.get(url=url, params=params)
+        response = session.get(url=url, params=params, headers={'User-Agent': self.get_user_agent()})
         data = response.json()
         if self.verbosity >= 2:
             self.stdout.write(f"CSRF token response: {data}")
@@ -230,7 +234,7 @@ class Command(BaseCommand):
         if self.verbosity >= 2:
             self.stdout.write(f"Editing page {title} with text: {text}")
         
-        response = session.post(url, data=params)
+        response = session.post(url, data=params, headers={'User-Agent': self.get_user_agent()})
         return response.json()
 
     def hash_data(self, data):
@@ -273,7 +277,8 @@ class Command(BaseCommand):
         sparql_query = self.get_sparql_query(quids)
         response = requests.get(
             'https://metabase.wikibase.cloud/query/sparql',
-            params={'query': sparql_query, 'format': 'json'}
+            params={'query': sparql_query, 'format': 'json'},
+            headers={'User-Agent': self.get_user_agent()}
         )
         formatted_data = self.process_sparql_response(response, skill_dict)
         output_capacities = self.create_output_capacities(formatted_data)
