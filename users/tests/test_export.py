@@ -54,7 +54,7 @@ class CommandTestCase(TestCase):
             progress=100,
             is_displayed=True,
         )
-        self.def_badge = 'Badge1§File:Open_Badges_-_Logo.png§https://meta.wikimedia.org/wiki/Capacity_Exchange/User_Guide#Badges'
+        self.def_badge = 'Badge1§File:Open_Badges_-_Logo.png§'
 
         self.profile_serializer = ProfileSerializer(Profile.objects.all(), many=True)
 
