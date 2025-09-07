@@ -92,7 +92,7 @@ class Command(BaseCommand):
             user_badges = UserBadge.objects.filter(user=user, progress=100, is_displayed=True)
             for badge in user_badges:
                 image = badge.badge.picture.split('/')[-1]
-                badge_data = f"{badge.badge.name}§{image}§https://meta.wikimedia.org/wiki/Capacity_Exchange/User_Guide#Badges"
+                badge_data = f"{badge.badge.name}§{image}§"
                 badges.append(badge_data)
 
             api = f"https://learn.wiki/api/badges/v1/assertions/user/{main_username}/"
@@ -101,8 +101,14 @@ class Command(BaseCommand):
                 for badge in response.json().get('results'):
                     badge_data = f"{badge['badge_class']['display_name']}§Open Badges - Logo.png§{badge['assertion_url']}"
                     badges.append(badge_data)
-            
-            data.append(self.format_list(badges))
+
+            # Remove last badges if the formatted string exceeds 400 chars
+            formatted_badges = self.format_list(badges)
+            while len(formatted_badges) > 400 and badges:
+                badges.pop()
+                formatted_badges = self.format_list(badges)
+
+            data.append(formatted_badges)
             formatted_data.append(data)
         
         if self.verbosity >= 2:
