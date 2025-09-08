@@ -7,6 +7,7 @@ from datetime import timedelta
 from message.models import Message
 from orgs.models import Organization
 from users.letsconnect import LetsConnectLog
+import requests
 
 class Command(BaseCommand):
     help = "Recount metrics and attribute or promote new badges to users"
@@ -28,6 +29,32 @@ class Command(BaseCommand):
                         'progress': self.evaluate_logic(logic, user),
                     },
                 )
+        
+        for user in users:
+            main_username = user.username
+            api = f"https://learn.wiki/api/badges/v1/assertions/user/{main_username}/"
+            response = requests.get(api)
+            if response.status_code == 200 and response.json().get('results', None):
+                for badge in response.json().get('results'):
+                    ext_badge, _ = Badge.objects.get_or_create(
+                        name=badge['badge_class']['display_name'],
+                        description=badge['badge_class']['description'],
+                        type='external',
+                        logic={'source': 'wikilearn'},
+                        defaults={
+                            'picture': badge['image_url'] or 'https://badgr.com/f18f753bfdf0c057.svg',
+                        }
+                    )
+                    UserBadge.objects.update_or_create(
+                        user=user,
+                        badge=ext_badge,
+                        defaults={
+                            'progress': 100,
+                            'external_assertion_url': badge['assertion_url'],
+                            'external_issued_on': badge['created']
+                        }
+                    )
+
 
     def evaluate_logic(self, logic, user):
 
