@@ -85,22 +85,16 @@ class Command(BaseCommand):
                     skills.extend(profile['skills_known'])
                     skills.extend(profile['skills_available'])
 
-        # Get badges from UserBadges and Wikilearn
+        # Get badges from UserBadges
         for data, main_username in export_rows:
             badges = []
             user = CustomUser.objects.get(username=main_username)
             user_badges = UserBadge.objects.filter(user=user, progress=100, is_displayed=True)
             for badge in user_badges:
-                image = badge.badge.picture.split('/')[-1]
-                badge_data = f"{badge.badge.name}§{image}§"
+                image = badge.badge.picture.split('/')[-1] if badge.badge.type == 'internal' else 'Open Badges - Logo.png'
+                url = badge.external_assertion_url if badge.badge.type == 'external' and badge.external_assertion_url else ''
+                badge_data = f"{badge.badge.name}§{image}§{url}"
                 badges.append(badge_data)
-
-            api = f"https://learn.wiki/api/badges/v1/assertions/user/{main_username}/"
-            response = requests.get(api, headers={'User-Agent': self.get_user_agent()})
-            if response.status_code == 200 and response.json().get('results', None):
-                for badge in response.json().get('results'):
-                    badge_data = f"{badge['badge_class']['display_name']}§Open Badges - Logo.png§{badge['assertion_url']}"
-                    badges.append(badge_data)
 
             # Remove last badges if the formatted string exceeds 400 chars
             formatted_badges = self.format_list(badges)

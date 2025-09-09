@@ -109,3 +109,74 @@ class CommandTestCase(TestCase):
 
             mock_update_or_create.assert_not_called()
 
+    @patch('users.management.commands.badges.UserBadge.objects.update_or_create')
+    @patch('users.management.commands.badges.Badge.objects.get_or_create')
+    @patch('users.management.commands.badges.requests.get')
+    def test_import_wikilearn_badges_success(self, mock_get, mock_badge_get_or_create, mock_userbadge_update):
+        user = self.user
+        mock_get.return_value.status_code = 200
+        mock_get.return_value.json.return_value = {
+            'results': [
+                {
+                    'badge_class': {
+                        'display_name': 'WL Badge',
+                        'description': 'Completed course',
+                    },
+                    'image_url': None,
+                    'assertion_url': 'https://learn.wiki/assert/123',
+                    'created': '2024-01-01T00:00:00Z',
+                }
+            ]
+        }
+
+        mock_badge_get_or_create.return_value = (MagicMock(), True)
+
+        self.command.import_wikilearn_badges(user)
+
+        mock_badge_get_or_create.assert_called_once()
+        mock_userbadge_update.assert_called_once()
+
+    @patch('users.management.commands.badges.Badge.objects.get_or_create')
+    @patch('users.management.commands.badges.requests.get')
+    def test_import_wikilearn_badges_no_results(self, mock_get, mock_badge_get_or_create):
+        user = self.user
+        mock_get.return_value.status_code = 200
+        mock_get.return_value.json.return_value = {'results': []}
+
+        self.command.import_wikilearn_badges(user)
+
+        mock_badge_get_or_create.assert_not_called()
+
+    @patch('users.management.commands.badges.UserBadge.objects.update_or_create')
+    @patch('users.management.commands.badges.Badge.objects.get_or_create')
+    @patch('users.management.commands.badges.requests.get')
+    def test_import_letsconnect_badges_success(self, mock_get, mock_badge_get_or_create, mock_userbadge_update):
+        user = self.user
+        mock_get.return_value.status_code = 200
+        mock_get.return_value.json.return_value = [
+            {
+                'name': 'LC Badge',
+                'description': 'Participated in LC',
+                'picture': 'https://example.org/pic.png',
+                'verification_code': 'ABC123',
+                'timestamp': '2024-02-01T00:00:00Z',
+            }
+        ]
+
+        mock_badge_get_or_create.return_value = (MagicMock(), True)
+
+        self.command.import_letsconnect_badges(user)
+
+        mock_badge_get_or_create.assert_called_once()
+        mock_userbadge_update.assert_called_once()
+
+    @patch('users.management.commands.badges.Badge.objects.get_or_create')
+    @patch('users.management.commands.badges.requests.get')
+    def test_import_letsconnect_badges_non_200(self, mock_get, mock_badge_get_or_create):
+        user = self.user
+        mock_get.return_value.status_code = 500
+
+        self.command.import_letsconnect_badges(user)
+
+        mock_badge_get_or_create.assert_not_called()
+

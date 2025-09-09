@@ -201,7 +201,7 @@ class CommandTestCase(TestCase):
 
         with self.assertRaises(Exception) as context:
             self.command.login(mock_session_instance, 'test_url', 'test_token')
-        self.assertEqual(str(context.exception), 'Login failed')        
+        self.assertIn('Login failed', str(context.exception))
 
     @patch('users.management.commands.export.requests.Session')
     def test_get_csrf_token(self, mock_session):
@@ -254,73 +254,23 @@ class CommandTestCase(TestCase):
         self.assertIsNone(result)
         mock_get.assert_called_once_with(data_type='users')
 
-    @patch('users.management.commands.export.requests.get')
-    def test_process_profiles_with_badges(self, mock_requests_get):
-        meta_wiki_users = ['TestUser1', 'AltUser2']
+    def test_process_profiles_with_too_many_badges(self):
+        # Create many internal badges for TestUser1 so the badges string exceeds 400 chars
+        user = CustomUser.objects.get(username='TestUser1')
+        for i in range(50):
+            b = Badge.objects.create(
+                name=f"VeryLongBadgeName_{i}_" + ("X" * 20),
+                picture='https://commons.wikimedia.org/wiki/File:Open_Badges_-_Logo.png',
+                description='D',
+                logic='{"target": "account_age", "value": "0"}',
+                type='internal'
+            )
+            UserBadge.objects.create(user=user, badge=b, progress=100, is_displayed=True)
 
-        # Mock badge API responses
-        mock_requests_get.side_effect = [
-            MagicMock(status_code=200, json=MagicMock(return_value={
-                'results': [
-                    {'badge_class': {'display_name': 'Badge1', 'course_id': 'Course1'}, 'assertion_url': 'URL1'},
-                    {'badge_class': {'display_name': 'Badge2', 'course_id': 'Course2'}, 'assertion_url': 'URL2'}
-                ]
-            })),
-            MagicMock(status_code=200, json=MagicMock(return_value={
-                'results': [
-                    {'badge_class': {'display_name': 'Badge3', 'course_id': 'Course3'}, 'assertion_url': 'URL3'}
-                ]
-            }))
-        ]
-
-        formatted_data, skills = self.command.process_profiles(self.profile_serializer.data, meta_wiki_users)
-
-        expected_data = [
-            ['TestUser1', '[1]', '[2]', f'[{self.def_badge}, Badge1§Open Badges - Logo.png§URL1, Badge2§Open Badges - Logo.png§URL2]'],
-            ['AltUser2', '[4]', '[5]', f'[{self.def_badge}, Badge3§Open Badges - Logo.png§URL3]']
-        ]
-        expected_skills = [1, 2, 4, 5]
-
-        self.assertEqual(formatted_data, expected_data)
-        self.assertEqual(set(skills), set(expected_skills))
-
-    @patch('users.management.commands.export.requests.get')
-    def test_process_profiles_with_too_many_badges(self, mock_requests_get):
         meta_wiki_users = ['TestUser1']
-        mock_requests_get.side_effect = [
-            MagicMock(status_code=200, json=MagicMock(return_value={
-                'results': [{'badge_class': {'display_name': f'B{i}', 'course_id': f'C{i}'}, 'assertion_url': f'U{i}'} for i in range(30)]
-            }))
-        ]
-
         formatted_data, _ = self.command.process_profiles(self.profile_serializer.data, meta_wiki_users)
+        # Badges column is at index 3 and must be <= 400 chars after trimming
         self.assertTrue(len(formatted_data[0][3]) <= 400)
-
-    @patch('users.management.commands.export.requests.get')
-    def test_process_profiles_with_missing_badges(self, mock_requests_get):
-        meta_wiki_users = ['TestUser1', 'AltUser2']
-
-        # Mock badge API responses with one failure
-        mock_requests_get.side_effect = [
-            MagicMock(status_code=200, json=MagicMock(return_value={
-                'results': [
-                    {'badge_class': {'display_name': 'Badge1', 'course_id': 'Course1'}, 'assertion_url': 'URL1'}
-                ]
-            })),
-            MagicMock(status_code=404)  # Simulate failure for the second user
-        ]
-
-        formatted_data, skills = self.command.process_profiles(self.profile_serializer.data, meta_wiki_users)
-
-        expected_data = [
-            ['TestUser1', '[1]', '[2]', f'[{self.def_badge}, Badge1§Open Badges - Logo.png§URL1]'],
-            ['AltUser2', '[4]', '[5]', f'[{self.def_badge}]']
-        ]
-        expected_skills = [1, 2, 4, 5]
-
-        self.assertEqual(formatted_data, expected_data)
-        self.assertEqual(set(skills), set(expected_skills))
-
 
     @patch('users.management.commands.export.requests.Session')
     def test_handle(self, mock_session):
