@@ -55,6 +55,28 @@ class Command(BaseCommand):
                         }
                     )
 
+            api2 = f"https://letsconn.toolforge.org/user-badges/?username={main_username}"
+            response2 = requests.get(api2)
+            if response2.status_code == 200:
+                for badge in response2.json():
+                    ext_badge, _ = Badge.objects.get_or_create(
+                        name=badge['name'],
+                        description=badge['description'],
+                        type='external',
+                        logic={'source': 'letsconnect'},
+                        defaults={
+                            'picture': badge['picture'] or None,
+                        }
+                    )
+                    UserBadge.objects.update_or_create(
+                        user=user,
+                        badge=ext_badge,
+                        defaults={
+                            'progress': 100,
+                            'external_assertion_url': f"https://letsconn.toolforge.org/badge/{badge['verification_code']}/",
+                            'external_issued_on': badge['timestamp']
+                        }
+                    )
 
     def evaluate_logic(self, logic, user):
 
