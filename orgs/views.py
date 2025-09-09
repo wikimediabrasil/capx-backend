@@ -4,6 +4,7 @@ from .models import Organization, OrganizationType, TagDiff, Document
 from .serializers import OrganizationSerializer, OrganizationTypeSerializer, TagDiffSerializer, DocumentSerializer
 from users.models import CustomUser as User, Territory
 from django_filters.rest_framework import DjangoFilterBackend
+from rest_framework.filters import OrderingFilter
 from drf_spectacular.utils import extend_schema, extend_schema_view, OpenApiParameter, OpenApiTypes
 from django.db import models
 from events.models import Events
@@ -61,7 +62,8 @@ from events.models import Events
 class OrganizationViewSet(viewsets.ModelViewSet):
     queryset = Organization.objects.all()
     serializer_class = OrganizationSerializer
-    filter_backends = [DjangoFilterBackend]
+    filter_backends = [DjangoFilterBackend, OrderingFilter]
+    ordering_fields = ['display_name', 'update_date']
     filterset_fields = [
         'display_name',
         'acronym',
