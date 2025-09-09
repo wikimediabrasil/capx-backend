@@ -53,6 +53,7 @@ class Command(BaseCommand):
         skills = []
         processed_usernames = set()
         export_rows = []
+        badge_meta_map = {}
 
         # First pass - process regular usernames
         for profile in profiles:
@@ -85,22 +86,52 @@ class Command(BaseCommand):
                     skills.extend(profile['skills_known'])
                     skills.extend(profile['skills_available'])
 
+        # Helper to extract assertion hash and base URL from a full assertion URL
+        def extract_hash_and_base(url: str):
+            if not url:
+                return "", ""
+            # Strip query/fragment
+            clean = url.split('#', 1)[0].split('?', 1)[0]
+            parts = [p for p in clean.split('/') if p]
+            if not parts:
+                return "", ""
+            hash_code = parts[-1]
+            base_url = clean[: clean.rfind(hash_code)].rstrip('/') + '/'
+            return hash_code, base_url
+
         # Get badges from UserBadges
         for data, main_username in export_rows:
-            badges = []
+            badges_for_user = []
             user = CustomUser.objects.get(username=main_username)
             user_badges = UserBadge.objects.filter(user=user, progress=100, is_displayed=True)
-            for badge in user_badges:
-                image = badge.badge.picture.split('/')[-1] if badge.badge.type == 'internal' else 'Open Badges - Logo.png'
-                url = badge.external_assertion_url if badge.badge.type == 'external' and badge.external_assertion_url else ''
-                badge_data = f"{badge.badge.name}§{image}§{url}"
-                badges.append(badge_data)
+            for user_badge in user_badges:
+                badge = user_badge.badge
+                image = badge.picture.split('/')[-1].split('?', 1)[0] if badge.picture.startswith('https://commons.wikimedia.org/wiki/Special:Redirect/file/') else 'Open Badges - Logo.png'
+                # Collect global metadata once per badge id
+                if badge.id not in badge_meta_map:
+                    badge_meta_map[badge.id] = {
+                        'id': badge.id,
+                        'name': badge.name,
+                        'image': image,
+                        'base_url': ''
+                    }
+                # For users.tab keep minimal info: internal -> id ; external -> id§hash
+                if badge.type == 'external' and user_badge.external_assertion_url:
+                    hash_code, base_url = extract_hash_and_base(user_badge.external_assertion_url)
+                    if base_url and not badge_meta_map[badge.id].get('base_url'):
+                        badge_meta_map[badge.id]['base_url'] = base_url
+                    if hash_code:
+                        badges_for_user.append(f"{badge.id}§{hash_code}")
+                    else:
+                        badges_for_user.append(str(badge.id))
+                else:
+                    badges_for_user.append(str(badge.id))
 
             # Remove last badges if the formatted string exceeds 400 chars
-            formatted_badges = self.format_list(badges)
-            while len(formatted_badges) > 400 and badges:
-                badges.pop()
-                formatted_badges = self.format_list(badges)
+            formatted_badges = self.format_list(badges_for_user)
+            while len(formatted_badges) > 400 and badges_for_user:
+                badges_for_user.pop()
+                formatted_badges = self.format_list(badges_for_user)
 
             data.append(formatted_badges)
             formatted_data.append(data)
@@ -109,7 +140,9 @@ class Command(BaseCommand):
             self.stdout.write(f"Processed profiles: {formatted_data}")
             self.stdout.write(f"Skills: {skills}")
 
-        return formatted_data, list(set(skills))
+        # Prepare badge metadata list (stable ordering by id)
+        badges_meta = [[meta['id'], meta['name'], meta['image'], meta.get('base_url', '')] for _, meta in sorted(badge_meta_map.items(), key=lambda kv: kv[0])]
+        return formatted_data, list(set(skills)), badges_meta
 
     def get_skill_dict(self, skills):
         skill_dict = {Skill.objects.get(id=skill).skill_wikidata_item: skill for skill in skills}
@@ -180,6 +213,25 @@ class Command(BaseCommand):
         if self.verbosity >= 2:
             self.stdout.write(f"Output capacities: {output_capacities}")
         return output_capacities
+
+    def create_output_badges(self, formatted_data):
+        output_badges = {
+            "license": "CC0-1.0",
+            "description": {"en": "Badges available in the CapX platform"},
+            "sources": "https://capx.toolforge.org",
+            "schema": {
+                "fields": [
+                    {"name": "id", "type": "number"},
+                    {"name": "name", "type": "string"},
+                    {"name": "image", "type": "string"},
+                    {"name": "base_url", "type": "string"}
+                ],
+            },
+            "data": formatted_data,
+        }
+        if self.verbosity >= 2:
+            self.stdout.write(f"Output badges: {output_badges}")
+        return output_badges
 
     def get_login_token(self, session, url):
         params = {
@@ -269,7 +321,7 @@ class Command(BaseCommand):
 
         profile_serializer = ProfileSerializer(Profile.objects.all(), many=True)
         meta_wiki_users = self.get_meta_wiki_users()
-        formatted_data, skills = self.process_profiles(profile_serializer.data, meta_wiki_users)
+        formatted_data, skills, badges_meta = self.process_profiles(profile_serializer.data, meta_wiki_users)
         output_users = self.create_output_users(formatted_data)
 
         skill_dict = self.get_skill_dict(skills)
@@ -282,17 +334,22 @@ class Command(BaseCommand):
         )
         formatted_data = self.process_sparql_response(response, skill_dict)
         output_capacities = self.create_output_capacities(formatted_data)
+        output_badges = self.create_output_badges(badges_meta)
 
         # Hash current data
         current_users_hash = self.hash_data(output_users)
         current_capacities_hash = self.hash_data(output_capacities)
+        current_badges_hash = self.hash_data(output_badges)
 
         # Get previous hashes from the database
         previous_users_hash = self.get_previous_hash('users')
         previous_capacities_hash = self.get_previous_hash('capacities')
+        previous_badges_hash = self.get_previous_hash('badges')
 
         # Check if data has changed
-        if current_users_hash != previous_users_hash or current_capacities_hash != previous_capacities_hash:
+        if (current_users_hash != previous_users_hash or
+            current_capacities_hash != previous_capacities_hash or
+            current_badges_hash != previous_badges_hash):
             if dry_run:
                 # Print JSON instead of saving
                 self.stdout.write("Dry run mode enabled. Outputting JSON data:")
@@ -300,6 +357,8 @@ class Command(BaseCommand):
                 self.stdout.write(json.dumps(output_users, indent=4))
                 self.stdout.write("Capacities JSON:")
                 self.stdout.write(json.dumps(output_capacities, indent=4))
+                self.stdout.write("Badges JSON:")
+                self.stdout.write(json.dumps(output_badges, indent=4))
             else:
                 session = requests.Session()
                 url = "https://commons.wikimedia.org/w/api.php"
@@ -321,3 +380,11 @@ class Command(BaseCommand):
                         json.dumps(output_capacities, indent=4), csrf_token
                     )
                     self.save_current_hash('capacities', current_capacities_hash)
+
+                if current_badges_hash != previous_badges_hash:
+                    csrf_token = self.get_csrf_token(session, url)
+                    self.edit_page(
+                        session, url, "Data:CapacityExchange/badges.tab", "Updating data",
+                        json.dumps(output_badges, indent=4), csrf_token
+                    )
+                    self.save_current_hash('badges', current_badges_hash)
