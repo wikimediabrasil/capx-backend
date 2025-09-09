@@ -331,7 +331,6 @@ class Badge(models.Model):
     description = models.TextField()
     logic = models.JSONField(null=True, blank=True, help_text="Logic fields for badge criteria.")
     type = models.CharField(max_length=10, choices=BADGE_TYPE_CHOICES, default="internal")
-    external_id = models.CharField(max_length=255, null=True, blank=True, help_text="ID from external badge provider, if applicable.")
 
     def __str__(self):
         return self.name
@@ -342,6 +341,8 @@ class UserBadge(models.Model):
     badge = models.ForeignKey(Badge, on_delete=models.CASCADE)
     progress = models.IntegerField(default=0, help_text="Progress towards the badge.")
     is_displayed = models.BooleanField(default=True)
+    external_assertion_url = models.URLField(max_length=512, null=True, blank=True)
+    external_issued_on = models.DateTimeField(null=True, blank=True)
 
     class Meta:
         unique_together = ('user', 'badge')
