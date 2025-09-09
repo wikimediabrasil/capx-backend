@@ -16,11 +16,14 @@ class Command(BaseCommand):
         badges = Badge.objects.all()
         users = CustomUser.objects.all()
 
+        self.update_internal_badges(badges, users)
+        self.import_external_badges(users)
+
+    def update_internal_badges(self, badges, users):
         for badge in badges:
             logic = badge.logic
             if not logic or badge.type == 'external':
                 continue
-
             for user in users:
                 UserBadge.objects.update_or_create(
                     user=user,
@@ -29,54 +32,61 @@ class Command(BaseCommand):
                         'progress': self.evaluate_logic(logic, user),
                     },
                 )
-        
-        for user in users:
-            main_username = user.username
-            api = f"https://learn.wiki/api/badges/v1/assertions/user/{main_username}/"
-            response = requests.get(api)
-            if response.status_code == 200 and response.json().get('results', None):
-                for badge in response.json().get('results'):
-                    ext_badge, _ = Badge.objects.get_or_create(
-                        name=badge['badge_class']['display_name'],
-                        description=badge['badge_class']['description'],
-                        type='external',
-                        logic={'source': 'wikilearn'},
-                        defaults={
-                            'picture': badge['image_url'] or 'https://badgr.com/f18f753bfdf0c057.svg',
-                        }
-                    )
-                    UserBadge.objects.update_or_create(
-                        user=user,
-                        badge=ext_badge,
-                        defaults={
-                            'progress': 100,
-                            'external_assertion_url': badge['assertion_url'],
-                            'external_issued_on': badge['created']
-                        }
-                    )
 
-            api2 = f"https://letsconn.toolforge.org/user-badges/?username={main_username}"
-            response2 = requests.get(api2)
-            if response2.status_code == 200:
-                for badge in response2.json():
-                    ext_badge, _ = Badge.objects.get_or_create(
-                        name=badge['name'],
-                        description=badge['description'],
-                        type='external',
-                        logic={'source': 'letsconnect'},
-                        defaults={
-                            'picture': badge['picture'] or None,
-                        }
-                    )
-                    UserBadge.objects.update_or_create(
-                        user=user,
-                        badge=ext_badge,
-                        defaults={
-                            'progress': 100,
-                            'external_assertion_url': f"https://letsconn.toolforge.org/badge/{badge['verification_code']}/",
-                            'external_issued_on': badge['timestamp']
-                        }
-                    )
+    def import_external_badges(self, users):
+        for user in users:
+            self.import_wikilearn_badges(user)
+            self.import_letsconnect_badges(user)
+
+    def import_wikilearn_badges(self, user):
+        main_username = user.username
+        api = f"https://learn.wiki/api/badges/v1/assertions/user/{main_username}/"
+        response = requests.get(api)
+        if response.status_code == 200 and response.json().get('results', None):
+            for badge in response.json().get('results'):
+                ext_badge, _ = Badge.objects.get_or_create(
+                    name=badge['badge_class']['display_name'],
+                    description=badge['badge_class']['description'],
+                    type='external',
+                    logic={'source': 'wikilearn'},
+                    defaults={
+                        'picture': badge['image_url'] or 'https://badgr.com/f18f753bfdf0c057.svg',
+                    }
+                )
+                UserBadge.objects.update_or_create(
+                    user=user,
+                    badge=ext_badge,
+                    defaults={
+                        'progress': 100,
+                        'external_assertion_url': badge['assertion_url'],
+                        'external_issued_on': badge['created']
+                    }
+                )
+
+    def import_letsconnect_badges(self, user):
+        main_username = user.username
+        api2 = f"https://letsconn.toolforge.org/user-badges/?username={main_username}"
+        response2 = requests.get(api2)
+        if response2.status_code == 200:
+            for badge in response2.json():
+                ext_badge, _ = Badge.objects.get_or_create(
+                    name=badge['name'],
+                    description=badge['description'],
+                    type='external',
+                    logic={'source': 'letsconnect'},
+                    defaults={
+                        'picture': badge['picture'] or None,
+                    }
+                )
+                UserBadge.objects.update_or_create(
+                    user=user,
+                    badge=ext_badge,
+                    defaults={
+                        'progress': 100,
+                        'external_assertion_url': f"https://letsconn.toolforge.org/badge/{badge['verification_code']}/",
+                        'external_issued_on': badge['timestamp']
+                    }
+                )
 
     def evaluate_logic(self, logic, user):
 
