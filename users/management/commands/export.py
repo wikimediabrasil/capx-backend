@@ -88,13 +88,10 @@ class Command(BaseCommand):
 
         # Helper to extract assertion hash and base URL from a full assertion URL
         def extract_hash_and_base(url: str):
-            if not url:
-                return "", ""
-            # Strip query/fragment
             clean = url.split('#', 1)[0].split('?', 1)[0]
             parts = [p for p in clean.split('/') if p]
-            if not parts:
-                return "", ""
+            if len(parts) < 2:
+                return url, ""
             hash_code = parts[-1]
             base_url = clean[: clean.rfind(hash_code)].rstrip('/') + '/'
             return hash_code, base_url
@@ -120,10 +117,7 @@ class Command(BaseCommand):
                     hash_code, base_url = extract_hash_and_base(user_badge.external_assertion_url)
                     if base_url and not badge_meta_map[badge.id].get('base_url'):
                         badge_meta_map[badge.id]['base_url'] = base_url
-                    if hash_code:
-                        badges_for_user.append(f"{badge.id}§{hash_code}")
-                    else:
-                        badges_for_user.append(str(badge.id))
+                    badges_for_user.append(f"{badge.id}§{hash_code}")
                 else:
                     badges_for_user.append(str(badge.id))
 

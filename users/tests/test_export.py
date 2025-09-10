@@ -54,7 +54,7 @@ class CommandTestCase(TestCase):
             progress=100,
             is_displayed=True,
         )
-        self.def_badge = 'Badge1§File:Open_Badges_-_Logo.png§'
+        self.def_badge_id = def_badge.id
 
         self.profile_serializer = ProfileSerializer(Profile.objects.all(), many=True)
 
@@ -80,24 +80,27 @@ class CommandTestCase(TestCase):
 
     def test_process_profiles(self):
         meta_wiki_users = ['TestUser1', 'AltUser2']
-        formatted_data, skills = self.command.process_profiles(self.profile_serializer.data, meta_wiki_users)
+        formatted_data, skills, badges_meta = self.command.process_profiles(self.profile_serializer.data, meta_wiki_users)
         self.assertEqual(formatted_data, [
-            ['TestUser1', '[1]', '[2]', f'[{self.def_badge}]'],
-            ['AltUser2', '[4]', '[5]', f'[{self.def_badge}]']
+            ['TestUser1', '[1]', '[2]', f'[{self.def_badge_id}]'],
+            ['AltUser2', '[4]', '[5]', f'[{self.def_badge_id}]']
         ])
         self.assertEqual(set(skills), {1, 2, 4, 5})
+        self.assertEqual(badges_meta, [[self.def_badge_id, 'Badge1', 'Open Badges - Logo.png', '']])
 
     def test_process_profiles_no_meta_wiki_users(self):
         meta_wiki_users = []
-        formatted_data, skills = self.command.process_profiles(self.profile_serializer.data, meta_wiki_users)
+        formatted_data, skills, badges_meta = self.command.process_profiles(self.profile_serializer.data, meta_wiki_users)
         self.assertEqual(formatted_data, [])
         self.assertEqual(skills, [])
+        self.assertEqual(badges_meta, [])
 
     def test_process_profiles_partial_meta_wiki_users(self):
         meta_wiki_users = ['TestUser1']
-        formatted_data, skills = self.command.process_profiles(self.profile_serializer.data, meta_wiki_users)
-        self.assertEqual(formatted_data, [['TestUser1', '[1]', '[2]', f'[{self.def_badge}]']])
+        formatted_data, skills, badges_meta = self.command.process_profiles(self.profile_serializer.data, meta_wiki_users)
+        self.assertEqual(formatted_data, [['TestUser1', '[1]', '[2]', f'[{self.def_badge_id}]']])
         self.assertEqual(set(skills), {1, 2})
+        self.assertEqual(badges_meta, [[self.def_badge_id, 'Badge1', 'Open Badges - Logo.png', '']])
 
     @patch('users.management.commands.export.Skill.objects.get')
     def test_get_skill_dict(self, mock_get):
@@ -259,18 +262,79 @@ class CommandTestCase(TestCase):
         user = CustomUser.objects.get(username='TestUser1')
         for i in range(50):
             b = Badge.objects.create(
-                name=f"VeryLongBadgeName_{i}_" + ("X" * 20),
+                name=f"BadgeName_{i}",
                 picture='https://commons.wikimedia.org/wiki/File:Open_Badges_-_Logo.png',
                 description='D',
-                logic='{"target": "account_age", "value": "0"}',
-                type='internal'
+                logic='{"source": "letsconnect"}',
+                type='external'
             )
-            UserBadge.objects.create(user=user, badge=b, progress=100, is_displayed=True)
+            UserBadge.objects.create(
+                user=user,
+                badge=b,
+                progress=100,
+                is_displayed=True,
+                external_assertion_url='https://example.com/assertion/12345678901234567890'+str(i),
+                external_issued_on='2024-01-01T00:00:00Z'
+            )
 
         meta_wiki_users = ['TestUser1']
-        formatted_data, _ = self.command.process_profiles(self.profile_serializer.data, meta_wiki_users)
+        formatted_data, _, _ = self.command.process_profiles(self.profile_serializer.data, meta_wiki_users)
         # Badges column is at index 3 and must be <= 400 chars after trimming
         self.assertTrue(len(formatted_data[0][3]) <= 400)
+
+    def test_process_profiles_extract_hash_and_base(self):
+        # Create many internal badges for TestUser1 so the badges string exceeds 400 chars
+        user = CustomUser.objects.get(username='TestUser1')
+        for i in range(3):
+            Badge.objects.create(
+                name=f"VeryLongBadgeName_{i}",
+                picture='https://commons.wikimedia.org/wiki/File:Open_Badges_-_Logo.png',
+                description='D',
+                logic='{"source": "letsconnect"}',
+                type='external'
+            )
+        UserBadge.objects.create(
+            user=user,
+            badge=Badge.objects.get(name='VeryLongBadgeName_0'),
+            progress=100,
+            is_displayed=True,
+            external_assertion_url='https://example.com/assertion/1234',
+            external_issued_on='2024-01-01T00:00:00Z'
+        )
+        UserBadge.objects.create(
+            user=user,
+            badge=Badge.objects.get(name='VeryLongBadgeName_1'),
+            progress=100,
+            is_displayed=True,
+            external_assertion_url='example',
+            external_issued_on='2024-01-01T00:00:00Z'
+        )
+        UserBadge.objects.create(
+            user=user,
+            badge=Badge.objects.get(name='VeryLongBadgeName_2'),
+            progress=100,
+            is_displayed=True,
+            external_assertion_url='',
+            external_issued_on='2024-01-01T00:00:00Z'
+        )
+
+        meta_wiki_users = ['TestUser1']
+        formatted_data, _, badges_meta = self.command.process_profiles(self.profile_serializer.data, meta_wiki_users)
+        expected_formatted_data = [
+            [
+                'TestUser1',
+                '[1]',
+                '[2]',
+                '[1, 2§1234, 3§example, 4]']
+            ]
+        expected_badges = [
+            [1, 'Badge1', 'Open Badges - Logo.png', ''], 
+            [2, 'VeryLongBadgeName_0', 'Open Badges - Logo.png', 'https://example.com/assertion/'], 
+            [3, 'VeryLongBadgeName_1', 'Open Badges - Logo.png', ''], 
+            [4, 'VeryLongBadgeName_2', 'Open Badges - Logo.png', '']
+        ]
+        self.assertEqual(formatted_data, expected_formatted_data)
+        self.assertEqual(badges_meta, expected_badges)
 
     @patch('users.management.commands.export.requests.Session')
     def test_handle(self, mock_session):
@@ -284,6 +348,7 @@ class CommandTestCase(TestCase):
              patch('users.management.commands.export.Command.get_sparql_query') as mock_get_sparql_query, \
              patch('users.management.commands.export.Command.process_sparql_response') as mock_process_sparql_response, \
              patch('users.management.commands.export.Command.create_output_capacities') as mock_create_output_capacities, \
+             patch('users.management.commands.export.Command.create_output_badges') as mock_create_output_badges, \
              patch('users.management.commands.export.Command.get_login_token') as mock_get_login_token, \
              patch('users.management.commands.export.Command.login') as mock_login, \
              patch('users.management.commands.export.Command.get_csrf_token') as mock_get_csrf_token, \
@@ -292,13 +357,14 @@ class CommandTestCase(TestCase):
             # Mocking the return values
             mock_profile_objects_all.return_value = []
             mock_get_meta_wiki_users.return_value = ['TestUser1']
-            mock_process_profiles.return_value = ([], [])
+            mock_process_profiles.return_value = ([], [], [])
             mock_create_output_users.return_value = {}
             mock_get_skill_dict.return_value = {}
             mock_get_sparql_query.return_value = 'sparql_query'
             mock_requests_get.return_value.json.return_value = {'results': {'bindings': []}}
             mock_process_sparql_response.return_value = []
             mock_create_output_capacities.return_value = {}
+            mock_create_output_badges.return_value = {}
             mock_get_login_token.return_value = 'test_login_token'
             mock_login.return_value = {'login': {'result': 'Success'}}
             mock_get_csrf_token.return_value = 'test_csrf_token'
@@ -317,6 +383,7 @@ class CommandTestCase(TestCase):
             mock_requests_get.assert_called_once()
             mock_process_sparql_response.assert_called_once()
             mock_create_output_capacities.assert_called_once()
+            mock_create_output_badges.assert_called_once()
             mock_get_login_token.assert_called_once()
             mock_login.assert_called_once()
             mock_get_csrf_token.assert_called()
