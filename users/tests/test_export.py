@@ -329,10 +329,10 @@ class CommandTestCase(TestCase):
             ]
         ]
         expected_badges = [
-            [1, 'Badge1', 'Open Badges - Logo.png', ''], 
-            [2, 'VeryLongBadgeName_0', 'Open Badges - Logo.png', 'https://example.com/assertion/'], 
-            [3, 'VeryLongBadgeName_1', 'Open Badges - Logo.png', ''], 
-            [4, 'VeryLongBadgeName_2', 'Open Badges - Logo.png', '']
+            [self.user_badge1.badge.id, 'Badge1', 'Open Badges - Logo.png', ''], 
+            [badge0.badge.id, 'VeryLongBadgeName_0', 'Open Badges - Logo.png', 'https://example.com/assertion/'], 
+            [badge1.badge.id, 'VeryLongBadgeName_1', 'Open Badges - Logo.png', ''], 
+            [badge2.badge.id, 'VeryLongBadgeName_2', 'Open Badges - Logo.png', '']
         ]
         self.assertEqual(formatted_data, expected_formatted_data)
         self.assertEqual(badges_meta, expected_badges)
