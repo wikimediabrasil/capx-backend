@@ -42,7 +42,7 @@ class CommandTestCase(TestCase):
             logic='{"target": "account_age", "value": "0"}',
             type='internal'
         )
-        UserBadge.objects.create(
+        self.user_badge1 = UserBadge.objects.create(
             user=testuser1,
             badge=def_badge,
             progress=100,
@@ -293,7 +293,7 @@ class CommandTestCase(TestCase):
                 logic='{"source": "letsconnect"}',
                 type='external'
             )
-        UserBadge.objects.create(
+        badge0 = UserBadge.objects.create(
             user=user,
             badge=Badge.objects.get(name='VeryLongBadgeName_0'),
             progress=100,
@@ -301,7 +301,7 @@ class CommandTestCase(TestCase):
             external_assertion_url='https://example.com/assertion/1234',
             external_issued_on='2024-01-01T00:00:00Z'
         )
-        UserBadge.objects.create(
+        badge1 = UserBadge.objects.create(
             user=user,
             badge=Badge.objects.get(name='VeryLongBadgeName_1'),
             progress=100,
@@ -309,7 +309,7 @@ class CommandTestCase(TestCase):
             external_assertion_url='example',
             external_issued_on='2024-01-01T00:00:00Z'
         )
-        UserBadge.objects.create(
+        badge2 = UserBadge.objects.create(
             user=user,
             badge=Badge.objects.get(name='VeryLongBadgeName_2'),
             progress=100,
@@ -325,8 +325,9 @@ class CommandTestCase(TestCase):
                 'TestUser1',
                 '[1]',
                 '[2]',
-                '[1, 2§1234, 3§example, 4]']
+                f'[{self.user_badge1.badge.id}, {badge0.badge.id}§1234, {badge1.badge.id}§example, {badge2.badge.id}]'
             ]
+        ]
         expected_badges = [
             [1, 'Badge1', 'Open Badges - Logo.png', ''], 
             [2, 'VeryLongBadgeName_0', 'Open Badges - Logo.png', 'https://example.com/assertion/'], 
