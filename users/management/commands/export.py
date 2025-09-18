@@ -138,6 +138,39 @@ class Command(BaseCommand):
         badges_meta = [[meta['id'], meta['name'], meta['image'], meta.get('base_url', '')] for _, meta in sorted(badge_meta_map.items(), key=lambda kv: kv[0])]
         return formatted_data, list(set(skills)), badges_meta
 
+    def get_skill_dict(self, skills):
+        skill_dict = {Skill.objects.get(id=skill).skill_wikidata_item: skill for skill in skills}
+        if self.verbosity >= 2:
+            self.stdout.write(f"Skill dictionary: {skill_dict}")
+        return skill_dict
+
+    def get_sparql_query(self, quids):
+        query = """
+        PREFIX wbt: <https://metabase.wikibase.cloud/prop/direct/>
+        SELECT ?item ?itemLabel ?itemDescription ?value WHERE {
+            VALUES ?value { %s }
+            ?item wbt:P1 ?value.
+        SERVICE wikibase:label { bd:serviceParam wikibase:language "en". }
+        }
+        """
+        sparql_query = query % ' '.join([f'"{quid}"' for quid in quids])
+        if self.verbosity >= 2:
+            self.stdout.write(f"SPARQL query: {sparql_query}")
+        return sparql_query
+
+    def process_sparql_response(self, response, skill_dict):
+        formatted_data = []
+        for item in response.json()['results']['bindings']:
+            data = [
+                skill_dict[item['value']['value']],
+                item['itemLabel']['value'] if 'itemLabel' in item else '',
+                item['itemDescription']['value'] if 'itemDescription' in item else ''
+            ]
+            formatted_data.append(data)
+        if self.verbosity >= 2:
+            self.stdout.write(f"SPARQL response data: {formatted_data}")
+        return formatted_data
+
     def create_output_users(self, formatted_data):
         output_users = {
             "license": "CC0-1.0",
@@ -157,7 +190,7 @@ class Command(BaseCommand):
             self.stdout.write(f"Output users: {output_users}")
         return output_users
 
-    def create_output_capacities(self):
+    def create_output_capacities(self, formatted_data):
         output_capacities = {
             "license": "CC0-1.0",
             "description": {"en": "Capacities added in the CapX platform"},
@@ -165,10 +198,11 @@ class Command(BaseCommand):
             "schema": {
                 "fields": [
                     {"name": "id", "type": "number"},
-                    {"name": "wikidata_id", "type": "string"}
+                    {"name": "name", "type": "string"},
+                    {"name": "description", "type": "string"}
                 ],
             },
-            "data": [list(x) for x in Skill.objects.all().values_list('id', 'skill_wikidata_item')],
+            "data": formatted_data,
         }
         if self.verbosity >= 2:
             self.stdout.write(f"Output capacities: {output_capacities}")
@@ -284,7 +318,16 @@ class Command(BaseCommand):
         formatted_data, skills, badges_meta = self.process_profiles(profile_serializer.data, meta_wiki_users)
         output_users = self.create_output_users(formatted_data)
 
-        output_capacities = self.create_output_capacities()
+        skill_dict = self.get_skill_dict(skills)
+        quids = list(skill_dict.keys())
+        sparql_query = self.get_sparql_query(quids)
+        response = requests.get(
+            'https://metabase.wikibase.cloud/query/sparql',
+            params={'query': sparql_query, 'format': 'json'},
+            headers={'User-Agent': self.get_user_agent()}
+        )
+        formatted_data = self.process_sparql_response(response, skill_dict)
+        output_capacities = self.create_output_capacities(formatted_data)
         output_badges = self.create_output_badges(badges_meta)
 
         # Hash current data

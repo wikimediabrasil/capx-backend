@@ -14,7 +14,6 @@ class CommandTestCase(TestCase):
         self.command = Command()
         self.command.verbosity = 2
         self.command.stdout = StringIO()
-        self.maxDiff = None
         testuser1 = CustomUser.objects.create(username='TestUser1')
         testuser2 = CustomUser.objects.create(username='TestUser2')
         Skill.objects.bulk_create([
@@ -103,6 +102,42 @@ class CommandTestCase(TestCase):
         self.assertEqual(set(skills), {1, 2})
         self.assertEqual(badges_meta, [[self.def_badge_id, 'Badge1', 'Open Badges - Logo.png', '']])
 
+    @patch('users.management.commands.export.Skill.objects.get')
+    def test_get_skill_dict(self, mock_get):
+        mock_get.side_effect = lambda id: MagicMock(skill_wikidata_item=f'Q{id}')
+        skills = [1, 2, 3]
+        result = self.command.get_skill_dict(skills)
+        self.assertEqual(result, {'Q1': 1, 'Q2': 2, 'Q3': 3})
+
+    def test_get_sparql_query(self):
+        quids = ['Q1', 'Q2', 'Q3']
+        result = self.command.get_sparql_query(quids)
+        expected_query = """
+        PREFIX wbt: <https://metabase.wikibase.cloud/prop/direct/>
+        SELECT ?item ?itemLabel ?itemDescription ?value WHERE {
+            VALUES ?value { "Q1" "Q2" "Q3" }
+            ?item wbt:P1 ?value.
+        SERVICE wikibase:label { bd:serviceParam wikibase:language "en". }
+        }
+        """
+        self.assertEqual(result.strip(), expected_query.strip())
+
+    @patch('users.management.commands.export.requests.get')
+    def test_process_sparql_response(self, mock_get):
+        mock_response = MagicMock()
+        mock_response.json.return_value = {
+            'results': {
+                'bindings': [
+                    {'value': {'value': 'Q1'}, 'itemLabel': {'value': 'Skill1'}, 'itemDescription': {'value': 'Description1'}},
+                    {'value': {'value': 'Q2'}, 'itemLabel': {'value': 'Skill2'}, 'itemDescription': {'value': 'Description2'}}
+                ]
+            }
+        }
+        mock_get.return_value = mock_response
+        skill_dict = {'Q1': 1, 'Q2': 2}
+        result = self.command.process_sparql_response(mock_response, skill_dict)
+        self.assertEqual(result, [[1, 'Skill1', 'Description1'], [2, 'Skill2', 'Description2']])
+
     def test_create_output_users(self):
         formatted_data = [['TestUser1', '[1]', '[2]', '[3]']]
         result = self.command.create_output_users(formatted_data)
@@ -123,7 +158,8 @@ class CommandTestCase(TestCase):
         self.assertEqual(result, expected_output)
 
     def test_create_output_capacities(self):
-        result = self.command.create_output_capacities()
+        formatted_data = [[1, 'Skill1', 'Description1']]
+        result = self.command.create_output_capacities(formatted_data)
         expected_output = {
             "license": "CC0-1.0",
             "description": {"en": "Capacities added in the CapX platform"},
@@ -131,10 +167,11 @@ class CommandTestCase(TestCase):
             "schema": {
                 "fields": [
                     {"name": "id", "type": "number"},
-                    {"name": "wikidata_id", "type": "string"}
+                    {"name": "name", "type": "string"},
+                    {"name": "description", "type": "string"}
                 ],
             },
-            "data": result["data"],
+            "data": formatted_data,
         }
         self.assertEqual(result, expected_output)
 
@@ -304,9 +341,13 @@ class CommandTestCase(TestCase):
     def test_handle(self, mock_session):
         # Redirect stdout to suppress output during test
         with patch('users.management.commands.export.Profile.objects.all') as mock_profile_objects_all, \
+             patch('users.management.commands.export.requests.get') as mock_requests_get, \
              patch('users.management.commands.export.Command.get_meta_wiki_users') as mock_get_meta_wiki_users, \
              patch('users.management.commands.export.Command.process_profiles') as mock_process_profiles, \
              patch('users.management.commands.export.Command.create_output_users') as mock_create_output_users, \
+             patch('users.management.commands.export.Command.get_skill_dict') as mock_get_skill_dict, \
+             patch('users.management.commands.export.Command.get_sparql_query') as mock_get_sparql_query, \
+             patch('users.management.commands.export.Command.process_sparql_response') as mock_process_sparql_response, \
              patch('users.management.commands.export.Command.create_output_capacities') as mock_create_output_capacities, \
              patch('users.management.commands.export.Command.create_output_badges') as mock_create_output_badges, \
              patch('users.management.commands.export.Command.get_login_token') as mock_get_login_token, \
@@ -319,6 +360,10 @@ class CommandTestCase(TestCase):
             mock_get_meta_wiki_users.return_value = ['TestUser1']
             mock_process_profiles.return_value = ([], [], [])
             mock_create_output_users.return_value = {}
+            mock_get_skill_dict.return_value = {}
+            mock_get_sparql_query.return_value = 'sparql_query'
+            mock_requests_get.return_value.json.return_value = {'results': {'bindings': []}}
+            mock_process_sparql_response.return_value = []
             mock_create_output_capacities.return_value = {}
             mock_create_output_badges.return_value = {}
             mock_get_login_token.return_value = 'test_login_token'
@@ -334,6 +379,10 @@ class CommandTestCase(TestCase):
             mock_get_meta_wiki_users.assert_called_once()
             mock_process_profiles.assert_called_once()
             mock_create_output_users.assert_called_once()
+            mock_get_skill_dict.assert_called_once()
+            mock_get_sparql_query.assert_called_once()
+            mock_requests_get.assert_called_once()
+            mock_process_sparql_response.assert_called_once()
             mock_create_output_capacities.assert_called_once()
             mock_create_output_badges.assert_called_once()
             mock_get_login_token.assert_called_once()
