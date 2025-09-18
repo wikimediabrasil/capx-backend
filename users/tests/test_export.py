@@ -136,7 +136,7 @@ class CommandTestCase(TestCase):
         mock_get.return_value = mock_response
         skill_dict = {'Q1': 1, 'Q2': 2}
         result = self.command.process_sparql_response(mock_response, skill_dict)
-        self.assertEqual(result, [[1, 'Skill1', 'Description1'], [2, 'Skill2', 'Description2']])
+        self.assertEqual(result, [[1, 'Skill1', 'Description1', 'Q1'], [2, 'Skill2', 'Description2', 'Q2']])
 
     def test_create_output_users(self):
         formatted_data = [['TestUser1', '[1]', '[2]', '[3]']]
@@ -168,7 +168,8 @@ class CommandTestCase(TestCase):
                 "fields": [
                     {"name": "id", "type": "number"},
                     {"name": "name", "type": "string"},
-                    {"name": "description", "type": "string"}
+                    {"name": "description", "type": "string"},
+                    {"name": "wikidata_item", "type": "string"}
                 ],
             },
             "data": formatted_data,

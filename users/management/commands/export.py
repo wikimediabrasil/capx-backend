@@ -164,7 +164,8 @@ class Command(BaseCommand):
             data = [
                 skill_dict[item['value']['value']],
                 item['itemLabel']['value'] if 'itemLabel' in item else '',
-                item['itemDescription']['value'] if 'itemDescription' in item else ''
+                item['itemDescription']['value'] if 'itemDescription' in item else '',
+                item['value']['value'] if 'value' in item else '',
             ]
             formatted_data.append(data)
         if self.verbosity >= 2:
@@ -199,7 +200,8 @@ class Command(BaseCommand):
                 "fields": [
                     {"name": "id", "type": "number"},
                     {"name": "name", "type": "string"},
-                    {"name": "description", "type": "string"}
+                    {"name": "description", "type": "string"},
+                    {"name": "wikidata_item", "type": "string"}
                 ],
             },
             "data": formatted_data,
