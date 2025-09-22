@@ -4,6 +4,8 @@ import requests
 from urllib.parse import urlparse
 from django.conf import settings
 from django.core.management.base import BaseCommand, CommandError
+from django.contrib.auth import get_user_model
+from bugs.models import Bug
 from skills.models import Skill
 
 METABASE_API_ENDPOINT = "https://metabase.wikibase.cloud/w/api.php"
@@ -73,6 +75,26 @@ class Command(BaseCommand):
                 except Exception as e:
                     self.stderr.write(f"Error applying {qid}/{lang} {field} to {side}: {e}")
             self.stdout.write(f"Applied edits: {applied}")
+
+        # Find mismatches (both sides present but different) and open bugs
+        mismatches = self.find_mismatches(metabase, metawiki)
+        if mismatches:
+            created = 0
+            skipped = 0
+            for qid, entries in mismatches.items():
+                existing = Bug.objects.filter(title=self.bug_title_for_qid(qid)).first()
+                if existing:
+                    skipped += 1
+                    continue
+                if self.verbosity >= 2:
+                    self.stdout.write(f"Creating bug for {qid} with {len(entries)} mismatches...")
+                if not dry_run:
+                    self.ensure_bug_for_mismatches(qid, entries, dry_run=False)
+                created += 1
+            self.stdout.write(f"Mismatch bugs created: {created}, existing: {skipped}")
+        else:
+            if self.verbosity >= 1:
+                self.stdout.write("No mismatches found.")
 
     def _has_value(self, v):
         return v is not None and str(v).strip() != ""
@@ -249,8 +271,8 @@ class Command(BaseCommand):
             }
         else:
             raise ValueError(f"Unsupported field for Metabase: {field}")
-    data["maxlag"] = "5"
-    r = session.post(METABASE_API_ENDPOINT, data=data, timeout=60)
+        data["maxlag"] = "5"
+        r = session.post(METABASE_API_ENDPOINT, data=data, timeout=60)
         r.raise_for_status()
         j = r.json()
         if "error" in j or j.get("success") is False:
@@ -271,8 +293,8 @@ class Command(BaseCommand):
             "token": token,
             "assert": "user",
         }
-    data["maxlag"] = "5"
-    r = session.post(METAWIKI_API_ENDPOINT, data=data, timeout=60)
+        data["maxlag"] = "5"
+        r = session.post(METAWIKI_API_ENDPOINT, data=data, timeout=60)
         r.raise_for_status()
         j = r.json()
         if j.get("edit", {}).get("result") != "Success":
@@ -285,6 +307,8 @@ class Command(BaseCommand):
         # Build VALUES list using a local wd: prefix
         query = f"""PREFIX wbt:<https://metabase.wikibase.cloud/prop/direct/>
             PREFIX wb: <https://metabase.wikibase.cloud/entity/>
+            PREFIX rdfs: <http://www.w3.org/2000/01/rdf-schema#>
+            PREFIX schema: <http://schema.org/>
             SELECT ?item ?value ?language (SAMPLE(?label) AS ?label) (SAMPLE(?description) AS ?description) WHERE {{  
                 VALUES ?value {{ {item_ids} }}
                 ?item wbt:P5 wb:Q34531.
@@ -322,6 +346,91 @@ class Command(BaseCommand):
                 "metabase_id": item_id,
             }
         return terms_by_item
+
+    def _normalize_text(self, s):
+        if s is None:
+            return None
+        return str(s).strip()
+
+    def find_mismatches(self, metabase, metawiki):
+        mismatches = {}
+        qids = set(metabase.keys()) | set(metawiki.keys())
+        for qid in sorted(qids):
+            langs = set(metabase.get(qid, {}).keys()) | set(metawiki.get(qid, {}).keys())
+            for lang in sorted(langs):
+                mb = metabase.get(qid, {}).get(lang, {})
+                mw = metawiki.get(qid, {}).get(lang, {})
+                for field in ("label", "description"):
+                    a = self._normalize_text(mb.get(field))
+                    b = self._normalize_text(mw.get(field))
+                    if self._has_value(a) and self._has_value(b) and a != b:
+                        mismatches.setdefault(qid, []).append({
+                            "lang": lang,
+                            "field": field,
+                            "metabase": a,
+                            "metawiki": b,
+                        })
+        return mismatches
+
+    def get_bug_report_user(self):
+        User = get_user_model()
+        username = "CapacityExchangeBot"
+        if username:
+            try:
+                return User.objects.get(username=username)
+            except User.DoesNotExist:
+                pass
+        try:
+            return User.objects.filter(is_superuser=True).order_by("id").first() or User.objects.order_by("id").first()
+        except Exception:
+            return None
+
+    def bug_title_for_qid(self, qid):
+        return f"Translation mismatches for {qid}"
+
+    def ensure_bug_for_mismatches(self, qid, entries, dry_run=False):
+        if not entries:
+            return None
+        title = self.bug_title_for_qid(qid)
+        existing = Bug.objects.filter(title=title).first()
+        if existing:
+            return existing
+        # Compose description
+        lines = [
+            f"Found {len(entries)} translation mismatches for {qid}.",
+            "",
+        ]
+        for e in entries:
+            mb = e["metabase"].replace("\n", " ") if e.get("metabase") else ""
+            mw = e["metawiki"].replace("\n", " ") if e.get("metawiki") else ""
+            if len(mb) > 300:
+                mb = mb[:297] + "..."
+            if len(mw) > 300:
+                mw = mw[:297] + "..."
+            lines.append(f"- [{e['lang']}] {e['field']}: metabase=\"{mb}\" | metawiki=\"{mw}\"")
+        description = "\n".join(lines)
+        # Respect Bug.description max_length (1000)
+        max_len = 1000
+        if len(description) > max_len:
+            note = "\n... (truncated)"
+            description = description[: max_len - len(note)] + note
+
+        if dry_run:
+            return {
+                "title": title,
+                "description": description,
+            }
+
+        reporter = self.get_bug_report_user()
+        if not reporter:
+            raise CommandError("Cannot create Bug: no reporter user available.")
+        bug = Bug.objects.create(
+            user=reporter,
+            title=title,
+            description=description,
+            bug_type="improvement",
+        )
+        return bug
 
     def fetch_metawiki(self):
         index_params = {
