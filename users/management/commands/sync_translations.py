@@ -56,15 +56,12 @@ class Command(BaseCommand):
                 field = t["field"]
                 value = t["value"]
                 side = t["side"]
+                metabase_id = t["metabase_id"]
                 try:
                     if side == "metabase":
-                        item_id = self._resolve_metabase_item_id(metabase, qid)
-                        if not item_id:
-                            self.stderr.write(f"Skip {qid}/{lang} {field}: metabase item not found")
-                            continue
-                        self.set_metabase_term(mb_session, mb_token, item_id, lang, field, value)
+                        self.set_metabase_term(mb_session, mb_token, metabase_id, lang, field, value)
                     elif side == "metawiki":
-                        self.set_metawiki_translation(mw_session, mw_token, qid, lang, field, value)
+                        self.set_metawiki_translation(mw_session, mw_token, qid, lang, field, value, metabase_id)
                     else:
                         self.stderr.write(f"Unknown side '{side}' for {qid}/{lang} {field}")
                         continue
@@ -105,6 +102,7 @@ class Command(BaseCommand):
         todos = []
         qid_set = {q for q in qids if q}
         for qid in sorted(qid_set):
+            metabase_id = mb_terms.get("metabase_id")
             mb_langs = set(metabase.get(qid, {}).keys())
             mw_langs = set(metawiki.get(qid, {}).keys())
             langs = mb_langs | mw_langs
@@ -120,6 +118,7 @@ class Command(BaseCommand):
                         "qid": qid,
                         "lang": lang,
                         "side": "metawiki",
+                        "metabase_id": metabase_id,
                         "field": "label",
                         "value": mb_label,
                     })
@@ -128,6 +127,7 @@ class Command(BaseCommand):
                         "qid": qid,
                         "lang": lang,
                         "side": "metabase",
+                        "metabase_id": metabase_id,
                         "field": "label",
                         "value": mw_label,
                     })
@@ -140,6 +140,7 @@ class Command(BaseCommand):
                         "qid": qid,
                         "lang": lang,
                         "side": "metawiki",
+                        "metabase_id": metabase_id,
                         "field": "description",
                         "value": mb_desc,
                     })
@@ -148,6 +149,7 @@ class Command(BaseCommand):
                         "qid": qid,
                         "lang": lang,
                         "side": "metabase",
+                        "metabase_id": metabase_id,
                         "field": "description",
                         "value": mw_desc,
                     })
@@ -193,13 +195,13 @@ class Command(BaseCommand):
         return val
 
     def login_metabase(self):
-        username = self._require_setting("METABASE_USERNAME")
-        password = self._require_setting("METABASE_PASSWORD")
+        username = os.environ.get("METABASE_USERNAME")
+        password = os.environ.get("METABASE_PASSWORD")
         return self._mw_login(METABASE_API_ENDPOINT, username, password)
 
     def login_metawiki(self):
-        username = self._require_setting("METAWIKI_USERNAME")
-        password = self._require_setting("METAWIKI_PASSWORD")
+        username = os.environ.get("METAWIKI_USERNAME")
+        password = os.environ.get("METAWIKI_PASSWORD")
         return self._mw_login(METAWIKI_API_ENDPOINT, username, password)
 
     def _mw_login(self, api_endpoint, username, password):
@@ -238,20 +240,12 @@ class Command(BaseCommand):
             raise CommandError("Failed to obtain CSRF token.")
         return s, csrf
 
-    def _resolve_metabase_item_id(self, metabase_map, qid):
-        langs = metabase_map.get(qid, {})
-        for _, data in langs.items():
-            item_id = data.get("metabase_id")
-            if item_id:
-                return item_id
-        return None
-
-    def set_metabase_term(self, session, token, item_id, lang, field, value):
+    def set_metabase_term(self, session, token, metabase_id, lang, field, value):
         if field == "label":
             action = "wbsetlabel"
             data = {
                 "action": action,
-                "id": item_id,
+                "id": metabase_id,
                 "language": lang,
                 "value": value,
                 "token": token,
@@ -262,7 +256,7 @@ class Command(BaseCommand):
             action = "wbsetdescription"
             data = {
                 "action": action,
-                "id": item_id,
+                "id": metabase_id,
                 "language": lang,
                 "value": value,
                 "token": token,
@@ -276,19 +270,19 @@ class Command(BaseCommand):
         r.raise_for_status()
         j = r.json()
         if "error" in j or j.get("success") is False:
-            raise CommandError(f"Metabase API error for {item_id}/{lang} {field}: {j}")
+            raise CommandError(f"Metabase API error for {metabase_id}/{lang} {field}: {j}")
 
     def compose_metawiki_title(self, qid, field, lang):
         base = f"Translations:Module:CapacityExchange/capacities.json/{qid}-{field}"
         return f"{base}/{lang}"
 
-    def set_metawiki_translation(self, session, token, qid, lang, field, value):
+    def set_metawiki_translation(self, session, token, qid, lang, field, value, metabase_id):
         title = self.compose_metawiki_title(qid, field, lang)
         data = {
             "action": "edit",
             "title": title,
             "text": value,
-            "summary": f"CapX sync: set {field} ({lang}) for {qid}",
+            "summary": f"CapX sync: set {field} ({lang}) for {qid}, imported from https://metabase.wikibase.cloud/wiki/Item:{metabase_id}",
             "format": "json",
             "token": token,
             "assert": "user",
