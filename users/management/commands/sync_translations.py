@@ -25,6 +25,11 @@ class Command(BaseCommand):
             action="store_true",
             help="Show changes without applying them.",
         )
+        parser.add_argument(
+            "--qids",
+            nargs="+",
+            help="Limit processing to specific QIDs (e.g., Q52 Q565)",
+        )
     def handle(self, *args, **options):
         self.verbosity = options.get("verbosity", 1)
 
@@ -37,10 +42,17 @@ class Command(BaseCommand):
             mb_session, mb_token = self.login_metabase()
             mw_session, mw_token = self.login_metawiki()
 
-        qids = list(Skill.objects.order_by("pk").values_list("skill_wikidata_item", flat=True))
+        cli_qids = options.get("qids")
+        if cli_qids:
+            qids = [q for q in cli_qids if q]
+        else:
+            qids = list(Skill.objects.order_by("pk").values_list("skill_wikidata_item", flat=True))
 
         metabase = self.fetch_metabase(qids)
-        metawiki = self.fetch_metawiki()
+        if cli_qids:
+            metawiki = self.fetch_metawiki_for_qids(qids)
+        else:
+            metawiki = self.fetch_metawiki()
 
         todos = self.diff_translations(qids, metabase, metawiki)
         self.print_todos(todos)
@@ -59,7 +71,7 @@ class Command(BaseCommand):
                 metabase_id = t["metabase_id"]
                 try:
                     if side == "metabase":
-                        self.set_metabase_term(mb_session, mb_token, metabase_id, lang, field, value)
+                        self.set_metabase_term(mb_session, mb_token, metabase_id, lang, field, value, qid)
                     elif side == "metawiki":
                         self.set_metawiki_translation(mw_session, mw_token, qid, lang, field, value, metabase_id)
                     else:
@@ -102,7 +114,7 @@ class Command(BaseCommand):
         todos = []
         qid_set = {q for q in qids if q}
         for qid in sorted(qid_set):
-            metabase_id = mb_terms.get("metabase_id")
+            metabase_id = self.get_metabase_id_for_qid(metabase, qid)
             mb_langs = set(metabase.get(qid, {}).keys())
             mw_langs = set(metawiki.get(qid, {}).keys())
             langs = mb_langs | mw_langs
@@ -240,7 +252,7 @@ class Command(BaseCommand):
             raise CommandError("Failed to obtain CSRF token.")
         return s, csrf
 
-    def set_metabase_term(self, session, token, metabase_id, lang, field, value):
+    def set_metabase_term(self, session, token, metabase_id, lang, field, value, qid):
         if field == "label":
             action = "wbsetlabel"
             data = {
@@ -249,6 +261,7 @@ class Command(BaseCommand):
                 "language": lang,
                 "value": value,
                 "token": token,
+                "summary": f"CapX sync: set {field} ({lang}) for {metabase_id}, imported from https://meta.wikimedia.org/wiki/Translations:Module:CapacityExchange/capacities.json/{qid}-{field}/{lang}",
                 "format": "json",
                 "assert": "user",
             }
@@ -260,6 +273,7 @@ class Command(BaseCommand):
                 "language": lang,
                 "value": value,
                 "token": token,
+                "summary": f"CapX sync: set {field} ({lang}) for {metabase_id}, imported from https://meta.wikimedia.org/wiki/Translations:Module:CapacityExchange/capacities.json/{qid}-{field}/{lang}",
                 "format": "json",
                 "assert": "user",
             }
@@ -278,11 +292,14 @@ class Command(BaseCommand):
 
     def set_metawiki_translation(self, session, token, qid, lang, field, value, metabase_id):
         title = self.compose_metawiki_title(qid, field, lang)
+        summary = f"CapX sync: set {field} ({lang}) for {qid}"
+        if metabase_id:
+            summary += f", imported from https://metabase.wikibase.cloud/wiki/Item:{metabase_id}"
         data = {
             "action": "edit",
             "title": title,
             "text": value,
-            "summary": f"CapX sync: set {field} ({lang}) for {qid}, imported from https://metabase.wikibase.cloud/wiki/Item:{metabase_id}",
+            "summary": summary,
             "format": "json",
             "token": token,
             "assert": "user",
@@ -298,7 +315,29 @@ class Command(BaseCommand):
         item_ids = " ".join(f"'{v}'" for v in qids if v)
         if not item_ids:
             return {}
-        # Build VALUES list using a local wd: prefix
+        # First, build a mapping of value (QID) -> metabase item id
+        map_query = f"""PREFIX wbt:<https://metabase.wikibase.cloud/prop/direct/>
+            PREFIX wb: <https://metabase.wikibase.cloud/entity/>
+            SELECT DISTINCT ?item ?value WHERE {{
+                VALUES ?value {{ {item_ids} }}
+                ?item wbt:P5 wb:Q34531.
+                ?item wbt:P67/wbt:P1 ?value.
+            }}"""
+        headers = {"Accept": "application/sparql-results+json", "User-Agent": USER_AGENT}
+        r = requests.get(METABASE_SPARQL_ENDPOINT, params={"query": map_query}, headers=headers, timeout=60)
+        r.raise_for_status()
+        map_data = r.json()
+        value_to_item = {}
+        for b in map_data.get("results", {}).get("bindings", []):
+            item_uri = b.get("item", {}).get("value")
+            value = b.get("value", {}).get("value")
+            item_id = self.parse_entity_id(item_uri) if item_uri else None
+            if item_id and value:
+                value_to_item[value] = item_id
+        # store mapping for later resolution
+        self.metabase_ids = value_to_item
+
+        # Then fetch label/description terms per language
         query = f"""PREFIX wbt:<https://metabase.wikibase.cloud/prop/direct/>
             PREFIX wb: <https://metabase.wikibase.cloud/entity/>
             PREFIX rdfs: <http://www.w3.org/2000/01/rdf-schema#>
@@ -320,7 +359,6 @@ class Command(BaseCommand):
             GROUP BY ?item ?value ?language
             ORDER BY ?language
             """
-        headers = {"Accept": "application/sparql-results+json", "User-Agent": USER_AGENT}
         r = requests.get(METABASE_SPARQL_ENDPOINT, params={"query": query}, headers=headers, timeout=60)
         r.raise_for_status()
         data = r.json()
@@ -340,6 +378,45 @@ class Command(BaseCommand):
                 "metabase_id": item_id,
             }
         return terms_by_item
+
+    def get_metabase_id_for_qid(self, metabase_map, qid):
+        # Prefer mapping gathered during fetch
+        if hasattr(self, "metabase_ids"):
+            mid = self.metabase_ids.get(qid)
+            if mid:
+                return mid
+        # Fallback: scan language entries (if any)
+        for data in metabase_map.get(qid, {}).values():
+            metabase_id = data.get("metabase_id")
+            if metabase_id:
+                return metabase_id
+        return None
+
+    def fetch_metawiki_for_qids(self, qids):
+        headers = {"User-Agent": USER_AGENT}
+        translations_by_qid: dict[str, dict[str, dict[str, str]]] = {}
+        total = len(qids)
+        for idx, qid in enumerate(qids, 1):
+            for field in ("label", "description"):
+                base_title = f"Translations:Module:CapacityExchange/capacities.json/{qid}-{field}"
+                title_params = {
+                    "action": "query",
+                    "format": "json",
+                    "meta": "messagetranslations",
+                    "formatversion": "2",
+                    "mttitle": base_title,
+                }
+                if getattr(self, "verbosity", 1) >= 2:
+                    self.stdout.write(f"Requesting translations for: {base_title} ({idx} of {total})")
+                r = requests.get(METAWIKI_API_ENDPOINT, params=title_params, timeout=30, headers=headers)
+                r.raise_for_status()
+                data = r.json()
+                translations = data.get("query", {}).get("messagetranslations", [])
+                for entry in translations:
+                    lang = entry.get("language")
+                    content = entry.get("translation", "")
+                    translations_by_qid.setdefault(qid, {}).setdefault(lang, {})[field] = content.strip()
+        return translations_by_qid
 
     def _normalize_text(self, s):
         if s is None:
@@ -436,12 +513,15 @@ class Command(BaseCommand):
             "mcprop": ""
         }
         headers = {"User-Agent": USER_AGENT}
+        if getattr(self, "verbosity", 1) >= 2:
+            self.stdout.write("Requesting MetaWiki messagecollection index...")
         r = requests.get(METAWIKI_API_ENDPOINT, params=index_params, timeout=30, headers=headers)
         r.raise_for_status()
         data = r.json()
         pages = data.get("query", {}).get("messagecollection", [])
         translations_by_qid: dict[str, dict[str, dict[str, str]]] = {}
-        for page in pages:
+        total_pages = len(pages)
+        for idx, page in enumerate(pages, 1):
             title = page.get("title", "")
             title_params = {
                 "action": "query",
@@ -450,6 +530,8 @@ class Command(BaseCommand):
                 "formatversion": "2",
                 "mttitle": title
             }
+            if getattr(self, "verbosity", 1) >= 2:
+                self.stdout.write(f"Requesting translations for: {title} (message {idx} of {total_pages})")
             r = requests.get(METAWIKI_API_ENDPOINT, params=title_params, timeout=30, headers=headers)
             r.raise_for_status()
             data = r.json()
