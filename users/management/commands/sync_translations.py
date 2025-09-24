@@ -25,74 +25,65 @@ class Command(BaseCommand):
             action="store_true",
             help="Show changes without applying them.",
         )
-        parser.add_argument(
-            "--qids",
-            nargs="+",
-            help="Limit processing to specific QIDs (e.g., Q52 Q565)",
-        )
     def handle(self, *args, **options):
         self.verbosity = options.get("verbosity", 1)
-
         dry_run = options["dry_run"]
-        mb_session = None
-        mb_token = None
-        mw_session = None
-        mw_token = None
-        if not dry_run:
-            mb_session, mb_token = self.login_metabase()
-            mw_session, mw_token = self.login_metawiki()
 
-        cli_qids = options.get("qids")
-        if cli_qids:
-            qids = [q for q in cli_qids if q]
-        else:
-            qids = list(Skill.objects.order_by("pk").values_list("skill_wikidata_item", flat=True))
-
+        mb_session, mb_token, mw_session, mw_token = self._init_sessions(dry_run)
+        qids = list(Skill.objects.order_by("pk").values_list("skill_wikidata_item", flat=True))
         metabase = self.fetch_metabase(qids)
-        if cli_qids:
-            metawiki = self.fetch_metawiki_for_qids(qids)
-        else:
-            metawiki = self.fetch_metawiki()
+        metawiki = self.fetch_metawiki()
 
         todos = self.diff_translations(qids, metabase, metawiki)
         self.print_todos(todos)
         if not todos and self.verbosity >= 1:
             self.stdout.write("No missing translations found.")
 
-        # Apply changes only where the other side is absent
         if not dry_run and todos:
-            applied = 0
-            for t in todos:
-                qid = t["qid"]
-                lang = t["lang"]
-                field = t["field"]
-                value = t["value"]
-                side = t["side"]
-                metabase_id = t["metabase_id"]
-                try:
-                    if side == "metabase":
-                        self.set_metabase_term(mb_session, mb_token, metabase_id, lang, field, value, qid)
-                    elif side == "metawiki":
-                        self.set_metawiki_translation(mw_session, mw_token, qid, lang, field, value, metabase_id)
-                    else:
-                        self.stderr.write(f"Unknown side '{side}' for {qid}/{lang} {field}")
-                        continue
-                    applied += 1
-                    time.sleep(0.2)
-                except requests.HTTPError as e:
-                    self.stderr.write(f"HTTP error applying {qid}/{lang} {field} to {side}: {e}")
-                except Exception as e:
-                    self.stderr.write(f"Error applying {qid}/{lang} {field} to {side}: {e}")
+            applied = self._apply_todos(todos, mb_session, mb_token, mw_session, mw_token)
             self.stdout.write(f"Applied edits: {applied}")
 
-        # Find mismatches (both sides present but different) and open bugs
+        self._process_mismatches(metabase, metawiki, dry_run)
+
+    def _init_sessions(self, dry_run):
+        mb_session = mb_token = mw_session = mw_token = None
+        if not dry_run:
+            mb_session, mb_token = self.login_metabase()
+            mw_session, mw_token = self.login_metawiki()
+        return mb_session, mb_token, mw_session, mw_token
+
+    def _apply_todos(self, todos, mb_session, mb_token, mw_session, mw_token):
+        applied = 0
+        for t in todos:
+            qid = t["qid"]
+            lang = t["lang"]
+            field = t["field"]
+            value = t["value"]
+            side = t["side"]
+            metabase_id = t["metabase_id"]
+            try:
+                if side == "metabase":
+                    self.set_metabase_term(mb_session, mb_token, metabase_id, lang, field, value, qid)
+                elif side == "metawiki":
+                    self.set_metawiki_translation(mw_session, mw_token, qid, lang, field, value, metabase_id)
+                else:
+                    self.stderr.write(f"Unknown side '{side}' for {qid}/{lang} {field}")
+                    continue
+                applied += 1
+                time.sleep(10)
+            except requests.HTTPError as e:
+                self.stderr.write(f"HTTP error applying {qid}/{lang} {field} to {side}: {e}")
+            except Exception as e:
+                self.stderr.write(f"Error applying {qid}/{lang} {field} to {side}: {e}")
+        return applied
+
+    def _process_mismatches(self, metabase, metawiki, dry_run):
         mismatches = self.find_mismatches(metabase, metawiki)
         if mismatches:
             created = 0
             skipped = 0
             for qid, entries in mismatches.items():
-                existing = Bug.objects.filter(title=self.bug_title_for_qid(qid)).first()
-                if existing:
+                if self._skip_existing_bug(qid):
                     skipped += 1
                     continue
                 if self.verbosity >= 2:
@@ -105,12 +96,38 @@ class Command(BaseCommand):
             if self.verbosity >= 1:
                 self.stdout.write("No mismatches found.")
 
+    def _skip_existing_bug(self, qid):
+        existing = Bug.objects.filter(title=self.bug_title_for_qid(qid)).first()
+        return existing is not None
+
     def _has_value(self, v):
         return v is not None and str(v).strip() != ""
 
     def diff_translations(self, qids, metabase, metawiki):
         # Returns a flat list of todo actions describing missing entries
         # [{qid, lang, side, field, value}]
+        def add_todo_if_missing(qid, lang, metabase_id, mb_terms, mw_terms, field, todos):
+            mb_value = mb_terms.get(field)
+            mw_value = mw_terms.get(field)
+            if self._has_value(mb_value) and not self._has_value(mw_value):
+                todos.append({
+                    "qid": qid,
+                    "lang": lang,
+                    "side": "metawiki",
+                    "metabase_id": metabase_id,
+                    "field": field,
+                    "value": mb_value,
+                })
+            if self._has_value(mw_value) and not self._has_value(mb_value):
+                todos.append({
+                    "qid": qid,
+                    "lang": lang,
+                    "side": "metabase",
+                    "metabase_id": metabase_id,
+                    "field": field,
+                    "value": mw_value,
+                })
+
         todos = []
         qid_set = {q for q in qids if q}
         for qid in sorted(qid_set):
@@ -121,50 +138,8 @@ class Command(BaseCommand):
             for lang in sorted(langs):
                 mb_terms = metabase.get(qid, {}).get(lang, {})
                 mw_terms = metawiki.get(qid, {}).get(lang, {})
-
-                # label
-                mb_label = mb_terms.get("label")
-                mw_label = mw_terms.get("label")
-                if self._has_value(mb_label) and not self._has_value(mw_label):
-                    todos.append({
-                        "qid": qid,
-                        "lang": lang,
-                        "side": "metawiki",
-                        "metabase_id": metabase_id,
-                        "field": "label",
-                        "value": mb_label,
-                    })
-                if self._has_value(mw_label) and not self._has_value(mb_label):
-                    todos.append({
-                        "qid": qid,
-                        "lang": lang,
-                        "side": "metabase",
-                        "metabase_id": metabase_id,
-                        "field": "label",
-                        "value": mw_label,
-                    })
-
-                # description
-                mb_desc = mb_terms.get("description")
-                mw_desc = mw_terms.get("description")
-                if self._has_value(mb_desc) and not self._has_value(mw_desc):
-                    todos.append({
-                        "qid": qid,
-                        "lang": lang,
-                        "side": "metawiki",
-                        "metabase_id": metabase_id,
-                        "field": "description",
-                        "value": mb_desc,
-                    })
-                if self._has_value(mw_desc) and not self._has_value(mb_desc):
-                    todos.append({
-                        "qid": qid,
-                        "lang": lang,
-                        "side": "metabase",
-                        "metabase_id": metabase_id,
-                        "field": "description",
-                        "value": mw_desc,
-                    })
+                for field in ("label", "description"):
+                    add_todo_if_missing(qid, lang, metabase_id, mb_terms, mw_terms, field, todos)
         return todos
 
     def print_todos(self, todos):
@@ -391,32 +366,6 @@ class Command(BaseCommand):
             if metabase_id:
                 return metabase_id
         return None
-
-    def fetch_metawiki_for_qids(self, qids):
-        headers = {"User-Agent": USER_AGENT}
-        translations_by_qid: dict[str, dict[str, dict[str, str]]] = {}
-        total = len(qids)
-        for idx, qid in enumerate(qids, 1):
-            for field in ("label", "description"):
-                base_title = f"Translations:Module:CapacityExchange/capacities.json/{qid}-{field}"
-                title_params = {
-                    "action": "query",
-                    "format": "json",
-                    "meta": "messagetranslations",
-                    "formatversion": "2",
-                    "mttitle": base_title,
-                }
-                if getattr(self, "verbosity", 1) >= 2:
-                    self.stdout.write(f"Requesting translations for: {base_title} ({idx} of {total})")
-                r = requests.get(METAWIKI_API_ENDPOINT, params=title_params, timeout=30, headers=headers)
-                r.raise_for_status()
-                data = r.json()
-                translations = data.get("query", {}).get("messagetranslations", [])
-                for entry in translations:
-                    lang = entry.get("language")
-                    content = entry.get("translation", "")
-                    translations_by_qid.setdefault(qid, {}).setdefault(lang, {})[field] = content.strip()
-        return translations_by_qid
 
     def _normalize_text(self, s):
         if s is None:
