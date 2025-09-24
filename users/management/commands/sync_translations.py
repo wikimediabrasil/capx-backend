@@ -1,4 +1,5 @@
 import os
+import re
 import time
 import requests
 from urllib.parse import urlparse
@@ -7,6 +8,7 @@ from django.core.management.base import BaseCommand, CommandError
 from django.contrib.auth import get_user_model
 from bugs.models import Bug
 from skills.models import Skill
+from collections import defaultdict
 
 METABASE_API_ENDPOINT = "https://metabase.wikibase.cloud/w/api.php"
 METABASE_SPARQL_ENDPOINT = "https://metabase.wikibase.cloud/query/sparql"
@@ -146,7 +148,6 @@ class Command(BaseCommand):
         if not todos:
             return
         # Group by QID then lang for nicer output
-        from collections import defaultdict
         grouped = defaultdict(lambda: defaultdict(list))
         for t in todos:
             grouped[t["qid"]][t["lang"]].append(t)
@@ -393,17 +394,15 @@ class Command(BaseCommand):
         return mismatches
 
     def get_bug_report_user(self):
-        User = get_user_model()
+        user = get_user_model()
         username = "CapacityExchangeBot"
-        if username:
-            try:
-                return User.objects.get(username=username)
-            except User.DoesNotExist:
-                pass
         try:
-            return User.objects.filter(is_superuser=True).order_by("id").first() or User.objects.order_by("id").first()
-        except Exception:
-            return None
+            return user.objects.get(username=username)
+        except user.DoesNotExist:
+            try:
+                return user.objects.filter(is_superuser=True).order_by("id").first() or user.objects.order_by("id").first()
+            except Exception:
+                return None
 
     def bug_title_for_qid(self, qid):
         return f"Translation mismatches for {qid}"
