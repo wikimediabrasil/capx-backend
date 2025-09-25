@@ -41,6 +41,7 @@ INSTALLED_APPS = [
     'rest_social_auth',
     'knox',
     'drf_spectacular',
+    'drf_spectacular_sidecar',
 ]
 
 MIDDLEWARE = [
@@ -168,4 +169,7 @@ SPECTACULAR_SETTINGS = {
     'DESCRIPTION': 'The Capacity Exchange (CapX) is a platform for finding and connecting with fellow Wikimedians to exchange knowledge, skills, and services on a global level.',
     'VERSION': '2.1.37',
     'SERVE_INCLUDE_SCHEMA': True,
+    'SWAGGER_UI_DIST': 'SIDECAR',
+    'SWAGGER_UI_FAVICON_HREF': 'SIDECAR',
+    'REDOC_DIST': 'SIDECAR',
 }
