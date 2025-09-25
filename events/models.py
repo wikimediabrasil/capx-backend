@@ -72,7 +72,8 @@ class Events(models.Model):
     time_end = models.DateTimeField(
         verbose_name="End Time",
         help_text="End time of the event.",
-        blank=True
+        blank=True,
+        null=True
     )
     creator = models.ForeignKey(
         settings.AUTH_USER_MODEL,
