@@ -849,7 +849,7 @@ class StatisticsViewTestCase(TestCase):
         response = self.client.get('/statistics/')
         self.assertEqual(response.status_code, status.HTTP_200_OK)
         expected_keys = [
-            "total_users", "new_users", "total_capacities", "new_capacities",
+            "total_users", "new_users", "active_users", "total_capacities", "new_capacities",
             "total_messages", "new_messages", "total_organizations", "new_organizations"
         ]
         for key in expected_keys:
