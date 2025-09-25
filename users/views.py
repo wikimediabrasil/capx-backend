@@ -14,6 +14,8 @@ from django_filters.rest_framework import DjangoFilterBackend
 from drf_spectacular.utils import extend_schema, extend_schema_view, OpenApiParameter, OpenApiTypes, OpenApiExample, OpenApiResponse
 from rest_framework.views import APIView
 from datetime import datetime
+from django.utils import timezone
+from datetime import timedelta
 
 
 @extend_schema_view(
@@ -608,39 +610,44 @@ class StatisticsView(APIView):
         }},
     )
     def get(self, request, *args, **kwargs):
+        now = timezone.now()
+        last_30_days = now - timedelta(days=30)
+        
         # Calculate total users and percentage change
-        total_users = Profile.objects.count()
+        total_users = Profile.objects.filter(user__is_active=True).count()
         new_users = Profile.objects.filter(
-            user__date_joined__month=datetime.now().month - 1,
-            user__date_joined__year=datetime.now().year
+            user__date_joined__gte=last_30_days,
+            user__is_active=True
+        ).count()
+        active_users = Profile.objects.filter(
+            user__last_login__gte=last_30_days,
+            user__is_active=True
         ).count()
 
         # Calculate total capacities and new capacities this month
         total_capacities = Skill.objects.count()
         new_capacities = Skill.objects.filter(
-            skill_date_of_creation__month=datetime.now().month,
-            skill_date_of_creation__year=datetime.now().year
+            skill_date_of_creation__gte=last_30_days
         ).count()
 
         # Calculate total messages and new messages this month
         total_messages = Message.objects.count()
         new_messages = Message.objects.filter(
-            date__month=datetime.now().month,
-            date__year=datetime.now().year
+            date__gte=last_30_days
         ).count()
 
         # Calculate total of organizations with managers and within this month
-        total_organizations = Organization.objects.filter(managers__isnull=False).count()
+        total_organizations = Organization.objects.filter(managers__isnull=False).distinct().count()
         new_organizations = Organization.objects.filter(
             managers__isnull=False,
-            management__joined_at__month=datetime.now().month,
-            management__joined_at__year=datetime.now().year
-        ).count()
+            management__joined_at__gte=last_30_days
+        ).distinct().count()
 
 
         return Response({
             "total_users": total_users,
             "new_users": new_users,
+            "active_users": active_users,
             "total_capacities": total_capacities,
             "new_capacities": new_capacities,
             "total_messages": total_messages,
