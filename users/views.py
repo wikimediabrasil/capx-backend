@@ -16,6 +16,7 @@ from rest_framework.views import APIView
 from datetime import datetime
 from django.utils import timezone
 from datetime import timedelta
+from knox.models import AuthToken
 
 
 @extend_schema_view(
@@ -619,10 +620,8 @@ class StatisticsView(APIView):
             user__date_joined__gte=last_30_days,
             user__is_active=True
         ).count()
-        active_users = Profile.objects.filter(
-            user__last_login__gte=last_30_days,
-            user__is_active=True
-        ).count()
+        recent_user_ids = AuthToken.objects.filter(created__gte=last_30_days).values_list('user_id', flat=True).distinct()
+        active_users = Profile.objects.filter(user__id__in=recent_user_ids, user__is_active=True).count()
 
         # Calculate total capacities and new capacities this month
         total_capacities = Skill.objects.count()
