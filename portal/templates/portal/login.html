@@ -1,0 +1,23 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <title>Partner Portal Login</title>
+  <style>
+    body { display:grid; place-items:center; min-height:100vh; font-family: system-ui, -apple-system, Segoe UI, Roboto, sans-serif; background: #f6f7f9; }
+    .panel { background:white; padding:32px; border-radius:12px; box-shadow: 0 6px 24px rgba(0,0,0,0.08); width: 360px; max-width: 92vw; }
+    h1 { margin-top:0; font-size: 1.4rem; }
+    a.button { display:block; text-align:center; background:#36c; color:white; padding:12px 16px; border-radius:8px; text-decoration:none; font-weight:600; }
+    a.button:hover { background:#2a4b8d; }
+    p { color:#444; }
+  </style>
+</head>
+<body>
+  <div class="panel">
+    <h1>Sign in to the Partner Portal</h1>
+    <p>Use your Wikimedia account to continue.</p>
+    <p><a class="button" href="{{ social_login_url }}">Login with Wikimedia</a></p>
+    <p style="font-size:12px;color:#666">You'll be redirected to OAuth and back here.</p>
+  </div>
+</body>
+</html>
