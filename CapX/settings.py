@@ -29,6 +29,7 @@ INSTALLED_APPS = [
     'orgs',
     'message',
     'projects',
+    'portal',
     'django.contrib.admin',
     'django.contrib.auth',
     'django.contrib.contenttypes',
