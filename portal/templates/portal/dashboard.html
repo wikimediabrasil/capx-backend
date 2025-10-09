@@ -1,5 +1,5 @@
 <!doctype html>
-<html>
+<html lang="en">
 <head>
   <meta charset="utf-8" />
   <title>Partner Portal</title>
@@ -57,14 +57,14 @@
       <h3>Manage portal access</h3>
       <form method="post" action="/portal/portal_user/add/" style="margin-bottom:8px;">
         {% csrf_token %}
-        <label>Username to grant access:</label>
-        <input name="username" placeholder="Wiki username" required />
+        <label for="grant-username">Username to grant access:</label>
+        <input id="grant-username" name="username" placeholder="Wiki username" required />
         <button type="submit">Grant access</button>
       </form>
       <form method="post" action="/portal/portal_user/remove/">
         {% csrf_token %}
-        <label>Username to revoke access:</label>
-        <input name="username" placeholder="Wiki username" required />
+        <label for="revoke-username">Username to revoke access:</label>
+        <input id="revoke-username" name="username" placeholder="Wiki username" required />
         <button type="submit">Revoke access</button>
       </form>
     {% endif %}

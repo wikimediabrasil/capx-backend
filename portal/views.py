@@ -10,9 +10,11 @@ from django.conf import settings
 from .models import PortalUser
 from social_django.utils import load_strategy, load_backend
 from users.submodels import AuthExtraInfo
-from django.views.decorators.http import require_POST
+from django.views.decorators.http import require_GET, require_POST
 from users.models import CustomUser, Profile
 from knox.models import AuthToken
+
+DASHBOARD_URL_NAME = 'portal:dashboard'
 
 def is_portal_user(user):
     if not user.is_authenticated:
@@ -33,10 +35,11 @@ def require_portal_access(view_func):
     return login_required(_wrapped)
 
 
+@require_GET
 def login_view(request):
     if request.user.is_authenticated:
         if is_portal_user(request.user) or is_portal_admin(request.user):
-            return redirect('portal:dashboard')
+            return redirect(DASHBOARD_URL_NAME)
         # Show login page with info but without auto-redirecting
         messages.error(request, "Your account is not authorized for the portal yet. Please contact an administrator.")
     # Use our wrapper that also writes AuthExtraInfo; keep template variable name
@@ -44,12 +47,14 @@ def login_view(request):
     return render(request, 'portal/login.html', {'social_login_url': oauth_begin_url})
 
 
+@require_GET
 def logout_view(request):
     logout(request)
     messages.success(request, 'You have been logged out.')
     return redirect('portal:login')
 
 
+@require_GET
 @require_portal_access
 def dashboard(request):
     # Show orgs the user manages and recent events for those orgs
@@ -102,13 +107,14 @@ def dashboard(request):
     return render(request, 'portal/dashboard.html', context)
 
 
+@require_GET
 def oauth_begin(request):
     """
     Start MediaWiki OAuth using social_django, but also create an AuthExtraInfo entry
     keyed by the request token with 'extra' set to the portal return path.
     """
     strategy = load_strategy(request)
-    portal_return_path = reverse('portal:dashboard')
+    portal_return_path = reverse(DASHBOARD_URL_NAME)
     # Ensure post-auth redirect target
     strategy.session_set('next', portal_return_path)
     backend = load_backend(strategy, 'mediawiki', redirect_uri=None)
@@ -126,6 +132,7 @@ def oauth_begin(request):
 
     return response
 
+@require_GET
 def oauth_callback(request):
     """
     Forward the provider callback to social_django's built-in completion endpoint,
@@ -154,19 +161,19 @@ def portal_user_add(request):
     username = request.POST.get('username', '').strip()
     if not username:
         messages.error(request, 'Username is required.')
-        return redirect('portal:dashboard')
+        return redirect(DASHBOARD_URL_NAME)
     try:
         target = CustomUser.all_objects.get(username=username)
     except CustomUser.DoesNotExist:
         messages.error(request, f'User "{username}" not found.')
-        return redirect('portal:dashboard')
+        return redirect(DASHBOARD_URL_NAME)
 
     PortalUser.objects.update_or_create(
         user=target,
         defaults={'authorizer': request.user, 'is_authorized': True}
     )
     messages.success(request, f'Portal access granted to {target.username}.')
-    return redirect('portal:dashboard')
+    return redirect(DASHBOARD_URL_NAME)
 
 
 @require_POST
@@ -178,16 +185,16 @@ def portal_user_remove(request):
     username = request.POST.get('username', '').strip()
     if not username:
         messages.error(request, 'Username is required.')
-        return redirect('portal:dashboard')
+        return redirect(DASHBOARD_URL_NAME)
     try:
         target = CustomUser.all_objects.get(username=username)
     except CustomUser.DoesNotExist:
         messages.error(request, f'User "{username}" not found.')
-        return redirect('portal:dashboard')
+        return redirect(DASHBOARD_URL_NAME)
 
     PortalUser.objects.update_or_create(
         user=target,
         defaults={'authorizer': request.user, 'is_authorized': False}
     )
     messages.success(request, f'Portal access revoked for {target.username}.')
-    return redirect('portal:dashboard')
+    return redirect(DASHBOARD_URL_NAME)
