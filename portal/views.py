@@ -1,4 +1,5 @@
-from django.contrib.auth.decorators import login_required
+from django.contrib.auth import REDIRECT_FIELD_NAME
+from django.contrib.auth.decorators import login_required as django_login_required
 from django.shortcuts import render, redirect
 from django.contrib.auth import logout
 from django.contrib import messages
@@ -16,6 +17,16 @@ from knox.models import AuthToken
 
 DASHBOARD_URL_NAME = 'portal:dashboard'
 
+# A login-required decorator that ignores settings.LOGIN_URL and always
+# redirects to the portal login page.
+def portal_login_required(view_func=None, *, redirect_field_name: str = REDIRECT_FIELD_NAME):
+    decorator = django_login_required(
+        redirect_field_name=redirect_field_name,
+        login_url='/portal/login/'
+    )
+    # Support being used with and without parentheses
+    return decorator(view_func) if view_func else decorator
+
 def is_portal_user(user):
     if not user.is_authenticated:
         return False
@@ -32,7 +43,7 @@ def require_portal_access(view_func):
         if not (is_portal_user(request.user) or is_portal_admin(request.user)):
             return HttpResponseForbidden("You don't have access to this portal.")
         return view_func(request, *args, **kwargs)
-    return login_required(_wrapped)
+    return portal_login_required(_wrapped)
 
 
 @require_GET
