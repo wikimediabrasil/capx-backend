@@ -3,16 +3,92 @@
 <head>
   <meta charset="utf-8" />
   <title>Partner Portal</title>
-  <link rel="stylesheet" href="/static/grappelli/stylesheets/screen.css" />
   <style>
-    body { padding: 20px; font-family: system-ui, -apple-system, Segoe UI, Roboto, sans-serif; }
-    header { display:flex; justify-content: space-between; align-items:center; margin-bottom: 1rem; }
-    h1 { margin: 0; }
-    .card { border: 1px solid #ddd; border-radius: 8px; padding: 16px; margin-bottom: 16px; }
+    :root {
+      --bg: #f7f9fc;
+      --card-bg: #ffffff;
+      --text: #1f2937;
+      --muted: #6b7280;
+      --border: #e5e7eb;
+      --primary: #2563eb;
+      --primary-600: #1d4ed8;
+      --accent: #10b981;
+    }
+
+    /* Base */
+    html, body {
+      margin: 0;
+      padding: 0;
+    }
+    body {
+      padding: 20px;
+      font-family: system-ui, -apple-system, Segoe UI, Roboto, "Helvetica Neue", Arial, sans-serif;
+      background: var(--bg);
+      color: var(--text);
+    }
+
+    /* Header */
+    header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 1rem;
+    }
+    header a { color: var(--primary); text-decoration: none; }
+    header a:hover { text-decoration: underline; }
+
+    h1 { margin: 0; font-weight: 650; }
+
+    /* Card */
+    .card {
+      background: var(--card-bg);
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      padding: 16px;
+      box-shadow: 0 1px 2px rgba(0,0,0,0.04);
+      margin-bottom: 16px;
+      overflow-x: auto; /* enable horizontal scroll if resized wider */
+    }
+
+    /* Grid utility if needed */
     .grid { display:grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 12px; }
-    table { width: 100%; border-collapse: collapse; }
-    th, td { padding: 8px; border-bottom: 1px solid #eee; text-align:left; }
-    .muted { color: #666; }
+
+    /* Table */
+    table { width: 100%; border-collapse: collapse; background: #fff; }
+    th, td { padding: 10px 12px; border-bottom: 1px solid var(--border); text-align: left; }
+    th { background: #f3f4f6; font-weight: 600; color: #374151; position: sticky; top: 0; z-index: 1; }
+    tr:hover td { background: #fafafa; }
+
+    /* Toolbar */
+    .table-toolbar { display:flex; gap: 8px; align-items:center; flex-wrap: wrap; margin-bottom: 12px; }
+    .table-toolbar input[type="search"] { padding: 8px 10px; border: 1px solid var(--border); border-radius: 8px; background: #fff; }
+    .table-toolbar button { padding: 8px 12px; border: 1px solid var(--border); border-radius: 8px; background: #fff; cursor: pointer; color: #111827; }
+    .table-toolbar button:hover { background: #f9fafb; }
+
+    /* Column toggles */
+    .col-toggles label { margin-right: 10px; font-size: 0.9rem; color: #374151; }
+    .col-toggles input { vertical-align: middle; }
+
+    /* Sorting */
+    th.sortable { cursor: pointer; user-select: none; }
+    th .sort-indicator { margin-left: 6px; font-size: 0.8em; color: var(--muted); }
+    th[data-sort="asc"] .sort-indicator { color: var(--primary); }
+    th[data-sort="desc"] .sort-indicator { color: var(--primary); }
+
+    /* Helpers */
+    .muted { color: var(--muted); }
+
+    /* Column resizing */
+    .col-resizer {
+      position: absolute;
+      right: 0;
+      top: 0;
+      width: 6px;
+      height: 100%;
+      cursor: col-resize;
+      user-select: none;
+    }
+    body.col-resizing, th.col-resizing, td.col-resizing { cursor: col-resize !important; }
   </style>
 </head>
 <body>
@@ -26,7 +102,12 @@
   <section class="card">
     <h2>Users</h2>
     {% if users_table %}
-      <table>
+      <div class="table-toolbar" aria-label="Users table controls">
+        <input type="search" id="users-filter-input" placeholder="Type to filter rows..." aria-label="Filter users" />
+        <div id="users-col-toggles" class="col-toggles" aria-label="Show/Hide columns"></div>
+        <button type="button" id="users-csv-btn">Download CSV</button>
+      </div>
+      <table id="users-table">
         <thead>
           <tr>
             <th>Username</th>
@@ -69,5 +150,252 @@
       </form>
     {% endif %}
   </section>
+    <script>
+      (function() {
+        var table = document.getElementById('users-table');
+        if (!table) return; // No rows
+        var thead = table.tHead;
+        var tbody = table.tBodies[0];
+        var headers = Array.from(thead.rows[0].cells);
+        var filterInput = document.getElementById('users-filter-input');
+        var togglesContainer = document.getElementById('users-col-toggles');
+        var csvBtn = document.getElementById('users-csv-btn');
+
+        // Track multi-column sort state: [{ index, dir }] dir: 1 asc, -1 desc
+        var sortState = [];
+
+        function textOf(node) {
+          return node.textContent.trim();
+        }
+
+        function parseValue(text) {
+          if (text === '') return '';
+          // Try date
+          var ts = Date.parse(text);
+          if (!isNaN(ts)) return ts; // number comparable
+          // Try number
+          var num = parseFloat(text.replace(/\s/g, '').replace(',', '.'));
+          if (!isNaN(num) && isFinite(num)) return num;
+          // Fallback string
+          return text.toLowerCase();
+        }
+
+        function getCellValue(tr, idx) {
+          var cell = tr.cells[idx];
+          return parseValue(textOf(cell || { textContent: '' }));
+        }
+
+        function compareRows(a, b) {
+          for (var i = 0; i < sortState.length; i++) {
+            var s = sortState[i];
+            var va = getCellValue(a, s.index);
+            var vb = getCellValue(b, s.index);
+            if (va < vb) return -1 * s.dir;
+            if (va > vb) return 1 * s.dir;
+          }
+          return 0;
+        }
+
+        function clearIndicators() {
+          headers.forEach(function(th) {
+            th.dataset.sort = '';
+            var ind = th.querySelector('.sort-indicator');
+            if (ind) ind.textContent = '';
+          });
+        }
+
+        function refreshIndicators() {
+          clearIndicators();
+          sortState.forEach(function(s, idx) {
+            var th = headers[s.index];
+            th.dataset.sort = s.dir === 1 ? 'asc' : 'desc';
+            var ind = th.querySelector('.sort-indicator');
+            if (!ind) {
+              ind = document.createElement('span');
+              ind.className = 'sort-indicator';
+              th.appendChild(ind);
+            }
+            // Add arrow and position index if multi-sort
+            var arrow = s.dir === 1 ? '▲' : '▼';
+            var pos = sortState.length > 1 ? ' ' + (idx + 1) : '';
+            ind.textContent = arrow + pos;
+          });
+        }
+
+        function applySort() {
+          if (!sortState.length) return; // nothing to sort
+          var rows = Array.from(tbody.rows);
+          rows.sort(compareRows);
+          // Re-append in new order
+          rows.forEach(function(r) { tbody.appendChild(r); });
+          refreshIndicators();
+        }
+
+        function toggleSort(index, additive) {
+          // Find existing
+          var existingIdx = sortState.findIndex(function(s) { return s.index === index; });
+          if (additive) {
+            if (existingIdx === -1) {
+              sortState.push({ index: index, dir: 1 });
+            } else {
+              var s = sortState[existingIdx];
+              if (s.dir === 1) s.dir = -1; else { sortState.splice(existingIdx, 1); }
+            }
+          } else {
+            if (existingIdx === -1) {
+              sortState = [{ index: index, dir: 1 }];
+            } else {
+              var d = sortState[existingIdx].dir;
+              sortState = [{ index: index, dir: d === 1 ? -1 : 1 }];
+            }
+          }
+          applySort();
+        }
+
+        // Make headers sortable
+        headers.forEach(function(th, idx) {
+          th.classList.add('sortable');
+          th.title = 'Click to sort. Shift-click for multi-column.';
+          th.addEventListener('click', function(e) {
+            toggleSort(idx, e.shiftKey);
+          });
+          // Ensure indicator span exists
+          var ind = document.createElement('span');
+          ind.className = 'sort-indicator';
+          th.appendChild(ind);
+        });
+
+        // Filter by typing
+        function normalize(s) { return s.toLowerCase(); }
+        function applyFilter() {
+          var q = normalize(filterInput.value || '');
+          var rows = Array.from(tbody.rows);
+          rows.forEach(function(r) {
+            var hay = normalize(r.textContent);
+            r.style.display = q === '' || hay.indexOf(q) !== -1 ? '' : 'none';
+          });
+        }
+        filterInput.addEventListener('input', applyFilter);
+
+        // Column visibility toggles
+        function visibleColumnCount() {
+          return headers.filter(function(th) { return th.style.display !== 'none'; }).length;
+        }
+        function setColumnVisibility(colIdx, visible) {
+          // Prevent hiding last visible column
+          if (!visible && visibleColumnCount() <= 1) return;
+          var display = visible ? '' : 'none';
+          headers[colIdx].style.display = display;
+          Array.from(tbody.rows).forEach(function(r) {
+            if (r.cells[colIdx]) r.cells[colIdx].style.display = display;
+          });
+          // If column was part of sort and we hid it, remove from sort
+          if (!visible) {
+            var i = sortState.findIndex(function(s) { return s.index === colIdx; });
+            if (i !== -1) { sortState.splice(i, 1); refreshIndicators(); }
+          }
+        }
+        function buildColumnToggles() {
+          headers.forEach(function(th, idx) {
+            var id = 'toggle-col-' + idx;
+            var label = document.createElement('label');
+            var cb = document.createElement('input');
+            cb.type = 'checkbox';
+            cb.id = id;
+            cb.checked = th.style.display !== 'none';
+            cb.addEventListener('change', function() { setColumnVisibility(idx, cb.checked); });
+            var span = document.createElement('span');
+            span.textContent = ' ' + textOf(th);
+            label.appendChild(cb);
+            label.appendChild(span);
+            togglesContainer.appendChild(label);
+          });
+        }
+        buildColumnToggles();
+
+        // CSV export (respects filter and visible columns)
+        function getVisibleColumnIndexes() {
+          var idxs = [];
+          headers.forEach(function(th, idx) {
+            if (getComputedStyle(th).display !== 'none') idxs.push(idx);
+          });
+          return idxs;
+        }
+        function escapeCSV(value) {
+          var s = String(value).replace(/"/g, '""');
+          return '"' + s + '"';
+        }
+        function downloadCSV() {
+          var colIdxs = getVisibleColumnIndexes();
+          var lines = [];
+          // Header
+          var headerLine = colIdxs.map(function(i) { return escapeCSV(textOf(headers[i])); }).join(',');
+          lines.push(headerLine);
+          // Rows
+          Array.from(tbody.rows).forEach(function(r) {
+            if (r.style.display === 'none') return; // filtered out
+            var vals = colIdxs.map(function(i) { return escapeCSV(textOf(r.cells[i] || { textContent: '' })); });
+            lines.push(vals.join(','));
+          });
+          var csv = lines.join('\r\n');
+          var blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+          var url = URL.createObjectURL(blob);
+          var a = document.createElement('a');
+          a.href = url;
+          a.download = 'users.csv';
+          document.body.appendChild(a);
+          a.click();
+          setTimeout(function(){ URL.revokeObjectURL(url); a.remove(); }, 0);
+        }
+        csvBtn.addEventListener('click', downloadCSV);
+
+        // Column resizing (plain JS)
+        function makeResizable() {
+          var minWidth = 60; // px
+          headers.forEach(function(th, colIdx) {
+            // Skip if already has a resizer (avoid duplicates on re-init)
+            if (th.querySelector('.col-resizer')) return;
+            var resizer = document.createElement('span');
+            resizer.className = 'col-resizer';
+            resizer.title = 'Drag to resize';
+            th.appendChild(resizer);
+
+            var startX, startWidth, cells;
+            function onMouseMove(e) {
+              var dx = e.clientX - startX;
+              var newWidth = Math.max(minWidth, startWidth + dx);
+              // Apply width to header and cells
+              cells.forEach(function(cell) {
+                cell.style.width = newWidth + 'px';
+                cell.style.minWidth = newWidth + 'px';
+                cell.style.maxWidth = newWidth + 'px';
+              });
+            }
+            function onMouseUp() {
+              document.body.classList.remove('col-resizing');
+              cells.forEach(function(cell) { cell.classList.remove('col-resizing'); });
+              document.removeEventListener('mousemove', onMouseMove);
+              document.removeEventListener('mouseup', onMouseUp);
+            }
+            resizer.addEventListener('mousedown', function(e) {
+              e.preventDefault();
+              e.stopPropagation(); // prevent triggering sort
+              startX = e.clientX;
+              startWidth = th.getBoundingClientRect().width;
+              // Collect cells in this column (header + body)
+              cells = [th];
+              Array.from(tbody.rows).forEach(function(r) {
+                if (r.cells[colIdx]) cells.push(r.cells[colIdx]);
+              });
+              document.body.classList.add('col-resizing');
+              cells.forEach(function(cell) { cell.classList.add('col-resizing'); });
+              document.addEventListener('mousemove', onMouseMove);
+              document.addEventListener('mouseup', onMouseUp);
+            });
+          });
+        }
+        makeResizable();
+      })();
+    </script>
 </body>
 </html>
