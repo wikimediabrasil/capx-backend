@@ -12,7 +12,7 @@ from .models import PortalUser
 from social_django.utils import load_strategy, load_backend
 from users.submodels import AuthExtraInfo
 from django.views.decorators.http import require_GET, require_POST
-from users.models import CustomUser, Profile
+from users.models import CustomUser, Profile, UserBadge
 from knox.models import AuthToken
 
 DASHBOARD_URL_NAME = 'portal:dashboard'
@@ -72,42 +72,75 @@ def dashboard(request):
     orgs = Organization.objects.filter(managers=request.user).distinct()
     events = Events.objects.filter(organization__in=orgs).order_by('-time_begin')[:50]
 
-    # Build users table for all portal users
-    # Prefetch affiliations to avoid N+1 queries
-    all_users = (
-        CustomUser.objects.all()
-        .order_by('username')
-        .prefetch_related('profile__affiliation')
+    # Build users table to reflect ProfileSerializer/model fields used by the template
+    profiles = (
+        Profile.objects.select_related('user')
+        .prefetch_related(
+            'affiliation',
+            'territory',
+            'wikimedia_project',
+            'skills_known',
+            'skills_available',
+            'skills_wanted',
+            'languageproficiency_set__language',
+        )
+        .order_by('user__username')
     )
 
-    # Precompute manager user ids
-    manager_user_ids = set(Management.objects.values_list('user_id', flat=True))
+    # Prepare manager organization per user to avoid N+1
+    managers_map = {}
+    for uid, oname in Management.objects.select_related('organization').values_list('user_id', 'organization__display_name'):
+        managers_map.setdefault(uid, []).append(oname)
+
+    # Prepare displayed badges per user
+    user_ids = list(profiles.values_list('user_id', flat=True))
+    badges_map = {}
+    for uid, bname in UserBadge.objects.select_related('badge').filter(user_id__in=user_ids, is_displayed=True, progress=100).values_list('user_id', 'badge__name'):
+        badges_map.setdefault(uid, []).append(bname)
 
     users_table = []
-    for u in all_users:
-        # Determine role: Staff > Manager > User
-        if getattr(u, 'is_staff', False):
-            role = 'Staff'
-        elif u.id in manager_user_ids:
-            role = 'Manager'
-        else:
-            role = 'User'
+    for p in profiles:
+        u = p.user
 
-        # Affiliation names
-        affiliations = []
-        if hasattr(u, 'profile') and u.profile:
-            affiliations = [org.display_name for org in u.profile.affiliation.all()]
-
-        # Get last login from AuthToken
+        # Last login via Knox token
         last_token = AuthToken.objects.filter(user=u).order_by('-created').first()
         last_login = last_token.created if last_token else None
 
+        # String representations for multi-relations
+        aff_str = ', '.join([org.display_name for org in p.affiliation.all()]) if p.affiliation.exists() else ''
+        terr_str = ', '.join([t.territory_name for t in p.territory.all()]) if p.territory.exists() else ''
+        proj_str = ', '.join([wp.wikimedia_project_name for wp in p.wikimedia_project.all()]) if p.wikimedia_project.exists() else ''
+        skills_known_str = ', '.join([str(s) for s in p.skills_known.all()]) if p.skills_known.exists() else ''
+        skills_available_str = ', '.join([str(s) for s in p.skills_available.all()]) if p.skills_available.exists() else ''
+        skills_wanted_str = ', '.join([str(s) for s in p.skills_wanted.all()]) if p.skills_wanted.exists() else ''
+
+        # Languages (name + proficiency)
+        languages = [
+            {'name': getattr(lp.language, 'language_name', None) or str(lp.language), 'proficiency': lp.proficiency or '-'}
+            for lp in p.languageproficiency_set.all()
+        ]
+
         users_table.append({
+            # Top-level user fields
             'username': u.username,
-            'role': role,
-            'affiliation': ', '.join(affiliations) if affiliations else '',
+            'is_staff': u.is_staff,
+            'is_active': u.is_active,
             'date_joined': u.date_joined,
             'last_login': last_login,
+            'last_update': p.last_update,
+            'wikidata_qid': p.wikidata_qid,
+            'wiki_alt': p.wiki_alt,
+            'territory': terr_str,
+            'language': languages,
+            'affiliation': aff_str,
+            'wikimedia_project': proj_str,
+            'team': p.team,
+            'skills_known': skills_known_str,
+            'skills_available': skills_available_str,
+            'skills_wanted': skills_wanted_str,
+            'is_manager': managers_map.get(u.id, []),
+            'badges': badges_map.get(u.id, []),
+            'automated_lets_connect': p.automated_lets_connect,
         })
     context = {
         'user': request.user,
