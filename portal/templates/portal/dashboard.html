@@ -111,20 +111,66 @@
         <thead>
           <tr>
             <th>Username</th>
-            <th>Role</th>
-            <th>Affiliation</th>
+            <th>Is staff</th>
+            <th>Is active</th>
             <th>Date joined</th>
+            <th>Last update</th>
             <th>Last login</th>
+            <th>Wikidata QID</th>
+            <th>Wiki alt</th>
+            <th>Territory</th>
+            <th>Language</th>
+            <th>Affiliation</th>
+            <th>Wikimedia project</th>
+            <th>Team</th>
+            <th>Skills known</th>
+            <th>Skills available</th>
+            <th>Skills wanted</th>
+            <th>Manager of organizations</th>
+            <th>Badges</th>
+            <th>Automated Lets Connect</th>
           </tr>
         </thead>
         <tbody>
           {% for row in users_table %}
             <tr>
               <td>{{ row.username }}</td>
-              <td>{{ row.role }}</td>
-              <td>{{ row.affiliation }}</td>
+              <td>{{ row.is_staff }}</td>
+              <td>{{ row.is_active }}</td>
               <td>{{ row.date_joined }}</td>
+              <td>{{ row.last_update }}</td>
               <td>{{ row.last_login }}</td>
+              <td>{{ row.wikidata_qid }}</td>
+              <td>{{ row.wiki_alt }}</td>
+              <td>{{ row.territory }}</td>
+              <td>
+                {% if row.language %}
+                  {% for lang in row.language %}
+                    {{ lang.name }} ({{ lang.proficiency }}){% if not forloop.last %}, {% endif %}
+                  {% endfor %}
+                {% endif %}
+              </td>
+              <td>{{ row.affiliation }}</td>
+              <td>{{ row.wikimedia_project }}</td>
+              <td>{{ row.team }}</td>
+              <td>{{ row.skills_known }}</td>
+              <td>{{ row.skills_available }}</td>
+              <td>{{ row.skills_wanted }}</td>
+              <td>
+                {% if row.is_manager %}
+                  {% for org_id in row.is_manager %}
+                    {{ org_id }}{% if not forloop.last %}, {% endif %}
+                  {% endfor %}
+                {% endif %}
+              </td>
+              <td>
+                {% if row.badges %}
+                  {% for badge_id in row.badges %}
+                    {{ badge_id }}{% if not forloop.last %}, {% endif %}
+                  {% endfor %}
+                {% endif %}
+              </td>
+              <td>{{ row.automated_lets_connect }}</td>
             </tr>
           {% endfor %}
         </tbody>
@@ -312,6 +358,32 @@
           });
         }
         buildColumnToggles();
+
+        // Auto-fit: hide columns from the right until the table fits the container
+        function hasHorizontalOverflow(container) {
+          return container.scrollWidth - container.clientWidth > 1; // tolerate 1px
+        }
+        function setToggleChecked(idx, checked) {
+          var cb = document.getElementById('toggle-col-' + idx);
+          if (cb) cb.checked = !!checked;
+        }
+        function autoFitColumns(minVisible) {
+          var container = table.closest('.card') || table.parentElement || document.body;
+          var min = (typeof minVisible === 'number' && minVisible > 0) ? minVisible : 5; // keep at least 5
+          // Early exit if no overflow
+          if (!hasHorizontalOverflow(container)) return;
+          // Iteratively hide the last visible column until it fits or we hit the minimum
+          var guard = 0; // safety to avoid infinite loops
+          while (hasHorizontalOverflow(container) && visibleColumnCount() > min && guard++ < headers.length) {
+            var visibleIdxs = getVisibleColumnIndexes();
+            if (!visibleIdxs.length) break;
+            var lastIdx = visibleIdxs[visibleIdxs.length - 1];
+            setColumnVisibility(lastIdx, false);
+            setToggleChecked(lastIdx, false);
+          }
+        }
+        // Run once after initial render
+        autoFitColumns(5);
 
         // CSV export (respects filter and visible columns)
         function getVisibleColumnIndexes() {
