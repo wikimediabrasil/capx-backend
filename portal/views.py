@@ -193,11 +193,15 @@ def dashboard(request):
             'badges': badges_map.get(u.id, []),
             'automated_lets_connect': p.automated_lets_connect,
         })
+    # List of PortalUser records (for admins to manage access)
+    portal_users = PortalUser.objects.select_related('user', 'authorizer').order_by('user__username')
+
     context = {
         'user': request.user,
         'organizations': orgs,
         'events': events,
         'users_table': users_table,
+        'portal_users': portal_users,
     }
     return render(request, 'portal/dashboard.html', context)
 
@@ -292,4 +296,28 @@ def portal_user_remove(request):
         defaults={'authorizer': request.user, 'is_authorized': False}
     )
     messages.success(request, f'Portal access revoked for {target.username}.')
+    return redirect(DASHBOARD_URL_NAME)
+
+
+@require_POST
+def portal_user_update_notes(request):
+    """Update notes for a portal user (staff only)."""
+    forbidden = _require_portal_admin(request)
+    if forbidden:
+        return forbidden
+    username = request.POST.get('username', '').strip()
+    notes = request.POST.get('notes', '').strip()
+    if not username:
+        messages.error(request, 'Username is required.')
+        return redirect(DASHBOARD_URL_NAME)
+    try:
+        target = CustomUser.all_objects.get(username=username)
+    except CustomUser.DoesNotExist:
+        messages.error(request, f'User "{username}" not found.')
+        return redirect(DASHBOARD_URL_NAME)
+
+    pu, _ = PortalUser.objects.get_or_create(user=target, defaults={'authorizer': request.user, 'is_authorized': True})
+    pu.notes = notes or None
+    pu.save(update_fields=['notes', 'updated_at'])
+    messages.success(request, f'Notes updated for {target.username}.')
     return redirect(DASHBOARD_URL_NAME)
