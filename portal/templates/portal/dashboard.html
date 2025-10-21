@@ -5,14 +5,19 @@
   <title>Partner Portal</title>
   <style>
     :root {
-      --bg: #f7f9fc;
+      --bg: #f6f8fb;
+      --surface: #f9fbff;
       --card-bg: #ffffff;
-      --text: #1f2937;
-      --muted: #6b7280;
-      --border: #e5e7eb;
-      --primary: #2563eb;
-      --primary-600: #1d4ed8;
-      --accent: #10b981;
+      --text: #0f172a;
+      --muted: #64748b;
+      --border: #e2e8f0;
+      --ring: #93c5fd;
+      --primary: #2563eb;      /* blue-600 */
+      --primary-600: #1d4ed8;  /* blue-700 */
+      --primary-700: #1e40af;  /* blue-800 */
+      --accent: #22c55e;       /* green-500 */
+      --warn: #f59e0b;         /* amber-500 */
+      --danger: #ef4444;       /* red-500 */
     }
 
     /* Base */
@@ -21,23 +26,44 @@
       padding: 0;
     }
     body {
-      padding: 20px;
-      font-family: system-ui, -apple-system, Segoe UI, Roboto, "Helvetica Neue", Arial, sans-serif;
-      background: var(--bg);
+      padding: 0;
+      font-family: ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, "Helvetica Neue", Arial, sans-serif;
+      background: linear-gradient(180deg, var(--surface), var(--bg) 60%);
       color: var(--text);
+      -webkit-font-smoothing: antialiased;
+      -moz-osx-font-smoothing: grayscale;
+    }
+
+    .container {
+      max-width: 1200px;
+      margin: 0 auto;
+      padding: 24px;
     }
 
     /* Header */
     header {
+      background: linear-gradient(90deg, rgba(37,99,235,0.08), rgba(34,197,94,0.08));
+      border-bottom: 1px solid var(--border);
+      position: sticky;
+      top: 0;
+      z-index: 10;
+      backdrop-filter: saturate(140%) blur(6px);
+    }
+    .header-inner {
+      max-width: 1200px;
+      margin: 0 auto;
+      padding: 16px 24px;
       display: flex;
       justify-content: space-between;
       align-items: center;
-      margin-bottom: 1rem;
+      gap: 16px;
     }
-    header a { color: var(--primary); text-decoration: none; }
-    header a:hover { text-decoration: underline; }
+    header a { color: var(--primary); text-decoration: none; font-weight: 550; }
+    header a:hover { color: var(--primary-700); }
 
-    h1 { margin: 0; font-weight: 650; }
+    h1 { margin: 0; font-weight: 700; letter-spacing: -0.01em; font-size: 1.4rem; }
+    h2 { margin: 0 0 12px; font-weight: 650; letter-spacing: -0.01em; }
+    h3 { margin: 12px 0 8px; font-weight: 650; }
 
     /* Card */
     .card {
@@ -45,7 +71,7 @@
       border: 1px solid var(--border);
       border-radius: 12px;
       padding: 16px;
-      box-shadow: 0 1px 2px rgba(0,0,0,0.04);
+      box-shadow: 0 1px 3px rgba(15, 23, 42, 0.05), 0 10px 20px -12px rgba(2,6,23,0.08);
       margin-bottom: 16px;
       overflow-x: auto; /* enable horizontal scroll if resized wider */
     }
@@ -54,20 +80,38 @@
     .grid { display:grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 12px; }
 
     /* Table */
-    table { width: 100%; border-collapse: collapse; background: #fff; }
-    th, td { padding: 10px 12px; border-bottom: 1px solid var(--border); text-align: left; }
-    th { background: #f3f4f6; font-weight: 600; color: #374151; position: sticky; top: 0; z-index: 1; }
-    tr:hover td { background: #fafafa; }
+    table { width: 100%; border-collapse: separate; border-spacing: 0; background: #fff; }
+    th, td { padding: 10px 12px; border-bottom: 1px solid var(--border); text-align: left; vertical-align: top; }
+    thead th { background: #f3f6fb; font-weight: 600; color: #0f172a; position: sticky; top: 0; z-index: 2; box-shadow: inset 0 -1px 0 var(--border); }
+    tbody tr:nth-child(even) td { background: #fafcff; }
+    tbody tr:hover td { background: #f5faff; }
+    /* Sticky first column */
+    th:first-child, td:first-child { position: sticky; left: 0; background: #fff; z-index: 3; box-shadow: 2px 0 0 0 var(--border); }
+    thead th:first-child { z-index: 4; background: #f3f6fb; }
 
     /* Toolbar */
-    .table-toolbar { display:flex; gap: 8px; align-items:center; flex-wrap: wrap; margin-bottom: 12px; }
-    .table-toolbar input[type="search"] { padding: 8px 10px; border: 1px solid var(--border); border-radius: 8px; background: #fff; }
-    .table-toolbar button { padding: 8px 12px; border: 1px solid var(--border); border-radius: 8px; background: #fff; cursor: pointer; color: #111827; }
-    .table-toolbar button:hover { background: #f9fafb; }
+    .table-toolbar { display:flex; gap: 10px; align-items:center; flex-wrap: wrap; margin-bottom: 12px; }
+    .table-toolbar input[type="search"] {
+      padding: 10px 12px;
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      background: #fff;
+      outline: none;
+      box-shadow: 0 1px 1px rgba(2,6,23,0.02);
+      min-width: 220px;
+    }
+    .table-toolbar input[type="search"]:focus { border-color: var(--primary); box-shadow: 0 0 0 3px rgba(37,99,235,0.15); }
+    .table-toolbar button { padding: 10px 12px; border: 1px solid var(--border); border-radius: 10px; cursor: pointer; color: #0f172a; transition: all .15s ease; background:#fff; }
+    .table-toolbar button:hover { background: #f7fafc; }
+    button.btn-primary { background: var(--primary); color: #fff !important; border-color: var(--primary); box-shadow: 0 1px 2px rgba(37, 99, 235, 0.25); }
+    button.btn-primary:hover { background: var(--primary-600); border-color: var(--primary-600); }
+    .edit-notes-btn { padding: 8px 10px; border: 1px solid var(--border); border-radius: 8px; background:#fff; cursor:pointer; }
+    .edit-notes-btn:hover { background:#f7fafc; }
 
     /* Column toggles */
-    .col-toggles label { margin-right: 10px; font-size: 0.9rem; color: #374151; }
-    .col-toggles input { vertical-align: middle; }
+    .col-toggles { display:flex; flex-wrap: wrap; gap: 8px; }
+    .col-toggles label { display:inline-flex; align-items:center; gap: 6px; padding: 6px 10px; border: 1px solid var(--border); border-radius: 999px; background: #fff; font-size: 0.85rem; color: #0f172a; }
+    .col-toggles input { vertical-align: middle; accent-color: var(--primary); }
 
     /* Sorting */
     th.sortable { cursor: pointer; user-select: none; }
@@ -77,6 +121,15 @@
 
     /* Helpers */
     .muted { color: var(--muted); }
+
+    /* Chips / Pills */
+    .chip { display: inline-flex; align-items: center; gap: 6px; padding: 3px 8px; border-radius: 999px; background: #f1f5f9; color: #0f172a; border: 1px solid var(--border); font-size: 12px; line-height: 1; white-space: nowrap; }
+    .chip + .chip { margin-left: 6px; }
+    .pill { display: inline-flex; align-items: center; padding: 4px 10px; border-radius: 999px; font-size: 12px; font-weight: 600; line-height: 1; white-space: nowrap; }
+    .pill--success { background: #ecfdf5; color: #065f46; border: 1px solid #a7f3d0; }
+    .pill--muted { background: #f1f5f9; color: #334155; border: 1px solid var(--border); }
+    .pill--danger { background: #fef2f2; color: #991b1b; border: 1px solid #fecaca; }
+  .notes-display { cursor: pointer; }
 
     /* Column resizing */
     .col-resizer {
@@ -89,113 +142,209 @@
       user-select: none;
     }
     body.col-resizing, th.col-resizing, td.col-resizing { cursor: col-resize !important; }
+
+    /* Forms */
+    form { display: grid; grid-template-columns: 1fr auto; gap: 8px; align-items: center; max-width: 520px; }
+    label { font-size: 0.9rem; color: var(--muted); }
+    input[type="text"], input[type="search"], input:not([type]) {
+      padding: 10px 12px; border: 1px solid var(--border); border-radius: 10px; background: #fff; outline: none;
+    }
+    input[type="text"]:focus, input:not([type]):focus { border-color: var(--primary); box-shadow: 0 0 0 3px rgba(37,99,235,0.15); }
+    form button { padding: 10px 12px; border: 1px solid var(--border); border-radius: 10px; cursor: pointer; }
+    form button[type="submit"] { background: var(--primary); border-color: var(--primary); color: #fff; }
+    form button[type="submit"]:hover { background: var(--primary-600); border-color: var(--primary-600); }
   </style>
 </head>
 <body>
   <header>
-    <h1>Welcome, {{ user.username }}</h1>
-    <nav>
-      <a href="/portal/logout/">Logout</a>
-    </nav>
+    <div class="header-inner">
+      <h1>Welcome, {{ user.username }}</h1>
+      <nav>
+        <a href="/portal/logout/">Logout</a>
+      </nav>
+    </div>
   </header>
 
-  <section class="card">
-    <h2>Users</h2>
-    {% if users_table %}
-      <div class="table-toolbar" aria-label="Users table controls">
-        <input type="search" id="users-filter-input" placeholder="Type to filter rows..." aria-label="Filter users" />
-        <div id="users-col-toggles" class="col-toggles" aria-label="Show/Hide columns"></div>
-        <button type="button" id="users-csv-btn">Download CSV</button>
-      </div>
-      <table id="users-table">
-        <thead>
-          <tr>
-            <th>Username</th>
-            <th>Is staff</th>
-            <th>Is active</th>
-            <th>Date joined</th>
-            <th>Last update</th>
-            <th>Last login</th>
-            <th>Wikidata QID</th>
-            <th>Wiki alt</th>
-            <th>Territory</th>
-            <th>Language</th>
-            <th>Affiliation</th>
-            <th>Wikimedia project</th>
-            <th>Team</th>
-            <th>Skills known</th>
-            <th>Skills available</th>
-            <th>Skills wanted</th>
-            <th>Manager of organizations</th>
-            <th>Badges</th>
-            <th>Automated Lets Connect</th>
-          </tr>
-        </thead>
-        <tbody>
-          {% for row in users_table %}
+  <div class="container">
+    <section class="card">
+      <h2>Users</h2>
+      {% if users_table %}
+        <div class="table-toolbar" aria-label="Users table controls">
+          <input type="search" id="users-filter-input" placeholder="Type to filter rows..." aria-label="Filter users" />
+          <div id="users-col-toggles" class="col-toggles" aria-label="Show/Hide columns"></div>
+          <button type="button" id="users-csv-btn" class="btn-primary">Download CSV</button>
+          <div id="users-row-limit" class="muted" style="margin-left:auto; display:flex; gap:8px; align-items:center;">
+            <span id="users-row-limit-info"></span>
+            <button type="button" id="users-toggle-limit-btn" style="display:none;">Show all</button>
+          </div>
+        </div>
+        <table id="users-table">
+          <thead>
             <tr>
-              <td>{{ row.username }}</td>
-              <td>{{ row.is_staff }}</td>
-              <td>{{ row.is_active }}</td>
-              <td>{{ row.date_joined }}</td>
-              <td>{{ row.last_update }}</td>
-              <td>{{ row.last_login }}</td>
-              <td>{{ row.wikidata_qid }}</td>
-              <td>{{ row.wiki_alt }}</td>
-              <td>{{ row.territory }}</td>
-              <td>
-                {% if row.language %}
-                  {% for lang in row.language %}
-                    {{ lang.name }} ({{ lang.proficiency }}){% if not forloop.last %}, {% endif %}
-                  {% endfor %}
-                {% endif %}
-              </td>
-              <td>{{ row.affiliation }}</td>
-              <td>{{ row.wikimedia_project }}</td>
-              <td>{{ row.team }}</td>
-              <td>{{ row.skills_known }}</td>
-              <td>{{ row.skills_available }}</td>
-              <td>{{ row.skills_wanted }}</td>
-              <td>
-                {% if row.is_manager %}
-                  {% for org_id in row.is_manager %}
-                    {{ org_id }}{% if not forloop.last %}, {% endif %}
-                  {% endfor %}
-                {% endif %}
-              </td>
-              <td>
-                {% if row.badges %}
-                  {% for badge_id in row.badges %}
-                    {{ badge_id }}{% if not forloop.last %}, {% endif %}
-                  {% endfor %}
-                {% endif %}
-              </td>
-              <td>{{ row.automated_lets_connect }}</td>
+              <th>Username</th>
+              <th>Is staff</th>
+              <th>Is active</th>
+              <th>Date joined</th>
+              <th>Last update</th>
+              <th>Last login</th>
+              <th>Wikidata QID</th>
+              <th>Wiki alt</th>
+              <th>Territory</th>
+              <th>Language</th>
+              <th>Affiliation</th>
+              <th>Wikimedia project</th>
+              <th>Team</th>
+              <th>Skills known</th>
+              <th>Skills available</th>
+              <th>Skills wanted</th>
+              <th>Manager of organizations</th>
+              <th>Badges</th>
+              <th>Automated Lets Connect</th>
             </tr>
-          {% endfor %}
-        </tbody>
-      </table>
-    {% else %}
-      <p class="muted">No users found.</p>
-    {% endif %}
-
+          </thead>
+          <tbody>
+            {% for row in users_table %}
+              <tr>
+                <td>{{ row.username }}</td>
+                <td>
+                  <span class="pill {{ row.is_staff|yesno:'pill--success,pill--muted' }}">{{ row.is_staff|yesno:'Staff,No' }}</span>
+                </td>
+                <td>
+                  <span class="pill {{ row.is_active|yesno:'pill--success,pill--danger' }}">{{ row.is_active|yesno:'Active,Inactive' }}</span>
+                </td>
+                <td>{{ row.date_joined }}</td>
+                <td>{{ row.last_update }}</td>
+                <td>{{ row.last_login }}</td>
+                <td>{{ row.wikidata_qid }}</td>
+                <td>{{ row.wiki_alt }}</td>
+                <td>{{ row.territory }}</td>
+                <td>
+                  {% if row.language %}
+                    {% for lang in row.language %}
+                      <span class="chip">{{ lang.name }} ({{ lang.proficiency }})</span>
+                    {% endfor %}
+                  {% endif %}
+                </td>
+                <td>{{ row.affiliation }}</td>
+                <td>{{ row.wikimedia_project }}</td>
+                <td>{{ row.team }}</td>
+                <td>{{ row.skills_known }}</td>
+                <td>{{ row.skills_available }}</td>
+                <td>{{ row.skills_wanted }}</td>
+                <td>
+                  {% if row.is_manager %}
+                    {% for org_id in row.is_manager %}
+                      <span class="chip">{{ org_id }}</span>
+                    {% endfor %}
+                  {% endif %}
+                </td>
+                <td>
+                  {% if row.badges %}
+                    {% for badge_id in row.badges %}
+                      <span class="chip">{{ badge_id }}</span>
+                    {% endfor %}
+                  {% endif %}
+                </td>
+                <td>
+                  <span class="pill {{ row.automated_lets_connect|yesno:'pill--success,pill--muted' }}">{{ row.automated_lets_connect|yesno:'Enabled,Disabled' }}</span>
+                </td>
+              </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      {% else %}
+        <p class="muted">No users found.</p>
+      {% endif %}
+    </section>
     {% if user.is_staff %}
-      <hr />
-      <h3>Manage portal access</h3>
-      <form method="post" action="/portal/portal_user/add/" style="margin-bottom:8px;">
-        {% csrf_token %}
-        <label for="grant-username">Username to grant access:</label>
-        <input id="grant-username" name="username" placeholder="Wiki username" required />
-        <button type="submit">Grant access</button>
-      </form>
-      <form method="post" action="/portal/portal_user/remove/">
-        {% csrf_token %}
-        <label for="revoke-username">Username to revoke access:</label>
-        <input id="revoke-username" name="username" placeholder="Wiki username" required />
-        <button type="submit">Revoke access</button>
-      </form>
+      <section class="card">
+        <h2>Manage Portal Access</h2>
+        <div class="table-toolbar" aria-label="Access management controls">
+          <form method="post" action="/portal/portal_user/add/" style="display:flex; gap:8px; align-items:center;">
+            {% csrf_token %}
+            <label for="grant-username">Grant:</label>
+            <input id="grant-username" name="username" placeholder="Wiki username" required />
+            <button type="submit" class="btn-primary">Grant access</button>
+          </form>
+          <form method="post" action="/portal/portal_user/remove/" style="display:flex; gap:8px; align-items:center;">
+            {% csrf_token %}
+            <label for="revoke-username">Revoke:</label>
+            <input id="revoke-username" name="username" placeholder="Wiki username" required />
+            <button type="submit">Revoke access</button>
+          </form>
+        </div>
+
+        <div class="table-toolbar" style="margin-top:8px">
+          <input type="search" id="portal-users-filter" placeholder="Filter authorized users..." aria-label="Filter portal users" />
+        </div>
+
+        <table id="portal-users-table">
+          <thead>
+            <tr>
+              <th>Username</th>
+              <th>Status</th>
+              <th>Authorized at</th>
+              <th>Authorizer</th>
+              <th>Notes</th>
+              <th>Actions</th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for pu in portal_users %}
+              <tr>
+                <td>{{ pu.user.username }}</td>
+                <td>
+                  <span class="pill {{ pu.is_authorized|yesno:'pill--success,pill--danger' }}">{{ pu.is_authorized|yesno:'Authorized,Revoked' }}</span>
+                </td>
+                <td>{{ pu.authorized_at }}</td>
+                <td>{% if pu.authorizer %}{{ pu.authorizer.username }}{% else %}-{% endif %}</td>
+                <td>
+                  <div class="notes-display" data-username="{{ pu.user.username }}" data-notes="{{ pu.notes|default_if_none:''|escape }}">{% if pu.notes %}{{ pu.notes }}{% else %}-{% endif %}</div>
+                </td>
+                <td>
+                  {% if pu.is_authorized %}
+                    <form method="post" action="/portal/portal_user/remove/" style="display:inline-block">
+                      {% csrf_token %}
+                      <input type="hidden" name="username" value="{{ pu.user.username }}" />
+                      <button type="submit">Revoke</button>
+                    </form>
+                  {% else %}
+                    <form method="post" action="/portal/portal_user/add/" style="display:inline-block">
+                      {% csrf_token %}
+                      <input type="hidden" name="username" value="{{ pu.user.username }}" />
+                      <button type="submit" class="btn-primary">Grant</button>
+                    </form>
+                  {% endif %}
+                  <button type="button" class="edit-notes-btn" data-username="{{ pu.user.username }}" data-notes="{{ pu.notes|default_if_none:''|escape }}">Edit notes</button>
+                </td>
+              </tr>
+            {% empty %}
+              <tr><td colspan="6" class="muted">No records.</td></tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </section>
     {% endif %}
-  </section>
+    
+    {% if user.is_staff %}
+    <!-- Notes modal -->
+    <div id="notes-modal" style="display:none; position:fixed; inset:0; background:rgba(2,6,23,0.45); z-index:50;">
+      <div style="background:#fff; border:1px solid var(--border); border-radius:12px; width:min(560px, 92vw); margin:10vh auto; padding:16px; box-shadow:0 20px 40px rgba(2,6,23,0.25);">
+        <h3 style="margin-top:0">Edit Notes</h3>
+        <form id="notes-form" method="post" action="/portal/portal_user/update_notes/" style="display:grid; gap:10px;">
+          {% csrf_token %}
+          <input type="hidden" name="username" id="notes-username" />
+          <label for="notes-text">Notes</label>
+          <textarea id="notes-text" name="notes" rows="5" style="padding:10px; border:1px solid var(--border); border-radius:10px; resize:vertical;"></textarea>
+          <div style="display:flex; gap:8px; justify-content:flex-end;">
+            <button type="button" id="notes-cancel">Cancel</button>
+            <button type="submit" class="btn-primary">Save</button>
+          </div>
+        </form>
+      </div>
+    </div>
+    {% endif %}
+  </div>
     <script>
       (function() {
         var table = document.getElementById('users-table');
@@ -275,6 +424,8 @@
           // Re-append in new order
           rows.forEach(function(r) { tbody.appendChild(r); });
           refreshIndicators();
+          // Re-apply row limit after sorting
+          if (typeof applyRowLimit === 'function') applyRowLimit();
         }
 
         function toggleSort(index, additive) {
@@ -313,6 +464,54 @@
 
         // Filter by typing
         function normalize(s) { return s.toLowerCase(); }
+        // Row limiting controls
+        var DEFAULT_LIMIT = 20;
+        var limitOn = true;
+        var infoEl = document.getElementById('users-row-limit-info');
+        var toggleBtn = document.getElementById('users-toggle-limit-btn');
+
+        function countVisibleRows() {
+          var c = 0;
+          for (var r of Array.from(tbody.rows)) {
+            if (getComputedStyle(r).display !== 'none') c++;
+          }
+          return c;
+        }
+
+        function clearRowLimit() {
+          for (var r of Array.from(tbody.rows)) {
+            if (r.dataset.hiddenByLimit === '1') {
+              r.style.display = '';
+              delete r.dataset.hiddenByLimit;
+            }
+          }
+        }
+
+        function applyRowLimit() {
+          clearRowLimit();
+          var q = normalize(filterInput.value || '');
+          var totalVisible = countVisibleRows();
+          if (!limitOn || q !== '' || totalVisible <= DEFAULT_LIMIT) {
+            if (infoEl) infoEl.textContent = q !== '' ? ('Showing ' + totalVisible + ' matched') : ('Showing all ' + totalVisible);
+            if (toggleBtn) toggleBtn.style.display = (q === '' && totalVisible > DEFAULT_LIMIT) ? '' : 'none';
+            if (toggleBtn) toggleBtn.textContent = 'Show less';
+            return;
+          }
+          // Hide rows beyond limit among currently visible
+          var shown = 0;
+          for (var r of Array.from(tbody.rows)) {
+            if (getComputedStyle(r).display === 'none') continue;
+            shown++;
+            if (shown > DEFAULT_LIMIT) {
+              r.style.display = 'none';
+              r.dataset.hiddenByLimit = '1';
+            }
+          }
+          var remaining = totalVisible - DEFAULT_LIMIT;
+          if (infoEl) infoEl.textContent = 'Showing first ' + DEFAULT_LIMIT + ' of ' + totalVisible;
+          if (toggleBtn) { toggleBtn.style.display = ''; toggleBtn.textContent = 'Show all (' + remaining + ' more)'; }
+        }
+
         function applyFilter() {
           var q = normalize(filterInput.value || '');
           var rows = Array.from(tbody.rows);
@@ -320,8 +519,26 @@
             var hay = normalize(r.textContent);
             r.style.display = q === '' || hay.indexOf(q) !== -1 ? '' : 'none';
           });
+          // When filtering, show all matched; when cleared, re-enable limit
+          limitOn = (q === '');
+          applyRowLimit();
         }
         filterInput.addEventListener('input', applyFilter);
+
+        if (toggleBtn) {
+          toggleBtn.addEventListener('click', function(){
+            if (limitOn) {
+              // Turn off limit and show all
+              limitOn = false;
+              applyRowLimit();
+              if (toggleBtn) toggleBtn.textContent = 'Show less';
+            } else {
+              // Re-enable limit
+              limitOn = true;
+              applyRowLimit();
+            }
+          });
+        }
 
         // Column visibility toggles
         function visibleColumnCount() {
@@ -384,6 +601,8 @@
         }
         // Run once after initial render
         autoFitColumns(5);
+        // Initialize row limit after initial render
+        applyRowLimit();
 
         // CSV export (respects filter and visible columns)
         function getVisibleColumnIndexes() {
@@ -405,7 +624,11 @@
           lines.push(headerLine);
           // Rows
           Array.from(tbody.rows).forEach(function(r) {
-            if (r.style.display === 'none') return; // filtered out
+            // Include rows hidden only by the row-limit (data-hidden flag),
+            // but exclude rows hidden by the search filter/visibility.
+            var isHidden = getComputedStyle(r).display === 'none';
+            var hiddenByLimit = r.dataset.hiddenByLimit === '1';
+            if (isHidden && !hiddenByLimit) return; // filtered/visibility hidden -> skip
             var vals = colIdxs.map(function(i) { return escapeCSV(textOf(r.cells[i] || { textContent: '' })); });
             lines.push(vals.join(','));
           });
@@ -467,6 +690,60 @@
           });
         }
         makeResizable();
+      })();
+
+      // Filter logic for portal users table
+      (function() {
+        var pTable = document.getElementById('portal-users-table');
+        var input = document.getElementById('portal-users-filter');
+        if (!pTable || !input) return;
+        var tbody = pTable.tBodies[0];
+        function norm(s){ return (s||'').toLowerCase(); }
+        function apply(){
+          var q = norm(input.value);
+          for (var r of Array.from(tbody.rows)){
+            var hay = norm(r.textContent);
+            r.style.display = q === '' || hay.indexOf(q) !== -1 ? '' : 'none';
+          }
+        }
+        input.addEventListener('input', apply);
+      })();
+
+      // Notes modal logic
+      (function(){
+        var modal = document.getElementById('notes-modal');
+        if (!modal) return;
+        var form = document.getElementById('notes-form');
+        var usernameInput = document.getElementById('notes-username');
+        var notesText = document.getElementById('notes-text');
+        var cancelBtn = document.getElementById('notes-cancel');
+
+        function openModal(username, notes){
+          usernameInput.value = username;
+          notesText.value = notes || '';
+          modal.style.display = 'block';
+          setTimeout(function(){ notesText.focus(); }, 0);
+        }
+        function closeModal(){ modal.style.display = 'none'; }
+
+        document.addEventListener('click', function(e){
+          var btn = e.target.closest('.edit-notes-btn');
+          if (btn){
+            var username = btn.getAttribute('data-username');
+            var notes = btn.getAttribute('data-notes') || '';
+            openModal(username, notes);
+            return;
+          }
+          var display = e.target.closest('.notes-display');
+          if (display){
+            var username2 = display.dataset.username;
+            var notes2 = display.dataset.notes || display.textContent || '';
+            openModal(username2, notes2.trim());
+          }
+        });
+        cancelBtn.addEventListener('click', function(){ closeModal(); });
+        modal.addEventListener('click', function(e){ if (e.target === modal) closeModal(); });
+        document.addEventListener('keydown', function(e){ if (e.key === 'Escape') closeModal(); });
       })();
     </script>
 </body>
