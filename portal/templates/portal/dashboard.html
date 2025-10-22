@@ -153,6 +153,13 @@
     form button { padding: 10px 12px; border: 1px solid var(--border); border-radius: 10px; cursor: pointer; }
     form button[type="submit"] { background: var(--primary); border-color: var(--primary); color: #fff; }
     form button[type="submit"]:hover { background: var(--primary-600); border-color: var(--primary-600); }
+
+    /* Sub-navigation */
+    .subnav { position: sticky; top: 64px; z-index: 9; background: rgba(255,255,255,0.75); backdrop-filter: blur(6px); border: 1px solid var(--border); border-radius: 10px; padding: 8px; margin-bottom: 16px; display:flex; gap:8px; flex-wrap:wrap; }
+    .subnav a { display:inline-flex; align-items:center; gap:8px; padding:8px 12px; border:1px solid var(--border); border-radius:999px; color:#0f172a; text-decoration:none; background:#fff; font-weight:550; }
+    .subnav a:hover { background:#f7fafc; }
+    .subnav a.active { background: var(--primary); color:#fff; border-color: var(--primary); }
+    .section-desc { margin: -6px 0 12px; color: var(--muted); font-size: 0.92rem; }
   </style>
 </head>
 <body>
@@ -166,8 +173,16 @@
   </header>
 
   <div class="container">
+    <nav class="subnav" aria-label="Section navigation">
+      <a href="#users" data-section-link>Users</a>
+      <a href="#membership" data-section-link>Membership</a>
+      <a href="#badges" data-section-link>Badges</a>
+      {% if user.is_staff %}<a href="#admin" data-section-link>Admin</a>{% endif %}
+    </nav>
     <section class="card">
+      <a id="users"></a>
       <h2>Users</h2>
+      <p class="section-desc">Browse, filter, and export users. Use the column toggles to tailor the view.</p>
       {% if users_table %}
         <div class="table-toolbar" aria-label="Users table controls">
           <input type="search" id="users-filter-input" placeholder="Type to filter rows..." aria-label="Filter users" />
@@ -256,25 +271,76 @@
         <p class="muted">No users found.</p>
       {% endif %}
     </section>
+
+    {% comment %} Partner management section for non-staff users {% endcomment %}
+
+    <section class="card">
+      <a id="membership"></a>
+      <h2>Manage membership (partners)</h2>
+      <p class="section-desc">Add or remove users from your partner. Members automatically gain portal access.</p>
+      <div class="grid" style="grid-template-columns: 1fr 1fr; gap:12px;">
+        <form method="post" action="/portal/partner/membership/add/">
+          {% csrf_token %}
+          <label for="partner-membership-add-user">User to add</label>
+          <input id="partner-membership-add-user" name="username" placeholder="Username" required />
+          <label for="partner-membership-add-partner">Select partner</label>
+          <select id="partner-membership-add-partner" name="partner_id" required style="padding:10px; border:1px solid var(--border); border-radius:10px;">
+            {% for p in partners_for_ui %}
+              <option value="{{ p.id }}">{{ p.name }}</option>
+            {% endfor %}
+          </select>
+          <button type="submit" class="btn-primary">Add membership</button>
+        </form>
+
+        <form method="post" action="/portal/partner/membership/remove/">
+          {% csrf_token %}
+          <label for="partner-membership-remove-user">User to remove</label>
+          <input id="partner-membership-remove-user" name="username" placeholder="Username" required />
+          <label for="partner-membership-remove-partner">Select partner</label>
+          <select id="partner-membership-remove-partner" name="partner_id" required style="padding:10px; border:1px solid var(--border); border-radius:10px;">
+            {% for p in partners_for_ui %}
+              <option value="{{ p.id }}">{{ p.name }}</option>
+            {% endfor %}
+          </select>
+          <button type="submit" style="background: var(--danger); color: #fff; border-color: var(--danger);">Remove membership</button>
+        </form>
+      </div>
+    </section>
+
+    {% comment %} Partner management section for staff users {% endcomment %}
+
     {% if user.is_staff %}
       <section class="card">
-        <h2>Manage Portal Access</h2>
-        <div class="table-toolbar" aria-label="Access management controls">
-          <form method="post" action="/portal/portal_user/add/" style="display:flex; gap:8px; align-items:center;">
+        <a id="admin"></a>
+        <h2>Manage partners (staff)</h2>
+        <p class="section-desc">Create or delete partners. Deleting a partner removes its memberships and access.</p>
+        <div class="grid" style="grid-template-columns: 1fr 1fr; gap:12px;">
+          <form method="post" action="/portal/partner/create/">
             {% csrf_token %}
-            <label for="grant-username">Grant:</label>
-            <input id="grant-username" name="username" placeholder="Wiki username" required />
-            <button type="submit" class="btn-primary">Grant access</button>
+            <label for="partner-create-name">Partner name</label>
+            <input id="partner-create-name" name="name" placeholder="New partner name" required />
+            <label for="partner-create-desc">Description</label>
+            <input id="partner-create-desc" name="description" placeholder="Optional description" />
+            <button type="submit" class="btn-primary">Create partner</button>
           </form>
-          <form method="post" action="/portal/portal_user/remove/" style="display:flex; gap:8px; align-items:center;">
+
+          <form method="post" action="/portal/partner/delete/">
             {% csrf_token %}
-            <label for="revoke-username">Revoke:</label>
-            <input id="revoke-username" name="username" placeholder="Wiki username" required />
-            <button type="submit">Revoke access</button>
+            <label for="partner-delete-id">Delete partner</label>
+            <select id="partner-delete-id" name="partner_id" required style="padding:10px; border:1px solid var(--border); border-radius:10px;">
+              {% for p in partners_for_ui %}
+                <option value="{{ p.id }}">{{ p.name }}</option>
+              {% endfor %}
+            </select>
+            <button type="submit" style="background: var(--danger); color: #fff; border-color: var(--danger);">Delete partner</button>
           </form>
         </div>
+      </section>
 
-        <div class="table-toolbar" style="margin-top:8px">
+      <section class="card">
+        <h2>Portal Access (staff)</h2>
+        <p class="section-desc">Derived from partner memberships. Use the filter to find users quickly.</p>
+        <div class="table-toolbar" style="margin-top:0">
           <input type="search" id="portal-users-filter" placeholder="Filter authorized users..." aria-label="Filter portal users" />
         </div>
 
@@ -282,41 +348,16 @@
           <thead>
             <tr>
               <th>Username</th>
-              <th>Status</th>
+              <th>Partner</th>
               <th>Authorized at</th>
-              <th>Authorizer</th>
-              <th>Notes</th>
-              <th>Actions</th>
             </tr>
           </thead>
           <tbody>
-            {% for pu in portal_users %}
+            {% for pu in partner_members %}
               <tr>
                 <td>{{ pu.user.username }}</td>
-                <td>
-                  <span class="pill {{ pu.is_authorized|yesno:'pill--success,pill--danger' }}">{{ pu.is_authorized|yesno:'Authorized,Revoked' }}</span>
-                </td>
-                <td>{{ pu.authorized_at }}</td>
-                <td>{% if pu.authorizer %}{{ pu.authorizer.username }}{% else %}-{% endif %}</td>
-                <td>
-                  <div class="notes-display" data-username="{{ pu.user.username }}" data-notes="{{ pu.notes|default_if_none:''|escape }}">{% if pu.notes %}{{ pu.notes }}{% else %}-{% endif %}</div>
-                </td>
-                <td>
-                  {% if pu.is_authorized %}
-                    <form method="post" action="/portal/portal_user/remove/" style="display:inline-block">
-                      {% csrf_token %}
-                      <input type="hidden" name="username" value="{{ pu.user.username }}" />
-                      <button type="submit">Revoke</button>
-                    </form>
-                  {% else %}
-                    <form method="post" action="/portal/portal_user/add/" style="display:inline-block">
-                      {% csrf_token %}
-                      <input type="hidden" name="username" value="{{ pu.user.username }}" />
-                      <button type="submit" class="btn-primary">Grant</button>
-                    </form>
-                  {% endif %}
-                  <button type="button" class="edit-notes-btn" data-username="{{ pu.user.username }}" data-notes="{{ pu.notes|default_if_none:''|escape }}">Edit notes</button>
-                </td>
+                <td>{{ pu.partner.name }}</td>
+                <td>{{ pu.created_at }}</td>
               </tr>
             {% empty %}
               <tr><td colspan="6" class="muted">No records.</td></tr>
@@ -325,26 +366,70 @@
         </table>
       </section>
     {% endif %}
-    
-    {% if user.is_staff %}
-    <!-- Notes modal -->
-    <div id="notes-modal" style="display:none; position:fixed; inset:0; background:rgba(2,6,23,0.45); z-index:50;">
-      <div style="background:#fff; border:1px solid var(--border); border-radius:12px; width:min(560px, 92vw); margin:10vh auto; padding:16px; box-shadow:0 20px 40px rgba(2,6,23,0.25);">
-        <h3 style="margin-top:0">Edit Notes</h3>
-        <form id="notes-form" method="post" action="/portal/portal_user/update_notes/" style="display:grid; gap:10px;">
+
+    {% comment %} Badges management section {% endcomment %}
+    <section class="card">
+      <a id="badges"></a>
+      <h2>Create / Delete badges</h2>
+      <p class="section-desc">Partner badges are scoped to a partner. Only staff or that partner’s members can create/delete.</p>
+      <div class="grid" style="grid-template-columns: 1fr 1fr; gap:12px;">
+        <form method="post" action="/portal/partner_badge/create/">
           {% csrf_token %}
-          <input type="hidden" name="username" id="notes-username" />
-          <label for="notes-text">Notes</label>
-          <textarea id="notes-text" name="notes" rows="5" style="padding:10px; border:1px solid var(--border); border-radius:10px; resize:vertical;"></textarea>
-          <div style="display:flex; gap:8px; justify-content:flex-end;">
-            <button type="button" id="notes-cancel">Cancel</button>
-            <button type="submit" class="btn-primary">Save</button>
-          </div>
+          <label for="partner-badge-create-name">Badge name</label>
+          <input id="partner-badge-create-name" name="name" placeholder="New badge name" required />
+          <label for="partner-badge-create-pic">Picture URL</label>
+          <input id="partner-badge-create-pic" name="picture" placeholder="https://example.com/badge.png" required />
+          <label for="partner-badge-create-desc">Description</label>
+          <input id="partner-badge-create-desc" name="description" placeholder="Optional description" />
+          <label for="partner-badge-create-partner">Select partner</label>
+          <select id="partner-badge-create-partner" name="partner_id" required style="padding:10px; border:1px solid var(--border); border-radius:10px;">
+            {% for p in partners_for_ui %}
+              <option value="{{ p.id }}">{{ p.name }}</option>
+            {% endfor %}
+          </select>
+          <button type="submit" class="btn-primary">Create partner badge</button>
+        </form>
+        <form method="post" action="/portal/partner_badge/delete/">
+          {% csrf_token %}
+          <label for="partner-badge-delete-id">Delete partner badge</label>
+          <select id="partner-badge-delete-id" name="badge_id" required style="padding:10px; border:1px solid var(--border); border-radius:10px;">
+            {% for b in partner_badges %}
+              <option value="{{ b.id }}">{{ b.name }} ({{ b.partner_name }})</option>
+            {% endfor %}
+          </select>
+          <button type="submit" style="background: var(--danger); color: #fff; border-color: var(--danger);">Delete partner badge</button>
         </form>
       </div>
-    </div>
-    {% endif %}
-  </div>
+    </section>
+    <section class="card">
+      <h2>Assign / Remove badges</h2>
+      <div class="grid" style="grid-template-columns: 1fr 1fr; gap:12px;">
+        <form method="post" action="/portal/partner_badge/assign/">
+          {% csrf_token %}
+          <label for="partner-badge-assign-user">User to assign badge</label>
+          <input id="partner-badge-assign-user" name="username" placeholder="Username" required />
+          <label for="partner-badge-assign-badge">Select badge</label>
+          <select id="partner-badge-assign-badge" name="badge_id" required style="padding:10px; border:1px solid var(--border); border-radius:10px;">
+            {% for b in partner_badges %}
+              <option value="{{ b.id }}">{{ b.name }} ({{ b.partner_name }})</option>
+            {% endfor %}
+          </select>
+          <button type="submit" class="btn-primary">Assign badge</button>
+        </form>
+        <form method="post" action="/portal/partner_badge/remove/">
+          {% csrf_token %}
+          <label for="partner-badge-remove-user">User to remove badge</label>
+          <input id="partner-badge-remove-user" name="username" placeholder="Username" required />
+          <label for="partner-badge-remove-badge">Select badge</label>
+          <select id="partner-badge-remove-badge" name="badge_id" required style="padding:10px; border:1px solid var(--border); border-radius:10px;">
+            {% for b in partner_badges %}
+              <option value="{{ b.id }}">{{ b.name }} ({{ b.partner_name }})</option>
+            {% endfor %}
+          </select>
+          <button type="submit" style="background: var(--danger); color: #fff; border-color: var(--danger);">Remove badge</button>
+        </form>
+      </div>
+    </section>
     <script>
       (function() {
         var table = document.getElementById('users-table');
@@ -690,6 +775,31 @@
           });
         }
         makeResizable();
+      })();
+
+      // Subnav active state + smooth scroll
+      (function(){
+        var links = Array.from(document.querySelectorAll('[data-section-link]'));
+        if (!links.length) return;
+        function setActiveByHash(){
+          var hash = location.hash || '#users';
+          links.forEach(function(a){ a.classList.toggle('active', a.getAttribute('href') === hash); });
+        }
+        links.forEach(function(a){
+          a.addEventListener('click', function(e){
+            e.preventDefault();
+            var href = a.getAttribute('href');
+            var target = document.querySelector(href);
+            if (target){
+              history.replaceState(null, '', href);
+              setActiveByHash();
+              var y = target.getBoundingClientRect().top + window.scrollY - 90; // offset for sticky header
+              window.scrollTo({ top: y, behavior: 'smooth' });
+            }
+          });
+        });
+        window.addEventListener('hashchange', setActiveByHash);
+        setActiveByHash();
       })();
 
       // Filter logic for portal users table

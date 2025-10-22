@@ -325,6 +325,7 @@ class Badge(models.Model):
     BADGE_TYPE_CHOICES = [
         ("internal", "Internal"),
         ("external", "External"),
+        ("partner", "Partner"),
     ]
     name = models.CharField(max_length=255)
     picture = models.URLField(max_length=512)
