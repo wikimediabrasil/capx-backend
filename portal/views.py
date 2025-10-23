@@ -8,11 +8,11 @@ from orgs.models import Organization, Management
 from events.models import Events
 from django.urls import reverse
 from django.conf import settings
-from .models import PortalUser
+from .models import Partner, PartnerMembership
 from social_django.utils import load_strategy, load_backend
 from users.submodels import AuthExtraInfo
 from django.views.decorators.http import require_GET, require_POST
-from users.models import CustomUser, Profile, UserBadge
+from users.models import CustomUser, Profile, UserBadge, Badge
 from knox.models import AuthToken
 import requests
 
@@ -31,7 +31,8 @@ def portal_login_required(view_func=None, *, redirect_field_name: str = REDIRECT
 def is_portal_user(user):
     if not user.is_authenticated:
         return False
-    return PortalUser.objects.filter(user=user, is_authorized=True).exists()
+    # Any user who belongs to at least one partner has portal access
+    return PartnerMembership.objects.filter(user=user).exists()
 
 
 def is_portal_admin(user):
@@ -193,18 +194,60 @@ def dashboard(request):
             'badges': badges_map.get(u.id, []),
             'automated_lets_connect': p.automated_lets_connect,
         })
-    # List of PortalUser records (for admins to manage access)
-    portal_users = PortalUser.objects.select_related('user', 'authorizer').order_by('user__username')
+    # Determine partners current user belongs to (for scoping)
+    user_partners = Partner.objects.filter(memberships__user=request.user).distinct()
+    # Partner badges available for assignment in portal, scoped by membership unless staff
+    if is_portal_admin(request.user):
+        partner_badges = Badge.objects.filter(type='partner').order_by('name')
+        partners_for_ui = Partner.objects.all().order_by('name')
+        partner_members = PartnerMembership.objects.select_related('partner', 'user').order_by('partner__name', 'user__username')
+    else:
+        partner_badges = Badge.objects.filter(
+            type='partner',
+            logic__partner__in=user_partners.values_list('id', flat=True)
+        ).order_by('name')
+        partners_for_ui = user_partners.order_by('name')
+        partner_members = PartnerMembership.objects.filter(user=request.user, partner__in=partners_for_ui).order_by('partner__name')
+
+    # Attach partner_name to each partner badge, using the id stored in logic['partner']
+    try:
+        pids = list({(b.logic or {}).get('partner') for b in partner_badges if (b.logic or {}).get('partner')})
+    except Exception:
+        pids = []
+    if pids:
+        name_map = {pid: name for pid, name in Partner.objects.filter(id__in=pids).values_list('id', 'name')}
+    else:
+        name_map = {}
+    for b in partner_badges:
+        pid = (b.logic or {}).get('partner')
+        setattr(b, 'partner_name', name_map.get(pid))
+
+    # Build awarded users map for partner badges to power the UI list
+    awarded_map = {}
+    if partner_badges:
+        bid_list = list(partner_badges.values_list('id', flat=True))
+        qs = (
+            UserBadge.objects
+            .select_related('user')
+            .filter(badge_id__in=bid_list)
+            .order_by('user__username')
+            .values_list('badge_id', 'user__username')
+        )
+        for bid, uname in qs:
+            awarded_map.setdefault(bid, []).append(uname)
 
     context = {
         'user': request.user,
         'organizations': orgs,
         'events': events,
         'users_table': users_table,
-        'portal_users': portal_users,
+        'partner_badges': partner_badges,
+        'user_partners': user_partners,
+        'partners_for_ui': partners_for_ui,
+        'partner_members': partner_members,
+        'partner_badges_awarded': awarded_map,
     }
     return render(request, 'portal/dashboard.html', context)
-
 
 @require_GET
 def oauth_begin(request):
@@ -244,80 +287,257 @@ def oauth_callback(request):
         complete_url = f"{complete_url}?{qs}"
     return redirect(complete_url)
 
-
 def _require_portal_admin(request):
     if not is_portal_admin(request.user):
         return HttpResponseForbidden("Admin permissions are required.")
     return None
 
+def _require_partner_scope(request, partner: Partner):
+    """Allow staff or members of the partner."""
+    if is_portal_admin(request.user):
+        return None
+    if PartnerMembership.objects.filter(user=request.user, partner=partner).exists():
+        return None
+    return HttpResponseForbidden("You don't have permission for this partner.")
 
 @require_POST
-def portal_user_add(request):
-    """Grant portal access to a user (staff only)."""
+def partner_create(request):
+    """Create a Partner (staff only)."""
     forbidden = _require_portal_admin(request)
     if forbidden:
         return forbidden
-    username = request.POST.get('username', '').strip()
-    if not username:
-        messages.error(request, 'Username is required.')
+    name = request.POST.get('name', '').strip()
+    description = request.POST.get('description', '').strip()
+    if not name:
+        messages.error(request, 'Partner name is required.')
         return redirect(DASHBOARD_URL_NAME)
-    try:
-        target = CustomUser.all_objects.get(username=username)
-    except CustomUser.DoesNotExist:
-        messages.error(request, f'User "{username}" not found.')
-        return redirect(DASHBOARD_URL_NAME)
-
-    PortalUser.objects.update_or_create(
-        user=target,
-        defaults={'authorizer': request.user, 'is_authorized': True}
-    )
-    messages.success(request, f'Portal access granted to {target.username}.')
+    Partner.objects.get_or_create(name=name, defaults={'description': description})
+    messages.success(request, f'Partner "{name}" created.')
     return redirect(DASHBOARD_URL_NAME)
 
-
 @require_POST
-def portal_user_remove(request):
-    """Revoke portal access from a user (staff only)."""
+def partner_delete(request):
+    """Delete a Partner (staff only)."""
     forbidden = _require_portal_admin(request)
     if forbidden:
         return forbidden
-    username = request.POST.get('username', '').strip()
-    if not username:
-        messages.error(request, 'Username is required.')
-        return redirect(DASHBOARD_URL_NAME)
+    partner_id = request.POST.get('partner_id', '').strip()
     try:
-        target = CustomUser.all_objects.get(username=username)
-    except CustomUser.DoesNotExist:
-        messages.error(request, f'User "{username}" not found.')
+        partner = Partner.objects.get(id=partner_id)
+    except Partner.DoesNotExist:
+        messages.error(request, 'Partner not found.')
         return redirect(DASHBOARD_URL_NAME)
-
-    PortalUser.objects.update_or_create(
-        user=target,
-        defaults={'authorizer': request.user, 'is_authorized': False}
-    )
-    messages.success(request, f'Portal access revoked for {target.username}.')
+    name = partner.name
+    partner.delete()
+    messages.success(request, f'Partner "{name}" deleted.')
     return redirect(DASHBOARD_URL_NAME)
 
+@require_POST
+@require_portal_access
+def partner_membership_add(request):
+    """Add a user to a Partner (staff or partner members)."""
+    partner_id = request.POST.get('partner_id', '').strip()
+    username = request.POST.get('username', '').strip()
+    if not partner_id or not username:
+        messages.error(request, 'Partner and username are required.')
+        return redirect(DASHBOARD_URL_NAME)
+    try:
+        partner = Partner.objects.get(id=partner_id)
+    except Partner.DoesNotExist:
+        messages.error(request, 'Partner not found.')
+        return redirect(DASHBOARD_URL_NAME)
+    scope_check = _require_partner_scope(request, partner)
+    if scope_check:
+        return scope_check
+    try:
+        user = CustomUser.all_objects.get(username=username)
+    except CustomUser.DoesNotExist:
+        messages.error(request, f'User "{username}" not found.')
+        return redirect(DASHBOARD_URL_NAME)
+    PartnerMembership.objects.get_or_create(partner=partner, user=user)
+    messages.success(request, f'Added {user.username} to {partner.name}.')
+    return redirect(DASHBOARD_URL_NAME)
 
 @require_POST
-def portal_user_update_notes(request):
-    """Update notes for a portal user (staff only)."""
-    forbidden = _require_portal_admin(request)
-    if forbidden:
-        return forbidden
+@require_portal_access
+def partner_membership_remove(request):
+    """Remove a user from a Partner (staff or partner members)."""
+    partner_id = request.POST.get('partner_id', '').strip()
     username = request.POST.get('username', '').strip()
-    notes = request.POST.get('notes', '').strip()
-    if not username:
-        messages.error(request, 'Username is required.')
+    if not partner_id or not username:
+        messages.error(request, 'Partner and username are required.')
+        return redirect(DASHBOARD_URL_NAME)
+    try:
+        partner = Partner.objects.get(id=partner_id)
+    except Partner.DoesNotExist:
+        messages.error(request, 'Partner not found.')
+        return redirect(DASHBOARD_URL_NAME)
+    scope_check = _require_partner_scope(request, partner)
+    if scope_check:
+        return scope_check
+    try:
+        user = CustomUser.all_objects.get(username=username)
+    except CustomUser.DoesNotExist:
+        messages.error(request, f'User "{username}" not found.')
+        return redirect(DASHBOARD_URL_NAME)
+    PartnerMembership.objects.filter(partner=partner, user=user).delete()
+    messages.success(request, f'Removed {user.username} from {partner.name}.')
+    return redirect(DASHBOARD_URL_NAME)
+
+@require_POST
+@require_portal_access
+def partner_badge_create(request):
+    """Create a partner-scoped badge (staff or members of that partner)."""
+    name = request.POST.get('name', '').strip()
+    picture = request.POST.get('picture', '').strip()
+    description = request.POST.get('description', '').strip()
+    partner_id = request.POST.get('partner_id', '').strip()
+    if not (name and picture and partner_id):
+        messages.error(request, 'Name, picture, and partner are required.')
+        return redirect(DASHBOARD_URL_NAME)
+    try:
+        partner = Partner.objects.get(id=partner_id)
+    except Partner.DoesNotExist:
+        messages.error(request, 'Selected partner not found.')
+        return redirect(DASHBOARD_URL_NAME)
+
+    # Permission: staff can create for any partner; members only for their own partner
+    if not is_portal_admin(request.user):
+        if not PartnerMembership.objects.filter(user=request.user, partner=partner).exists():
+            return HttpResponseForbidden("You don't have permission to create badges for this partner.")
+
+    Badge.objects.create(
+        name=name,
+        picture=picture,
+        description=description or '',
+        logic={'partner': partner.id},
+        type='partner',
+    )
+    messages.success(request, f'Created partner badge "{name}" for {partner.name}.')
+    return redirect(DASHBOARD_URL_NAME)
+
+@require_POST
+@require_portal_access
+def partner_badge_assign(request):
+    """Assign a partner badge to a user (portal access required)."""
+    username = request.POST.get('username', '').strip()
+    badge_id = request.POST.get('badge_id', '').strip()
+    if not username or not badge_id:
+        messages.error(request, 'Username and badge are required.')
         return redirect(DASHBOARD_URL_NAME)
     try:
         target = CustomUser.all_objects.get(username=username)
     except CustomUser.DoesNotExist:
         messages.error(request, f'User "{username}" not found.')
         return redirect(DASHBOARD_URL_NAME)
+    try:
+        badge = Badge.objects.get(id=badge_id, type='partner')
+    except Badge.DoesNotExist:
+        messages.error(request, 'Selected badge not found or not a partner badge.')
+        return redirect(DASHBOARD_URL_NAME)
 
-    pu, _ = PortalUser.objects.get_or_create(user=target, defaults={'authorizer': request.user, 'is_authorized': True})
-    pu.notes = notes or None
-    pu.save(update_fields=['notes', 'updated_at'])
-    messages.success(request, f'Notes updated for {target.username}.')
+    # Permission: staff can assign any; non-staff must belong to the badge's partner
+    if not is_portal_admin(request.user):
+        partner = Partner.objects.get(id=badge.logic.get('partner')) if badge.logic else None
+        if not partner or not PartnerMembership.objects.filter(user=request.user, partner=partner).exists():
+            return HttpResponseForbidden("You don't have permission to assign this partner's badges.")
+
+    UserBadge.objects.update_or_create(
+        user=target,
+        badge=badge,
+        defaults={'progress': 100, 'is_displayed': True}
+    )
+    messages.success(request, f'Assigned "{badge.name}" to {target.username}.')
+    return redirect(DASHBOARD_URL_NAME)
+
+@require_POST
+@require_portal_access
+def partner_badge_remove(request):
+    """Remove a partner badge from a user (portal access required)."""
+    username = request.POST.get('username', '').strip()
+    badge_id = request.POST.get('badge_id', '').strip()
+    if not username or not badge_id:
+        messages.error(request, 'Username and badge are required.')
+        return redirect(DASHBOARD_URL_NAME)
+    try:
+        target = CustomUser.all_objects.get(username=username)
+    except CustomUser.DoesNotExist:
+        messages.error(request, f'User "{username}" not found.')
+        return redirect(DASHBOARD_URL_NAME)
+    try:
+        badge = Badge.objects.get(id=badge_id, type='partner')
+    except Badge.DoesNotExist:
+        messages.error(request, 'Selected badge not found or not a partner badge.')
+        return redirect(DASHBOARD_URL_NAME)
+
+    # Permission: staff can remove any; non-staff must belong to the badge's partner
+    if not is_portal_admin(request.user):
+        partner = Partner.objects.get(id=badge.logic.get('partner')) if badge.logic else None
+        if not partner or not PartnerMembership.objects.filter(user=request.user, partner=partner).exists():
+            return HttpResponseForbidden("You don't have permission to remove this partner's badges.")
+
+    UserBadge.objects.filter(user=target, badge=badge).delete()
+    messages.success(request, f'Removed "{badge.name}" from {target.username}.')
+    return redirect(DASHBOARD_URL_NAME)
+
+@require_POST
+@require_portal_access
+def partner_badge_delete(request):
+    """Delete a partner badge."""
+    badge_id = request.POST.get('badge_id', '').strip()
+    if not badge_id:
+        messages.error(request, 'Badge is required.')
+        return redirect(DASHBOARD_URL_NAME)
+    try:
+        badge = Badge.objects.get(id=badge_id, type='partner')
+    except Badge.DoesNotExist:
+        messages.error(request, 'Selected badge not found or not a partner badge.')
+        return redirect(DASHBOARD_URL_NAME)
+
+    # Permission: staff can delete any; non-staff must belong to the badge's partner
+    if not is_portal_admin(request.user):
+        partner = Partner.objects.get(id=badge.logic.get('partner')) if badge.logic else None
+        if not partner or not PartnerMembership.objects.filter(user=request.user, partner=partner).exists():
+            return HttpResponseForbidden("You don't have permission to delete this partner's badges.")
+
+    name = badge.name
+    badge.delete()
+    messages.success(request, f'Deleted partner badge "{name}".')
+    return redirect(DASHBOARD_URL_NAME)
+
+@require_POST
+@require_portal_access
+def partner_badge_update(request):
+    """Update editable fields of a partner badge (name, picture, description)."""
+    badge_id = request.POST.get('badge_id', '').strip()
+    name = request.POST.get('name', '').strip()
+    picture = request.POST.get('picture', '').strip()
+    description = request.POST.get('description', '').strip()
+    if not badge_id:
+        messages.error(request, 'Badge is required.')
+        return redirect(DASHBOARD_URL_NAME)
+    try:
+        badge = Badge.objects.get(id=badge_id, type='partner')
+    except Badge.DoesNotExist:
+        messages.error(request, 'Selected badge not found or not a partner badge.')
+        return redirect(DASHBOARD_URL_NAME)
+
+    # Permission: staff can edit any; non-staff must belong to the badge's partner
+    partner = Partner.objects.get(id=badge.logic.get('partner')) if badge.logic else None
+    if not is_portal_admin(request.user):
+        if not partner or not PartnerMembership.objects.filter(user=request.user, partner=partner).exists():
+            return HttpResponseForbidden("You don't have permission to edit this partner's badges.")
+
+    changed = []
+    if name:
+        badge.name = name
+        changed.append('name')
+    if picture:
+        badge.picture = picture
+        changed.append('picture')
+    if description != '':
+        badge.description = description
+        changed.append('description')
+    badge.save()
+    messages.success(request, f'Updated badge {badge.name} (changed: {", ".join(changed) or "no fields"}).')
     return redirect(DASHBOARD_URL_NAME)

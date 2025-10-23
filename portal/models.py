@@ -2,19 +2,22 @@ from django.db import models
 from django.conf import settings
 
 
-class PortalUser(models.Model):
-    user = models.OneToOneField(settings.AUTH_USER_MODEL, on_delete=models.CASCADE)
-    authorizer = models.ForeignKey(
-        settings.AUTH_USER_MODEL,
-        null=True,
-        on_delete=models.SET_NULL,
-        related_name='authorized_users',
-    )
-    authorized_at = models.DateTimeField(auto_now_add=True)
-    is_authorized = models.BooleanField(default=True)
-    notes = models.TextField(null=True, blank=True)
-    updated_at = models.DateTimeField(auto_now=True)
+class Partner(models.Model):
+    name = models.CharField(max_length=255, unique=True)
+    description = models.TextField(blank=True, default="")
+    created_at = models.DateTimeField(auto_now_add=True)
 
     def __str__(self):
-        status = 'authorized' if self.is_authorized else 'revoked'
-        return f"PortalUser({self.user.username}, {status})"
+        return self.name
+
+
+class PartnerMembership(models.Model):
+    partner = models.ForeignKey(Partner, on_delete=models.CASCADE, related_name='memberships')
+    user = models.ForeignKey('users.CustomUser', on_delete=models.CASCADE, related_name='partner_memberships')
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        unique_together = ('partner', 'user')
+
+    def __str__(self):
+        return f"{self.user.username} @ {self.partner.name}"
