@@ -13,6 +13,7 @@ urlpatterns = [
     path('partner_badge/remove/', views.partner_badge_remove, name='partner_badge_remove'),
     path('partner_badge/create/', views.partner_badge_create, name='partner_badge_create'),
     path('partner_badge/delete/', views.partner_badge_delete, name='partner_badge_delete'),
+    path('partner_badge/update/', views.partner_badge_update, name='partner_badge_update'),
     path('partner/create/', views.partner_create, name='partner_create'),
     path('partner/delete/', views.partner_delete, name='partner_delete'),
     path('partner/membership/add/', views.partner_membership_add, name='partner_membership_add'),

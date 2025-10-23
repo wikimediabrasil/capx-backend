@@ -222,6 +222,20 @@ def dashboard(request):
         pid = (b.logic or {}).get('partner')
         setattr(b, 'partner_name', name_map.get(pid))
 
+    # Build awarded users map for partner badges to power the UI list
+    awarded_map = {}
+    if partner_badges:
+        bid_list = list(partner_badges.values_list('id', flat=True))
+        qs = (
+            UserBadge.objects
+            .select_related('user')
+            .filter(badge_id__in=bid_list)
+            .order_by('user__username')
+            .values_list('badge_id', 'user__username')
+        )
+        for bid, uname in qs:
+            awarded_map.setdefault(bid, []).append(uname)
+
     context = {
         'user': request.user,
         'organizations': orgs,
@@ -231,6 +245,7 @@ def dashboard(request):
         'user_partners': user_partners,
         'partners_for_ui': partners_for_ui,
         'partner_members': partner_members,
+        'partner_badges_awarded': awarded_map,
     }
     return render(request, 'portal/dashboard.html', context)
 
@@ -488,4 +503,41 @@ def partner_badge_delete(request):
     name = badge.name
     badge.delete()
     messages.success(request, f'Deleted partner badge "{name}".')
+    return redirect(DASHBOARD_URL_NAME)
+
+@require_POST
+@require_portal_access
+def partner_badge_update(request):
+    """Update editable fields of a partner badge (name, picture, description)."""
+    badge_id = request.POST.get('badge_id', '').strip()
+    name = request.POST.get('name', '').strip()
+    picture = request.POST.get('picture', '').strip()
+    description = request.POST.get('description', '').strip()
+    if not badge_id:
+        messages.error(request, 'Badge is required.')
+        return redirect(DASHBOARD_URL_NAME)
+    try:
+        badge = Badge.objects.get(id=badge_id, type='partner')
+    except Badge.DoesNotExist:
+        messages.error(request, 'Selected badge not found or not a partner badge.')
+        return redirect(DASHBOARD_URL_NAME)
+
+    # Permission: staff can edit any; non-staff must belong to the badge's partner
+    partner = Partner.objects.get(id=badge.logic.get('partner')) if badge.logic else None
+    if not is_portal_admin(request.user):
+        if not partner or not PartnerMembership.objects.filter(user=request.user, partner=partner).exists():
+            return HttpResponseForbidden("You don't have permission to edit this partner's badges.")
+
+    changed = []
+    if name:
+        badge.name = name
+        changed.append('name')
+    if picture:
+        badge.picture = picture
+        changed.append('picture')
+    if description != '':
+        badge.description = description
+        changed.append('description')
+    badge.save()
+    messages.success(request, f'Updated badge {badge.name} (changed: {", ".join(changed) or "no fields"}).')
     return redirect(DASHBOARD_URL_NAME)

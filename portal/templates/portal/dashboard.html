@@ -74,6 +74,7 @@
       box-shadow: 0 1px 3px rgba(15, 23, 42, 0.05), 0 10px 20px -12px rgba(2,6,23,0.08);
       margin-bottom: 16px;
       overflow-x: auto; /* enable horizontal scroll if resized wider */
+      position: relative; /* for accent bar */
     }
 
     /* Grid utility if needed */
@@ -150,9 +151,38 @@
       padding: 10px 12px; border: 1px solid var(--border); border-radius: 10px; background: #fff; outline: none;
     }
     input[type="text"]:focus, input:not([type]):focus { border-color: var(--primary); box-shadow: 0 0 0 3px rgba(37,99,235,0.15); }
-    form button { padding: 10px 12px; border: 1px solid var(--border); border-radius: 10px; cursor: pointer; }
-    form button[type="submit"] { background: var(--primary); border-color: var(--primary); color: #fff; }
-    form button[type="submit"]:hover { background: var(--primary-600); border-color: var(--primary-600); }
+    form button, li button, td button { padding: 10px 12px; border: 1px solid var(--border); border-radius: 10px; cursor: pointer; }
+    
+    /* Card accents + header for hierarchy/contrast */
+    .card::before {
+      content: '';
+      position: absolute;
+      left: 0;
+      top: 0;
+      bottom: 0;
+      width: 4px;
+      border-radius: 12px 0 0 12px;
+      background: var(--accent-color, var(--border));
+    }
+    .card-head { display:flex; align-items:center; gap:10px; margin-bottom:8px; }
+    .icon-badge { width:28px; height:28px; border-radius:999px; display:inline-flex; align-items:center; justify-content:center; background: rgba(37,99,235,0.08);
+      border:1px solid rgba(37,99,235,0.25); font-size:16px; }
+    .card[data-accent="users"]{ --accent-color: var(--primary); }
+    .card[data-accent="membership"]{ --accent-color: var(--accent); }
+    .card[data-accent="badges"]{ --accent-color: #8b5cf6; }
+    .card[data-accent="admin"]{ --accent-color: var(--warn); }
+    .card[data-accent="access"]{ --accent-color: #0ea5e9; }
+
+    /* Tabs for progressive disclosure */
+    .tabs { display:flex; gap:8px; align-items:center; margin-bottom: 8px; flex-wrap: wrap; }
+    .tabs [role="tab"] { padding:8px 12px; border:1px solid var(--border); border-radius:999px; background:#fff; cursor:pointer; }
+    .tabs [role="tab"][aria-selected="true"] { background: var(--primary); color:#fff; border-color: var(--primary); }
+    [role="tabpanel"][hidden] { display:none; }
+    .danger-hint { background:#fff1f2; color:#9f1239; border:1px solid #fecdd3; padding:8px 10px; border-radius:10px; margin: 2px 0 8px; }
+
+    /* Button variants */
+    button.btn-danger { background: var(--danger); color:#fff !important; border-color: var(--danger); }
+    button.btn-danger:hover { filter: brightness(0.95); }
 
     /* Sub-navigation */
     .subnav { position: sticky; top: 64px; z-index: 9; background: rgba(255,255,255,0.75); backdrop-filter: blur(6px); border: 1px solid var(--border); border-radius: 10px; padding: 8px; margin-bottom: 16px; display:flex; gap:8px; flex-wrap:wrap; }
@@ -166,7 +196,7 @@
   <header>
     <div class="header-inner">
       <h1>Welcome, {{ user.username }}</h1>
-      <nav>
+      <nav aria-label="User navigation">
         <a href="/portal/logout/">Logout</a>
       </nav>
     </div>
@@ -179,10 +209,9 @@
       <a href="#badges" data-section-link>Badges</a>
       {% if user.is_staff %}<a href="#admin" data-section-link>Admin</a>{% endif %}
     </nav>
-    <section class="card">
+    <section class="card" data-accent="users">
       <a id="users"></a>
-      <h2>Users</h2>
-      <p class="section-desc">Browse, filter, and export users. Use the column toggles to tailor the view.</p>
+      <div class="card-head"><span class="icon-badge" aria-hidden="true">👤</span><div><h2 style="margin:0">Users</h2><p class="section-desc" style="margin:2px 0 0">Browse, filter, and export users. Use the column toggles to tailor the view.</p></div></div>
       {% if users_table %}
         <div class="table-toolbar" aria-label="Users table controls">
           <input type="search" id="users-filter-input" placeholder="Type to filter rows..." aria-label="Filter users" />
@@ -274,12 +303,15 @@
 
     {% comment %} Partner management section for non-staff users {% endcomment %}
 
-    <section class="card">
+    <section class="card" data-accent="membership">
       <a id="membership"></a>
-      <h2>Manage membership (partners)</h2>
-      <p class="section-desc">Add or remove users from your partner. Members automatically gain portal access.</p>
-      <div class="grid" style="grid-template-columns: 1fr 1fr; gap:12px;">
-        <form method="post" action="/portal/partner/membership/add/">
+      <div class="card-head"><span class="icon-badge" aria-hidden="true">🤝</span><div><h2 style="margin:0">Manage membership (partners)</h2><p class="section-desc" style="margin:2px 0 0">Add or remove users from your partner. Members automatically gain portal access.</p></div></div>
+      <div class="tabs" role="tablist" aria-label="Membership actions">
+        <button type="button" role="tab" aria-selected="true" aria-controls="panel-membership-add" id="tab-membership-add">Add member</button>
+        <button type="button" role="tab" aria-selected="false" aria-controls="panel-membership-remove" id="tab-membership-remove">Remove member</button>
+      </div>
+      <div id="panel-membership-add" role="tabpanel" aria-labelledby="tab-membership-add">
+        <form method="post" action="/portal/partner/membership/add/" aria-label="Add membership">
           {% csrf_token %}
           <label for="partner-membership-add-user">User to add</label>
           <input id="partner-membership-add-user" name="username" placeholder="Username" required />
@@ -291,8 +323,9 @@
           </select>
           <button type="submit" class="btn-primary">Add membership</button>
         </form>
-
-        <form method="post" action="/portal/partner/membership/remove/">
+      </div>
+      <div id="panel-membership-remove" role="tabpanel" aria-labelledby="tab-membership-remove" hidden>
+        <form method="post" action="/portal/partner/membership/remove/" aria-label="Remove membership">
           {% csrf_token %}
           <label for="partner-membership-remove-user">User to remove</label>
           <input id="partner-membership-remove-user" name="username" placeholder="Username" required />
@@ -302,7 +335,8 @@
               <option value="{{ p.id }}">{{ p.name }}</option>
             {% endfor %}
           </select>
-          <button type="submit" style="background: var(--danger); color: #fff; border-color: var(--danger);">Remove membership</button>
+          <div class="danger-hint" role="note">Removing a member immediately revokes their portal access for this partner.</div>
+          <button type="submit" class="btn-danger">Remove membership</button>
         </form>
       </div>
     </section>
@@ -310,12 +344,15 @@
     {% comment %} Partner management section for staff users {% endcomment %}
 
     {% if user.is_staff %}
-      <section class="card">
+      <section class="card" data-accent="admin">
         <a id="admin"></a>
-        <h2>Manage partners (staff)</h2>
-        <p class="section-desc">Create or delete partners. Deleting a partner removes its memberships and access.</p>
-        <div class="grid" style="grid-template-columns: 1fr 1fr; gap:12px;">
-          <form method="post" action="/portal/partner/create/">
+        <div class="card-head"><span class="icon-badge" aria-hidden="true">🛠️</span><div><h2 style="margin:0">Manage partners (staff)</h2><p class="section-desc" style="margin:2px 0 0">Create or delete partners. Deleting a partner removes its memberships and access.</p></div></div>
+        <div class="tabs" role="tablist" aria-label="Partner admin actions">
+          <button type="button" role="tab" aria-selected="true" aria-controls="panel-partner-create" id="tab-partner-create">Create partner</button>
+          <button type="button" role="tab" aria-selected="false" aria-controls="panel-partner-delete" id="tab-partner-delete">Delete partner</button>
+        </div>
+        <div id="panel-partner-create" role="tabpanel" aria-labelledby="tab-partner-create">
+          <form method="post" action="/portal/partner/create/" aria-label="Create partner">
             {% csrf_token %}
             <label for="partner-create-name">Partner name</label>
             <input id="partner-create-name" name="name" placeholder="New partner name" required />
@@ -323,8 +360,9 @@
             <input id="partner-create-desc" name="description" placeholder="Optional description" />
             <button type="submit" class="btn-primary">Create partner</button>
           </form>
-
-          <form method="post" action="/portal/partner/delete/">
+        </div>
+        <div id="panel-partner-delete" role="tabpanel" aria-labelledby="tab-partner-delete" hidden>
+          <form method="post" action="/portal/partner/delete/" aria-label="Delete partner">
             {% csrf_token %}
             <label for="partner-delete-id">Delete partner</label>
             <select id="partner-delete-id" name="partner_id" required style="padding:10px; border:1px solid var(--border); border-radius:10px;">
@@ -332,14 +370,14 @@
                 <option value="{{ p.id }}">{{ p.name }}</option>
               {% endfor %}
             </select>
-            <button type="submit" style="background: var(--danger); color: #fff; border-color: var(--danger);">Delete partner</button>
+            <div class="danger-hint" role="note">This will delete the partner and all its memberships. This action cannot be undone.</div>
+            <button type="submit" class="btn-danger">Delete partner</button>
           </form>
         </div>
       </section>
 
-      <section class="card">
-        <h2>Portal Access (staff)</h2>
-        <p class="section-desc">Derived from partner memberships. Use the filter to find users quickly.</p>
+      <section class="card" data-accent="access">
+        <div class="card-head"><span class="icon-badge" aria-hidden="true">🔐</span><div><h2 style="margin:0">Portal Access (staff)</h2><p class="section-desc" style="margin:2px 0 0">Derived from partner memberships. Use the filter to find users quickly.</p></div></div>
         <div class="table-toolbar" style="margin-top:0">
           <input type="search" id="portal-users-filter" placeholder="Filter authorized users..." aria-label="Filter portal users" />
         </div>
@@ -367,13 +405,64 @@
       </section>
     {% endif %}
 
-    {% comment %} Badges management section {% endcomment %}
-    <section class="card">
+    {% comment %} Badges management section (merged) {% endcomment %}
+    <section class="card" data-accent="badges">
       <a id="badges"></a>
-      <h2>Create / Delete badges</h2>
-      <p class="section-desc">Partner badges are scoped to a partner. Only staff or that partner’s members can create/delete.</p>
-      <div class="grid" style="grid-template-columns: 1fr 1fr; gap:12px;">
-        <form method="post" action="/portal/partner_badge/create/">
+      <div class="card-head"><span class="icon-badge" aria-hidden="true">🏷️</span><div><h2 style="margin:0">Badges</h2><p class="section-desc" style="margin:2px 0 0">Partner badges are scoped to a partner. Only staff or that partner’s members can manage them.</p></div></div>
+      <div class="tabs" role="tablist" aria-label="Badges tabs">
+        <button type="button" role="tab" aria-selected="true" aria-controls="panel-badges-manage" id="tab-badges-manage">Manage badges</button>
+        <button type="button" role="tab" aria-selected="false" aria-controls="panel-badges-assign" id="tab-badges-assign">Assignments</button>
+      </div>
+      <div id="panel-badges-manage" role="tabpanel" aria-labelledby="tab-badges-manage">
+        <table id="badges-table">
+          <thead>
+            <tr>
+              <th>Badge</th>
+              <th>Partner</th>
+              <th>Description</th>
+              <th>Actions</th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for b in partner_badges %}
+              <tr data-badge-row data-badge-id="{{ b.id }}">
+                <td><strong>{{ b.name }}</strong></td>
+                <td>{{ b.partner_name }}</td>
+                <td>{{ b.description }}</td>
+                <td style="white-space:nowrap">
+                  <button type="button" data-action="edit-badge" data-badge-id="{{ b.id }}" class="btn-primary" style="padding:6px 10px; font-size:0.85rem;">Edit</button>
+                  <button type="button" data-action="manage-assign" data-badge-id="{{ b.id }}" class="" style="padding:6px 10px; font-size:0.85rem; border:1px solid var(--border); border-radius:10px; background:#fff;">Manage assignments</button>
+                  <form method="post" action="/portal/partner_badge/delete/" style="display:inline-block;">
+                    {% csrf_token %}
+                    <input type="hidden" name="badge_id" value="{{ b.id }}" />
+                    <button type="submit" class="btn-danger" style="padding:6px 10px; font-size:0.85rem;">Delete</button>
+                  </form>
+                </td>
+              </tr>
+              <tr data-badge-edit-row data-for="{{ b.id }}" hidden>
+                <td colspan="4">
+                  <form method="post" action="/portal/partner_badge/update/" aria-label="Update badge {{ b.name }}" style="grid-template-columns: 1fr auto;">
+                    {% csrf_token %}
+                    <input type="hidden" name="badge_id" value="{{ b.id }}" />
+                    <label for="badge-name-{{ b.id }}">Name</label>
+                    <input id="badge-name-{{ b.id }}" name="name" value="{{ b.name }}" />
+                    <label for="badge-pic-{{ b.id }}">Picture URL</label>
+                    <input id="badge-pic-{{ b.id }}" name="picture" value="{{ b.picture }}" />
+                    <label for="badge-desc-{{ b.id }}">Description</label>
+                    <input id="badge-desc-{{ b.id }}" name="description" value="{{ b.description }}" />
+                    <div class="form-note">Partner: {{ b.partner_name }} (fixed)</div>
+                    <button type="submit" class="btn-primary">Save changes</button>
+                  </form>
+                </td>
+              </tr>
+            {% empty %}
+              <tr><td colspan="4" class="muted">No partner badges yet.</td></tr>
+            {% endfor %}
+          </tbody>
+        </table>
+        <hr style="border:none; border-top:1px solid var(--border); margin:12px 0;" />
+        <h3>Create new badge</h3>
+        <form method="post" action="/portal/partner_badge/create/" aria-label="Create partner badge">
           {% csrf_token %}
           <label for="partner-badge-create-name">Badge name</label>
           <input id="partner-badge-create-name" name="name" placeholder="New badge name" required />
@@ -389,45 +478,39 @@
           </select>
           <button type="submit" class="btn-primary">Create partner badge</button>
         </form>
-        <form method="post" action="/portal/partner_badge/delete/">
-          {% csrf_token %}
-          <label for="partner-badge-delete-id">Delete partner badge</label>
-          <select id="partner-badge-delete-id" name="badge_id" required style="padding:10px; border:1px solid var(--border); border-radius:10px;">
-            {% for b in partner_badges %}
-              <option value="{{ b.id }}">{{ b.name }} ({{ b.partner_name }})</option>
-            {% endfor %}
-          </select>
-          <button type="submit" style="background: var(--danger); color: #fff; border-color: var(--danger);">Delete partner badge</button>
-        </form>
       </div>
-    </section>
-    <section class="card">
-      <h2>Assign / Remove badges</h2>
-      <div class="grid" style="grid-template-columns: 1fr 1fr; gap:12px;">
-        <form method="post" action="/portal/partner_badge/assign/">
-          {% csrf_token %}
-          <label for="partner-badge-assign-user">User to assign badge</label>
-          <input id="partner-badge-assign-user" name="username" placeholder="Username" required />
-          <label for="partner-badge-assign-badge">Select badge</label>
-          <select id="partner-badge-assign-badge" name="badge_id" required style="padding:10px; border:1px solid var(--border); border-radius:10px;">
+      <div id="panel-badges-assign" role="tabpanel" aria-labelledby="tab-badges-assign" hidden>
+        <div class="table-toolbar" style="margin-top:0">
+          <label for="assignments-badge-select" class="muted" style="align-self:center;">Badge</label>
+          <select id="assignments-badge-select" style="padding:10px; border:1px solid var(--border); border-radius:10px;">
             {% for b in partner_badges %}
               <option value="{{ b.id }}">{{ b.name }} ({{ b.partner_name }})</option>
             {% endfor %}
           </select>
-          <button type="submit" class="btn-primary">Assign badge</button>
-        </form>
-        <form method="post" action="/portal/partner_badge/remove/">
-          {% csrf_token %}
-          <label for="partner-badge-remove-user">User to remove badge</label>
-          <input id="partner-badge-remove-user" name="username" placeholder="Username" required />
-          <label for="partner-badge-remove-badge">Select badge</label>
-          <select id="partner-badge-remove-badge" name="badge_id" required style="padding:10px; border:1px solid var(--border); border-radius:10px;">
-            {% for b in partner_badges %}
-              <option value="{{ b.id }}">{{ b.name }} ({{ b.partner_name }})</option>
-            {% endfor %}
-          </select>
-          <button type="submit" style="background: var(--danger); color: #fff; border-color: var(--danger);">Remove badge</button>
-        </form>
+        </div>
+        <div class="grid" style="grid-template-columns: 1fr 1fr; gap:12px; align-items:start;">
+          <div>
+            <h3 style="margin-top:0">Awarded users</h3>
+            <ul id="awarded-users-list" style="list-style:none; padding-left:0; margin-top:8px;"></ul>
+            <form id="badge-remove-shared-form" method="post" action="/portal/partner_badge/remove/" style="display:none;">
+              {% csrf_token %}
+              <input type="hidden" name="username" id="badge-remove-username" />
+              <input type="hidden" name="badge_id" id="badge-remove-badge-id" />
+            </form>
+          </div>
+          <div>
+            <h3 style="margin-top:0">Assign to user</h3>
+            <form method="post" action="/portal/partner_badge/assign/" aria-label="Assign partner badge">
+              {% csrf_token %}
+              <label for="partner-badge-assign-user">User to assign</label>
+              <input id="partner-badge-assign-user" name="username" placeholder="Username" required />
+              <input type="hidden" name="badge_id" id="assign-badge-hidden" />
+              <button type="submit" class="btn-primary">Assign badge</button>
+            </form>
+            <div class="form-note">The selection above controls which badge is assigned.</div>
+          </div>
+        </div>
+        {{ partner_badges_awarded|json_script:"partner-badges-awarded-data" }}
       </div>
     </section>
     <script>
@@ -854,6 +937,136 @@
         cancelBtn.addEventListener('click', function(){ closeModal(); });
         modal.addEventListener('click', function(e){ if (e.target === modal) closeModal(); });
         document.addEventListener('keydown', function(e){ if (e.key === 'Escape') closeModal(); });
+      })();
+
+      // Tabs and progressive disclosure controls
+      (function(){
+        function initTablist(tablist){
+          var tabs = Array.from(tablist.querySelectorAll('[role="tab"]'));
+          // Initialize ARIA state
+          tabs.forEach(function(tab){
+            var controls = tab.getAttribute('aria-controls');
+            var panel = controls && document.getElementById(controls);
+            if (!panel) return;
+            panel.hidden = tab.getAttribute('aria-selected') !== 'true';
+          });
+          // Click + keyboard
+          tabs.forEach(function(tab, index){
+            tab.addEventListener('click', function(){
+              tabs.forEach(function(t){ t.setAttribute('aria-selected', 'false'); });
+              tab.setAttribute('aria-selected', 'true');
+              tabs.forEach(function(t){
+                var pid = t.getAttribute('aria-controls');
+                var pnl = pid && document.getElementById(pid);
+                if (pnl) pnl.hidden = t.getAttribute('aria-selected') !== 'true';
+              });
+            });
+            tab.addEventListener('keydown', function(e){
+              if (e.key !== 'ArrowRight' && e.key !== 'ArrowLeft') return;
+              e.preventDefault();
+              var dir = e.key === 'ArrowRight' ? 1 : -1;
+              var next = tabs[(index + dir + tabs.length) % tabs.length];
+              if (next){ next.focus(); next.click(); }
+            });
+          });
+        }
+        var lists = document.querySelectorAll('[role="tablist"]');
+        for (var list of lists) initTablist(list);
+      })();
+
+      // Badges manage/assignments JS
+      (function(){
+        var manageTabBtn = document.getElementById('tab-badges-manage');
+        var assignTabBtn = document.getElementById('tab-badges-assign');
+        var panelAssign = document.getElementById('panel-badges-assign');
+        var badgeSelect = document.getElementById('assignments-badge-select');
+        var awardedList = document.getElementById('awarded-users-list');
+        var assignHidden = document.getElementById('assign-badge-hidden');
+        var removeForm = document.getElementById('badge-remove-shared-form');
+        var removeUserInput = document.getElementById('badge-remove-username');
+        var removeBadgeInput = document.getElementById('badge-remove-badge-id');
+        var dataEl = document.getElementById('partner-badges-awarded-data');
+        var awardedMap = {};
+        if (dataEl) {
+          try { awardedMap = JSON.parse(dataEl.textContent || '{}'); } catch(e) { awardedMap = {}; }
+        }
+
+        function setSelectedBadge(bid){
+          if (!badgeSelect) return;
+          var opt = badgeSelect.querySelector('option[value="' + bid + '"]');
+          if (opt) { badgeSelect.value = String(bid); }
+          syncAssignHidden();
+          renderAwarded();
+        }
+        function syncAssignHidden(){ if (assignHidden && badgeSelect) assignHidden.value = badgeSelect.value || ''; }
+        function renderAwarded(){
+          if (!awardedList || !badgeSelect) return;
+          awardedList.innerHTML = '';
+          var bid = badgeSelect.value;
+          var users = awardedMap[bid] || [];
+          if (!users.length){
+            var li = document.createElement('li');
+            li.className = 'muted';
+            li.textContent = 'No users have this badge yet.';
+            awardedList.appendChild(li);
+            return;
+          }
+          users.forEach(function(u){
+            var li = document.createElement('li');
+            li.style.display = 'flex';
+            li.style.alignItems = 'center';
+            li.style.justifyContent = 'space-between';
+            li.style.gap = '8px';
+            var span = document.createElement('span');
+            span.textContent = u;
+            var btn = document.createElement('button');
+            btn.type = 'button';
+            btn.className = 'form btn-danger';
+            btn.textContent = 'Remove';
+            btn.addEventListener('click', function(){
+              if (!removeForm) return;
+              removeUserInput.value = u;
+              removeBadgeInput.value = bid;
+              removeForm.submit();
+            });
+            li.appendChild(span);
+            li.appendChild(btn);
+            awardedList.appendChild(li);
+          });
+        }
+        if (badgeSelect){
+          badgeSelect.addEventListener('change', function(){ syncAssignHidden(); renderAwarded(); });
+          syncAssignHidden();
+          renderAwarded();
+        }
+
+        // Manage assignments button from table rows
+        document.addEventListener('click', function(e){
+          var m = e.target.closest('[data-action="manage-assign"]');
+          if (m){
+            var bid = m.getAttribute('data-badge-id');
+            // switch to Assignments tab
+            if (assignTabBtn && manageTabBtn){
+              manageTabBtn.setAttribute('aria-selected', 'false');
+              assignTabBtn.setAttribute('aria-selected', 'true');
+              var managePanel = document.getElementById(manageTabBtn.getAttribute('aria-controls'));
+              var assignPanel = document.getElementById(assignTabBtn.getAttribute('aria-controls'));
+              if (managePanel) managePanel.hidden = true;
+              if (assignPanel) assignPanel.hidden = false;
+            }
+            setSelectedBadge(bid);
+            if (panelAssign){
+              var y = panelAssign.getBoundingClientRect().top + window.scrollY - 90;
+              window.scrollTo({ top: y, behavior: 'smooth' });
+            }
+          }
+          var editBtn = e.target.closest('[data-action="edit-badge"]');
+          if (editBtn){
+            var id = editBtn.getAttribute('data-badge-id');
+            var row = document.querySelector('tr[data-badge-edit-row][data-for="' + id + '"]');
+            if (row){ row.hidden = !row.hidden; }
+          }
+        });
       })();
     </script>
 </body>
