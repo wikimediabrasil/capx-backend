@@ -812,7 +812,7 @@ class RecommendationView(APIView):
         new_skills_qs = (
             Skill.objects.exclude(id__in=list(all_user_skill_ids))
             .annotate(
-                known_count=Count('user_known_skils', distinct=True),
+                known_count=Count('user_known_skills', distinct=True),
                 available_count=Count('user_available_skills', distinct=True),
             )
             .annotate(popularity=F('known_count') + F('available_count'))

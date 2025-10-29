@@ -167,7 +167,7 @@ class Profile(models.Model):
     skills_known = models.ManyToManyField(
         Skill,
         verbose_name="Known capacity",
-        related_name="user_known_skils",
+        related_name="user_known_skills",
         help_text="List of IDs of skills that the user knows.",
         blank=True
     )
@@ -181,7 +181,7 @@ class Profile(models.Model):
     skills_wanted = models.ManyToManyField(
         Skill, 
         verbose_name="Wanted capacity", 
-        related_name="user_desired_skils",
+        related_name="user_desired_skills",
         help_text="List of IDs of skills that the user wants to learn.",
         blank=True
     )
