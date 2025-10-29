@@ -221,18 +221,20 @@
       {% if user.is_staff %}<a href="#admin" data-section-link>Admin</a>{% endif %}
     </nav>
     {% if messages %}
-      <ul class="card" data-accent="messages">
-          <div class="card-head">
-            <span class="icon-badge" aria-hidden="true">💬</span>
-            <div>
-              <h2 style="margin:0">Messages</h2>
-              <p class="section-desc" style="margin:2px 0 0">You have {{ messages|length }} new messages.</p>
-            </div>
+      <div class="card" data-accent="messages">
+        <div class="card-head">
+          <span class="icon-badge" aria-hidden="true">💬</span>
+          <div>
+            <h2 style="margin:0">Messages</h2>
+            <p class="section-desc" style="margin:2px 0 0">You have {{ messages|length }} new messages.</p>
           </div>
+        </div>
+        <ul>
           {% for message in messages %}
           <li{% if message.tags %} class="{{ message.tags }}"{% endif %}>{{ message }}</li>
           {% endfor %}
-      </ul>
+        </ul>
+      </div>
     {% endif %}
     <section class="card" data-accent="users">
       <a id="users"></a>
