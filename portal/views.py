@@ -426,11 +426,6 @@ def partner_badge_assign(request):
         messages.error(request, 'Username and badge are required.')
         return redirect(DASHBOARD_URL_NAME)
     try:
-        target = CustomUser.all_objects.get(username=username)
-    except CustomUser.DoesNotExist:
-        messages.error(request, f'User "{username}" not found.')
-        return redirect(DASHBOARD_URL_NAME)
-    try:
         badge = Badge.objects.get(id=badge_id, type='partner')
     except Badge.DoesNotExist:
         messages.error(request, 'Selected badge not found or not a partner badge.')
@@ -442,12 +437,45 @@ def partner_badge_assign(request):
         if not partner or not PartnerMembership.objects.filter(user=request.user, partner=partner).exists():
             return HttpResponseForbidden("You don't have permission to assign this partner's badges.")
 
-    UserBadge.objects.update_or_create(
-        user=target,
-        badge=badge,
-        defaults={'progress': 100, 'is_displayed': True}
-    )
-    messages.success(request, f'Assigned "{badge.name}" to {target.username}.')
+    # Support assigning to multiple users in a single submission.
+    # Accept ONLY comma-separated list: "user1,user2,user3".
+    tokens = [t.strip() for t in username.split(',') if t and t.strip()]
+    if not tokens:
+        messages.error(request, 'Please provide at least one username.')
+        return redirect(DASHBOARD_URL_NAME)
+
+    # De-duplicate while preserving order
+    seen = set()
+    usernames = []
+    for t in tokens:
+        if t not in seen:
+            seen.add(t)
+            usernames.append(t)
+
+    # Fetch all users in one query
+    users = list(CustomUser.all_objects.filter(username__in=usernames))
+    user_by_name = {u.username: u for u in users}
+    missing = [u for u in usernames if u not in user_by_name]
+
+    assigned = []
+    for uname, user in user_by_name.items():
+        UserBadge.objects.update_or_create(
+            user=user,
+            badge=badge,
+            defaults={'progress': 100, 'is_displayed': True}
+        )
+        assigned.append(uname)
+
+    # Build compact messages
+    def _list_preview(names, max_items=10):
+        if len(names) <= max_items:
+            return ', '.join(names)
+        return f"{', '.join(names[:max_items])} and {len(names) - max_items} more"
+
+    if assigned:
+        messages.success(request, f'Assigned "{badge.name}" to: {_list_preview(assigned)}.')
+    if missing:
+        messages.error(request, f'Users not found: {_list_preview(missing)}.')
     return redirect(DASHBOARD_URL_NAME)
 
 @require_POST
