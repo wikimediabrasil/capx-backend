@@ -44,11 +44,17 @@ class AccountUserAdmin(AuthUserAdmin):
         return super(AccountUserAdmin, self).change_view(*args, **kwargs)
 
 
+class ProfileAdmin(admin.ModelAdmin):
+    # Prevent adding profiles directly; they are created automatically with users
+    def has_add_permission(self, request):
+        return False
+
+
 admin.site.register(CustomUser, AccountUserAdmin)
 admin.site.register(Territory)
 admin.site.register(Language)
 admin.site.register(WikimediaProject)
-admin.site.register(Profile)
+admin.site.register(Profile, ProfileAdmin)
 admin.site.register(Badge)
 admin.site.register(UserBadge)
 admin.site.register(LetsConnectLog)
