@@ -10,6 +10,8 @@ class ProfileInline(admin.StackedInline):
 
 class AccountUserAdmin(AuthUserAdmin):
     list_display = ('username', 'is_staff', 'is_active')
+    # Use a custom add form template to display a very prominent warning banner.
+    add_form_template = 'admin/users/customuser/add_form.html'
 
     fieldsets = (
         (None, {
