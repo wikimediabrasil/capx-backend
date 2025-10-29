@@ -18,6 +18,7 @@
       --accent: #22c55e;       /* green-500 */
       --warn: #f59e0b;         /* amber-500 */
       --danger: #ef4444;       /* red-500 */
+      --message: #e0f2fe;      /* sky-200 */
     }
 
     /* Base */
@@ -130,7 +131,7 @@
     .pill--success { background: #ecfdf5; color: #065f46; border: 1px solid #a7f3d0; }
     .pill--muted { background: #f1f5f9; color: #334155; border: 1px solid var(--border); }
     .pill--danger { background: #fef2f2; color: #991b1b; border: 1px solid #fecaca; }
-  .notes-display { cursor: pointer; }
+    .notes-display { cursor: pointer; }
 
     /* Column resizing */
     .col-resizer {
@@ -190,6 +191,16 @@
     .subnav a:hover { background:#f7fafc; }
     .subnav a.active { background: var(--primary); color:#fff; border-color: var(--primary); }
     .section-desc { margin: -6px 0 12px; color: var(--muted); font-size: 0.92rem; }
+
+    /* Django messages */
+    .card[data-accent="messages"]::before {
+      background: var(--message);
+    }
+    li.success { background: #ecfdf5; color: #065f46; border: 1px solid #a7f3d0; padding: 10px 12px; border-radius: 8px; margin-bottom: 6px; }
+    li.info { background: #e0f2fe; color: #0369a1; border: 1px solid #7dd3fc; padding: 10px 12px; border-radius: 8px; margin-bottom: 6px; }
+    li.warning { background: #fef3c7; color: #92400e; border: 1px solid #fde68a; padding: 10px 12px; border-radius: 8px; margin-bottom: 6px; }
+    li.error { background: #fef2f2; color: #991b1b; border: 1px solid #fecaca; padding: 10px 12px; border-radius: 8px; margin-bottom: 6px; }
+    li.debug { background: #f3f4f6; color: #374151; border: 1px solid #d1d5db; padding: 10px 12px; border-radius: 8px; margin-bottom: 6px; }
   </style>
 </head>
 <body>
@@ -209,6 +220,22 @@
       <a href="#badges" data-section-link>Badges</a>
       {% if user.is_staff %}<a href="#admin" data-section-link>Admin</a>{% endif %}
     </nav>
+    {% if messages %}
+      <div class="card" data-accent="messages">
+        <div class="card-head">
+          <span class="icon-badge" aria-hidden="true">💬</span>
+          <div>
+            <h2 style="margin:0">Messages</h2>
+            <p class="section-desc" style="margin:2px 0 0">You have {{ messages|length }} new messages.</p>
+          </div>
+        </div>
+        <ul>
+          {% for message in messages %}
+          <li{% if message.tags %} class="{{ message.tags }}"{% endif %}>{{ message }}</li>
+          {% endfor %}
+        </ul>
+      </div>
+    {% endif %}
     <section class="card" data-accent="users">
       <a id="users"></a>
       <div class="card-head"><span class="icon-badge" aria-hidden="true">👤</span><div><h2 style="margin:0">Users</h2><p class="section-desc" style="margin:2px 0 0">Browse, filter, and export users. Use the column toggles to tailor the view.</p></div></div>
@@ -503,11 +530,12 @@
             <form method="post" action="/portal/partner_badge/assign/" aria-label="Assign partner badge">
               {% csrf_token %}
               <label for="partner-badge-assign-user">User to assign</label>
-              <input id="partner-badge-assign-user" name="username" placeholder="Username" required />
+              <input id="partner-badge-assign-user" name="username" placeholder="Username(s), comma-separated" required />
               <input type="hidden" name="badge_id" id="assign-badge-hidden" />
               <button type="submit" class="btn-primary">Assign badge</button>
             </form>
             <div class="form-note">The selection above controls which badge is assigned.</div>
+            <div class="form-note">Tip: enter multiple usernames separated by commas (e.g., Alice,Bob,Carol).</div>
           </div>
         </div>
         {{ partner_badges_awarded|json_script:"partner-badges-awarded-data" }}

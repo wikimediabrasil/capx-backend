@@ -1,0 +1,50 @@
+{% extends "admin/change_form.html" %}
+
+{# Extra styles to make the banner VERY prominent without affecting the whole admin #}
+{% block extrastyle %}
+  {{ block.super }}
+  <style>
+    .capx-big-warning {
+      font-size: 1.25rem; /* base upsize */
+      line-height: 1.5;
+      padding: 18px 20px;
+      margin: 0 0 18px 0;
+      border: 3px solid #b91c1c;           /* dark red */
+      background: #fef2f2;                  /* light red background */
+      color: #7f1d1d;                       /* text red */
+      border-radius: 10px;
+      box-shadow: 0 2px 0 rgba(0,0,0,0.05);
+    }
+    .capx-big-warning-inner { display: flex; align-items: flex-start; gap: 12px; }
+    .capx-big-warning strong { font-size: 1.35rem; display: block; }
+    .capx-big-warning .capx-sub { display: block; font-size: 1.05rem; opacity: 0.95; margin-top: 6px; }
+
+    /* Big blinking warning icon */
+    .capx-warning-icon { width: 60px; height: 60px; flex: 0 0 auto; }
+    @keyframes capx-blink {
+      0%, 45% { opacity: 1; }
+      55%, 100% { opacity: 0; }
+    }
+    .capx-blink { animation: capx-blink 1.2s steps(2, jump-none) infinite; }
+    @media (prefers-reduced-motion: reduce) {
+      .capx-blink { animation: none; }
+    }
+  </style>
+{% endblock %}
+
+{# Inject the big banner right above the form #}
+{% block form_top %}
+  <div class="capx-big-warning">
+    <div class="capx-big-warning-inner">
+      <!-- Inline SVG warning icon -->
+      <svg class="capx-warning-icon capx-blink" viewBox="0 0 24 24" role="img" aria-label="Warning">
+        <path fill="#b91c1c" d="M1 21h22L12 2 1 21Z"></path>
+        <path fill="#ffffff" d="M13 17h-2v2h2v-2Zm0-8h-2v6h2V9Z"></path>
+      </svg>
+      <div class="capx-warning-text">
+        <strong>Users are created automatically on first OAuth login.</strong>
+        <span class="capx-sub">Only create a user manually for exceptional cases (e.g., data migration or debugging). This action should be rare.</span>
+      </div>
+    </div>
+  </div>
+{% endblock %}
