@@ -17,6 +17,7 @@ from datetime import datetime
 from django.utils import timezone
 from datetime import timedelta
 from knox.models import AuthToken
+from django.db.models import Count, F
 
 
 @extend_schema_view(
@@ -736,3 +737,109 @@ class StatisticsView(APIView):
             "skill_available_user_counts": skill_available_user_counts,
             "skill_wanted_user_counts": skill_wanted_user_counts,
         })
+
+
+class RecommendationView(APIView):
+    permission_classes = [IsAuthenticated]
+
+    @extend_schema(
+        summary='Get personalized recommendations for the logged-in user.',
+        description='Returns people to share skills with or learn from, people with the same language(s), new skills to consider, and upcoming events related to user skills.',
+        parameters=[
+            OpenApiParameter(
+                name='limit',
+                description='Maximum number of items per list (default 10, max 50).',
+                required=False,
+                type=OpenApiTypes.INT,
+            ),
+        ],
+        responses={(200, 'application/json'): {
+            'type': 'object',
+            'properties': {
+                'share_with': {'type': 'array', 'items': {'type': 'object'}},
+                'learn_from': {'type': 'array', 'items': {'type': 'object'}},
+                'same_language': {'type': 'array', 'items': {'type': 'object'}},
+                'new_skills': {'type': 'array', 'items': {'type': 'object'}},
+                'events': {'type': 'array', 'items': {'type': 'object'}},
+            }
+        }}
+    )
+    def get(self, request, *args, **kwargs):
+        user = request.user
+        try:
+            profile = Profile.objects.get(user=user)
+        except Profile.DoesNotExist:
+            return Response({
+                'share_with': [],
+                'learn_from': [],
+                'same_language': [],
+                'new_skills': [],
+                'events': [],
+            })
+
+        # Results limit
+        try:
+            limit = int(request.query_params.get('limit', 10))
+        except ValueError:
+            limit = 10
+        limit = max(1, min(limit, 50))
+
+        # Collect user's skills
+        skills_known_ids = set(profile.skills_known.values_list('id', flat=True))
+        skills_available_ids = set(profile.skills_available.values_list('id', flat=True))
+        skills_wanted_ids = set(profile.skills_wanted.values_list('id', flat=True))
+        all_user_skill_ids = skills_known_ids | skills_available_ids | skills_wanted_ids
+
+        # People to share skills with: others who want what I can teach
+        share_with_qs = Profile.objects.filter(
+            skills_wanted__id__in=list(skills_available_ids)
+        ).exclude(pk=profile.pk).distinct()[:limit]
+
+        # People to learn from: others who can teach what I want
+        learn_from_qs = Profile.objects.filter(
+            skills_available__id__in=list(skills_wanted_ids)
+        ).exclude(pk=profile.pk).distinct()[:limit]
+
+        # Same language people: share any language (exclude proficiency 0)
+        lang_ids = list(
+            profile.languageproficiency_set.exclude(proficiency=0).values_list('language_id', flat=True)
+        )
+        same_lang_qs = Profile.objects.filter(
+            languageproficiency__language_id__in=lang_ids
+        ).exclude(languageproficiency__proficiency=0).exclude(pk=profile.pk).distinct()[:limit]
+
+        # New skills: popular skills the user doesn't have/want yet
+        new_skills_qs = (
+            Skill.objects.exclude(id__in=list(all_user_skill_ids))
+            .annotate(
+                known_count=Count('user_known_skills', distinct=True),
+                available_count=Count('user_available_skills', distinct=True),
+            )
+            .annotate(popularity=F('known_count') + F('available_count'))
+            .order_by('-popularity', 'id')[:limit]
+        )
+
+        # Events: upcoming events related to my skills
+        now = timezone.now()
+        related_ids = list(skills_known_ids | skills_wanted_ids)
+        events_qs = (
+            Events.objects.filter(
+                related_skills__id__in=related_ids,
+                time_begin__gte=now
+            ).order_by('time_begin').distinct()[:limit]
+        )
+
+        # Serialize
+        users_serializer = UsersByTagSerializer
+        from skills.serializers import SkillSerializer  # local import to avoid cycles
+        from events.serializers import EventSerializer
+
+        data = {
+            'share_with': users_serializer(share_with_qs, many=True).data,
+            'learn_from': users_serializer(learn_from_qs, many=True).data,
+            'same_language': users_serializer(same_lang_qs, many=True).data,
+            'new_skills': SkillSerializer(new_skills_qs, many=True).data,
+            'events': EventSerializer(events_qs, many=True).data,
+        }
+
+        return Response(data)
