@@ -1,6 +1,6 @@
 from .models import Profile, Territory, Language, WikimediaProject, Avatar, SavedItem, Badge, UserBadge
 from orgs.models import Organization
-from .serializers import ProfileSerializer, TerritorySerializer, LanguageSerializer, WikimediaProjectSerializer, UsersBySkillSerializer, UsersByTagSerializer, AvatarSerializer, SavedItemSerializer, BadgeSerializer, UserBadgeSerializer
+from .serializers import ProfileSerializer, TerritorySerializer, LanguageSerializer, WikimediaProjectSerializer, UsersBySkillSerializer, UsersByTagSerializer, AvatarSerializer, SavedItemSerializer, BadgeSerializer, UserBadgeSerializer, RecommendationUserSerializer
 from skills.models import Skill
 from events.models import Events
 from projects.models import Project
@@ -791,22 +791,52 @@ class RecommendationView(APIView):
         all_user_skill_ids = skills_known_ids | skills_available_ids | skills_wanted_ids
 
         # People to share skills with: others who want what I can teach
-        share_with_qs = Profile.objects.filter(
-            skills_wanted__id__in=list(skills_available_ids)
-        ).exclude(pk=profile.pk).distinct()[:limit]
+        share_with_qs = (
+            Profile.objects.exclude(pk=profile.pk)
+            .annotate(
+                match_count=Count(
+                    'skills_wanted',
+                    filter=models.Q(skills_wanted__id__in=list(skills_available_ids)),
+                    distinct=True,
+                )
+            )
+            .filter(match_count__gt=0)
+            .order_by('-match_count', '?')[:limit]
+        )
 
         # People to learn from: others who can teach what I want
-        learn_from_qs = Profile.objects.filter(
-            skills_available__id__in=list(skills_wanted_ids)
-        ).exclude(pk=profile.pk).distinct()[:limit]
+        learn_from_qs = (
+            Profile.objects.exclude(pk=profile.pk)
+            .annotate(
+                match_count=Count(
+                    'skills_available',
+                    filter=models.Q(skills_available__id__in=list(skills_wanted_ids)),
+                    distinct=True,
+                )
+            )
+            .filter(match_count__gt=0)
+            .order_by('-match_count', '?')[:limit]
+        )
 
-        # Same language people: share any language (exclude proficiency 0)
+        # Same language people: rank by number of shared languages (exclude proficiency 0), randomize ties
         lang_ids = list(
             profile.languageproficiency_set.exclude(proficiency=0).values_list('language_id', flat=True)
         )
-        same_lang_qs = Profile.objects.filter(
-            languageproficiency__language_id__in=lang_ids
-        ).exclude(languageproficiency__proficiency=0).exclude(pk=profile.pk).distinct()[:limit]
+        same_lang_qs = (
+            Profile.objects.exclude(pk=profile.pk)
+            .annotate(
+                match_count=Count(
+                    'languageproficiency',
+                    filter=(
+                        models.Q(languageproficiency__language_id__in=lang_ids)
+                        & ~models.Q(languageproficiency__proficiency=0)
+                    ),
+                    distinct=True,
+                )
+            )
+            .filter(match_count__gt=0)
+            .order_by('-match_count', '?')[:limit]
+        )
 
         # New skills: popular skills the user doesn't have/want yet
         new_skills_qs = (
@@ -816,7 +846,7 @@ class RecommendationView(APIView):
                 available_count=Count('user_available_skills', distinct=True),
             )
             .annotate(popularity=F('known_count') + F('available_count'))
-            .order_by('-popularity', 'id')[:limit]
+            .order_by('-popularity', '?')[:limit]
         )
 
         # Events: upcoming events related to my skills
@@ -830,14 +860,13 @@ class RecommendationView(APIView):
         )
 
         # Serialize
-        users_serializer = UsersByTagSerializer
         from skills.serializers import SkillSerializer  # local import to avoid cycles
         from events.serializers import EventSerializer
 
         data = {
-            'share_with': users_serializer(share_with_qs, many=True).data,
-            'learn_from': users_serializer(learn_from_qs, many=True).data,
-            'same_language': users_serializer(same_lang_qs, many=True).data,
+            'share_with': RecommendationUserSerializer(share_with_qs, many=True).data,
+            'learn_from': RecommendationUserSerializer(learn_from_qs, many=True).data,
+            'same_language': RecommendationUserSerializer(same_lang_qs, many=True).data,
             'new_skills': SkillSerializer(new_skills_qs, many=True).data,
             'events': EventSerializer(events_qs, many=True).data,
         }
