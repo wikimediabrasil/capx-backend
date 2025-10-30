@@ -283,9 +283,9 @@
                 <td>
                   <span class="pill {{ row.is_active|yesno:'pill--success,pill--danger' }}">{{ row.is_active|yesno:'Active,Inactive' }}</span>
                 </td>
-                <td>{{ row.date_joined }}</td>
-                <td>{{ row.last_update }}</td>
-                <td>{{ row.last_login }}</td>
+                <td>{{ row.date_joined|date:"c" }}</td>
+                <td>{{ row.last_update|date:"c" }}</td>
+                <td>{{ row.last_login|date:"c" }}</td>
                 <td>{{ row.wikidata_qid }}</td>
                 <td>{{ row.wiki_alt }}</td>
                 <td>{{ row.territory }}</td>
@@ -422,7 +422,7 @@
               <tr>
                 <td>{{ pu.user.username }}</td>
                 <td>{{ pu.partner.name }}</td>
-                <td>{{ pu.created_at }}</td>
+                <td>{{ pu.created_at|date:"c" }}</td>
               </tr>
             {% empty %}
               <tr><td colspan="6" class="muted">No records.</td></tr>
