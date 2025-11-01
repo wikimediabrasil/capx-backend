@@ -180,6 +180,21 @@ class UsersByTagSerializer(serializers.ModelSerializer):
             'profile_image'
         ]
 
+
+class RecommendationUserSerializer(serializers.ModelSerializer):
+    username = serializers.CharField(source='user.username')
+    matches = serializers.IntegerField(source='match_count')
+
+    class Meta:
+        model = Profile
+        fields = [
+            'id',
+            'display_name',
+            'username',
+            'profile_image',
+            'matches',
+        ]
+
 @extend_schema_field({
     'type': 'integer',
     'description': 'ID of the organization or user',
