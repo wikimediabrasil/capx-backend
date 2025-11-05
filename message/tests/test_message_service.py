@@ -10,13 +10,7 @@ class MessageServiceTest(TestCase):
     def setUp(self):
         self.sender = CustomUser.objects.create_user(username='sender', password=str(secrets.randbits(16)))
         self.receiver = 'receiver'
-        self.message = Message.objects.create(
-            sender=self.sender,
-            receiver=self.receiver,
-            message='Test message',
-            subject='Test subject',
-            method='email'
-        )
+        # Create UserSocialAuth BEFORE Message to avoid auto-send failure
         self.user_social_auth = UserSocialAuth.objects.create(
             user=self.sender,
             provider='mediawiki',
@@ -28,6 +22,15 @@ class MessageServiceTest(TestCase):
                 }
             }
         )
+        # Create message with mocked send to avoid triggering send in setUp
+        with patch('message.models.MessageService.send_message'):
+            self.message = Message.objects.create(
+                sender=self.sender,
+                receiver=self.receiver,
+                message='Test message',
+                subject='Test subject',
+                method='email'
+            )
 
     @patch('message.services.message_service.OAuth1Session')
     def test_send_message_user_not_emailable(self, mock_oauth):
@@ -113,6 +116,7 @@ class MessageServiceTest(TestCase):
         MessageService.send_message(self.message)
         self.message.refresh_from_db()
         self.assertEqual(self.message.status, 'sent')
+        self.assertEqual(self.message.method, 'talkpage')  # Verify method was updated
         self.assertEqual(self.message.error_message, 'Receiver is not emailable. Using talk page instead.')
 
     @patch('message.services.message_service.OAuth1Session')
@@ -128,4 +132,5 @@ class MessageServiceTest(TestCase):
         MessageService.send_message(self.message)
         self.message.refresh_from_db()
         self.assertEqual(self.message.status, 'sent')
+        self.assertEqual(self.message.method, 'talkpage')  # Verify method was updated
         self.assertEqual(self.message.error_message, 'Sender is not emailable. Using talk page instead.')

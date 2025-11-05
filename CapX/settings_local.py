@@ -45,7 +45,7 @@ def configure_settings():
     else:
         debug = True
         hosts = ['127.0.0.1']
-        callback = 'http://127.0.0.1:3000/oauth/'
+        callback = 'http://localhost:3000/oauth'
         message = 'You are running in local mode, please make sure to set up the replica.my.cnf file to run in production mode'
         email_host = 'localhost'
         email_port = 25

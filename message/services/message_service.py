@@ -22,14 +22,17 @@ class MessageService:
                 return
 
             # Step 3: Decide method and send message
+            error_message = ''
             if instance.method == 'talkpage':
                 success = MessageService._send_talk_page(oauth, url, instance, token)
             elif instance.method == 'email':
                 if not MessageService._is_user_emailable(oauth, url, instance.receiver):
                     error_message = 'Receiver is not emailable. Using talk page instead.'
+                    instance.method = 'talkpage'
                     success = MessageService._send_talk_page(oauth, url, instance, token)
                 elif not MessageService._is_user_emailable(oauth, url, instance.sender):
                     error_message = 'Sender is not emailable. Using talk page instead.'
+                    instance.method = 'talkpage'
                     success = MessageService._send_talk_page(oauth, url, instance, token)
                 else:
                     success = MessageService._send_email(oauth, url, instance, token)
@@ -38,7 +41,7 @@ class MessageService:
             MessageService._update_instance_status(
                 instance,
                 'sent' if success else 'failed',
-                error_message if 'error_message' in locals() else ''
+                error_message
             )
 
         except Exception as e:
@@ -57,6 +60,8 @@ class MessageService:
     @staticmethod
     def _update_instance_status(instance, status, error_message):
         instance.status = status
+        # Set error_message: preserve when there's a fallback (sent with warning) or failure
+        # Clear error_message when successful without fallback
         instance.error_message = error_message
         instance.subject = ''
         instance.message = ''
