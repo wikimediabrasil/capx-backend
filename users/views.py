@@ -102,8 +102,11 @@ class UsersViewSet(viewsets.ReadOnlyModelViewSet):
             queryset = queryset.filter(territory__id__in=child_territories)
 
         if name_search and name_search.strip():
-            # Fuzzy search: case-insensitive partial match on username
-            queryset = queryset.filter(user__username__icontains=name_search)
+            # Fuzzy search: case-insensitive partial match on username or profile wiki_alt
+            queryset = queryset.filter(
+                models.Q(user__username__icontains=name_search) |
+                models.Q(wiki_alt__icontains=name_search)
+            ).distinct()
 
         if has_skills_known is not None:
             if has_skills_known.lower() == 'true':
