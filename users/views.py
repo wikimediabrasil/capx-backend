@@ -1,6 +1,6 @@
 from .models import Profile, Territory, Language, WikimediaProject, Avatar, SavedItem, Badge, UserBadge
 from orgs.models import Organization
-from .serializers import ProfileSerializer, TerritorySerializer, LanguageSerializer, WikimediaProjectSerializer, UsersBySkillSerializer, UsersByTagSerializer, AvatarSerializer, SavedItemSerializer, BadgeSerializer, UserBadgeSerializer, RecommendationUserSerializer
+from .serializers import ProfileSerializer, TerritorySerializer, LanguageSerializer, WikimediaProjectSerializer, UsersBySkillSerializer, UsersByTagSerializer, AvatarSerializer, SavedItemSerializer, BadgeSerializer, UserBadgeSerializer, RecommendationUserSerializer, RecommendationOrganizationSerializer
 from skills.models import Skill
 from events.models import Events
 from projects.models import Project
@@ -765,7 +765,7 @@ class RecommendationView(APIView):
 
     @extend_schema(
         summary='Get personalized recommendations for the logged-in user.',
-        description='Returns people to share skills with or learn from, people with the same language(s), new skills to consider, and upcoming events related to user skills.',
+        description='Returns people to share skills with or learn from, people with the same language(s), organizations to share with or learn from, new skills to consider, and upcoming events related to user skills.',
         parameters=[
             OpenApiParameter(
                 name='limit',
@@ -780,6 +780,8 @@ class RecommendationView(APIView):
                 'share_with': {'type': 'array', 'items': {'type': 'object'}},
                 'learn_from': {'type': 'array', 'items': {'type': 'object'}},
                 'same_language': {'type': 'array', 'items': {'type': 'object'}},
+                'share_with_orgs': {'type': 'array', 'items': {'type': 'object'}},
+                'learn_from_orgs': {'type': 'array', 'items': {'type': 'object'}},
                 'new_skills': {'type': 'array', 'items': {'type': 'object'}},
                 'events': {'type': 'array', 'items': {'type': 'object'}},
             }
@@ -794,6 +796,8 @@ class RecommendationView(APIView):
                 'share_with': [],
                 'learn_from': [],
                 'same_language': [],
+                'share_with_orgs': [],
+                'learn_from_orgs': [],
                 'new_skills': [],
                 'events': [],
             })
@@ -880,6 +884,34 @@ class RecommendationView(APIView):
             ).order_by('time_begin').distinct()[:limit]
         )
 
+        # Organizations to share skills with: organizations that want what I can teach
+        share_with_orgs_qs = (
+            Organization.objects.filter(managers__isnull=False)
+            .annotate(
+                match_count=Count(
+                    'wanted_capacities',
+                    filter=models.Q(wanted_capacities__id__in=list(skills_available_ids)),
+                    distinct=True,
+                )
+            )
+            .filter(match_count__gt=0)
+            .order_by('-match_count', '?')[:limit]
+        )
+
+        # Organizations to learn from: organizations that can teach what I want
+        learn_from_orgs_qs = (
+            Organization.objects.filter(managers__isnull=False)
+            .annotate(
+                match_count=Count(
+                    'available_capacities',
+                    filter=models.Q(available_capacities__id__in=list(skills_wanted_ids)),
+                    distinct=True,
+                )
+            )
+            .filter(match_count__gt=0)
+            .order_by('-match_count', '?')[:limit]
+        )
+
         # Serialize
         from skills.serializers import SkillSerializer  # local import to avoid cycles
         from events.serializers import EventSerializer
@@ -888,6 +920,8 @@ class RecommendationView(APIView):
             'share_with': RecommendationUserSerializer(share_with_qs, many=True).data,
             'learn_from': RecommendationUserSerializer(learn_from_qs, many=True).data,
             'same_language': RecommendationUserSerializer(same_lang_qs, many=True).data,
+            'share_with_orgs': RecommendationOrganizationSerializer(share_with_orgs_qs, many=True).data,
+            'learn_from_orgs': RecommendationOrganizationSerializer(learn_from_orgs_qs, many=True).data,
             'new_skills': SkillSerializer(new_skills_qs, many=True).data,
             'events': EventSerializer(events_qs, many=True).data,
         }
