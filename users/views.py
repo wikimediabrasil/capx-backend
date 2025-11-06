@@ -55,6 +55,12 @@ from django.db.models import Count, F
                 required=False,
                 type=OpenApiTypes.INT,
             ),
+            OpenApiParameter(
+                name='name',
+                description='Fuzzy search for users by username. Case-insensitive partial matching.',
+                required=False,
+                type=OpenApiTypes.STR,
+            ),
         ],
     ),
     retrieve=extend_schema(
@@ -85,6 +91,7 @@ class UsersViewSet(viewsets.ReadOnlyModelViewSet):
         has_skills_wanted = self.request.query_params.get('has_skills_wanted')
         has_any_skills = self.request.query_params.get('has_any_skills')
         territory_id = self.request.query_params.get('territory')
+        name_search = self.request.query_params.get('name')
 
         if territory_id:
             # Include profiles in the specified territory or its child territories
@@ -93,6 +100,12 @@ class UsersViewSet(viewsets.ReadOnlyModelViewSet):
                 models.Q(parent_territory__id=territory_id)
             ).values_list('id', flat=True)
             queryset = queryset.filter(territory__id__in=child_territories)
+
+        if name_search:
+            # Fuzzy search: case-insensitive partial match on username
+            queryset = queryset.filter(
+                models.Q(user__username__icontains=name_search)
+            ).distinct()
 
         if has_skills_known is not None:
             if has_skills_known.lower() == 'true':
