@@ -55,6 +55,12 @@ from django.db.models import Count, F
                 required=False,
                 type=OpenApiTypes.INT,
             ),
+            OpenApiParameter(
+                name='ordering',
+                description='Sort users by field. Prefix with "-" for descending order. Options: last_update.',
+                required=False,
+                type=OpenApiTypes.STR,
+            ),
         ],
     ),
     retrieve=extend_schema(
@@ -65,7 +71,8 @@ from django.db.models import Count, F
 class UsersViewSet(viewsets.ReadOnlyModelViewSet):
     serializer_class = ProfileSerializer
     queryset = Profile.objects.all()
-    filter_backends = [DjangoFilterBackend]
+    filter_backends = [DjangoFilterBackend, filters.OrderingFilter]
+    ordering_fields = ['last_update']
     filterset_fields = [
         'user__username',
         'about',
