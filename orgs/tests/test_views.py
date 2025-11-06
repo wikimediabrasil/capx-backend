@@ -411,30 +411,31 @@ class OrganizationOrderingTestCase(APITestCase):
         
         # Create multiple organizations with different attributes
         from django.utils import timezone
-        import time
+        from datetime import timedelta
+        
+        now = timezone.now()
         
         self.org1 = Organization.objects.create(
             display_name='Zulu Organization',
             acronym='ZO',
-            type=self.organization_type
+            type=self.organization_type,
+            update_date=now - timedelta(minutes=2)
         )
         self.org1.managers.add(self.user)
-        
-        time.sleep(0.01)  # Small delay to ensure different timestamps
         
         self.org2 = Organization.objects.create(
             display_name='Alpha Organization',
             acronym='AO',
-            type=self.organization_type
+            type=self.organization_type,
+            update_date=now - timedelta(minutes=1)
         )
         self.org2.managers.add(self.user)
-        
-        time.sleep(0.01)
         
         self.org3 = Organization.objects.create(
             display_name='Beta Organization',
             acronym='BO',
-            type=self.organization_type
+            type=self.organization_type,
+            update_date=now
         )
         self.org3.managers.add(self.user)
 

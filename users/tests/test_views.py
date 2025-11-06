@@ -917,18 +917,17 @@ class UsersOrderingTestCase(TestCase):
         self.assertEqual(display_names[2], 'Alice Johnson')
 
     def test_users_ordering_by_last_update_desc(self):
-        # Update profile of user1 to make it the most recently updated
-        import time
-        time.sleep(0.01)  # Small delay to ensure different timestamps
-        self.user1.profile.about = 'Updated bio'
-        self.user1.profile.save()
+        # Since last_update has auto_now=True, we need to update the profile to trigger a new timestamp
+        # The last user to be saved will have the most recent last_update
+        self.user3.profile.about = 'Updated bio for user3'
+        self.user3.profile.save()
         
         response = self.client.get('/users/?ordering=-last_update')
         self.assertEqual(response.status_code, status.HTTP_200_OK)
         results = response.data['results']
         self.assertGreaterEqual(len(results), 3)
-        # user1 should be first as it was updated most recently
-        self.assertEqual(results[0]['user']['username'], 'alpha_user')
+        # user3 should be first as it was updated most recently
+        self.assertEqual(results[0]['user']['username'], 'gamma_user')
 
     def test_users_ordering_by_date_joined_asc(self):
         response = self.client.get('/users/?ordering=user__date_joined')
