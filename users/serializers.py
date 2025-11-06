@@ -195,6 +195,20 @@ class RecommendationUserSerializer(serializers.ModelSerializer):
             'matches',
         ]
 
+
+class RecommendationOrganizationSerializer(serializers.ModelSerializer):
+    matches = serializers.IntegerField(source='match_count')
+
+    class Meta:
+        model = Organization
+        fields = [
+            'id',
+            'display_name',
+            'profile_image',
+            'acronym',
+            'matches',
+        ]
+
 @extend_schema_field({
     'type': 'integer',
     'description': 'ID of the organization or user',
