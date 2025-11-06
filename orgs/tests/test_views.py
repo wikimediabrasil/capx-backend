@@ -401,3 +401,84 @@ class OrganizationFilterViewSetTestCase(APITestCase):
             models.Q(available_capacities__isnull=True) &
             models.Q(wanted_capacities__isnull=True)
         ).distinct().count())
+
+
+class OrganizationOrderingTestCase(APITestCase):
+    def setUp(self):
+        self.client = APIClient()
+        self.user = CustomUser.objects.create_user(username='test', password=str(secrets.randbits(16)))
+        self.organization_type = OrganizationType.objects.create(type_name='Type 1', type_code='TYPE1')
+        
+        # Create multiple organizations with different attributes
+        from django.utils import timezone
+        from datetime import timedelta
+        
+        now = timezone.now()
+        
+        self.org1 = Organization.objects.create(
+            display_name='Zulu Organization',
+            acronym='ZO',
+            type=self.organization_type,
+            update_date=now - timedelta(minutes=2)
+        )
+        self.org1.managers.add(self.user)
+        
+        self.org2 = Organization.objects.create(
+            display_name='Alpha Organization',
+            acronym='AO',
+            type=self.organization_type,
+            update_date=now - timedelta(minutes=1)
+        )
+        self.org2.managers.add(self.user)
+        
+        self.org3 = Organization.objects.create(
+            display_name='Beta Organization',
+            acronym='BO',
+            type=self.organization_type,
+            update_date=now
+        )
+        self.org3.managers.add(self.user)
+
+    def test_organizations_ordering_by_display_name_asc(self):
+        response = self.client.get('/organizations/?ordering=display_name')
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        results = response.data['results']
+        self.assertEqual(len(results), 3)
+        # Alpha should come before Beta, and Beta before Zulu
+        display_names = [r['display_name'] for r in results]
+        self.assertEqual(display_names[0], 'Alpha Organization')
+        self.assertEqual(display_names[1], 'Beta Organization')
+        self.assertEqual(display_names[2], 'Zulu Organization')
+
+    def test_organizations_ordering_by_display_name_desc(self):
+        response = self.client.get('/organizations/?ordering=-display_name')
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        results = response.data['results']
+        self.assertEqual(len(results), 3)
+        # Zulu should come before Beta, and Beta before Alpha
+        display_names = [r['display_name'] for r in results]
+        self.assertEqual(display_names[0], 'Zulu Organization')
+        self.assertEqual(display_names[1], 'Beta Organization')
+        self.assertEqual(display_names[2], 'Alpha Organization')
+
+    def test_organizations_ordering_by_update_date_asc(self):
+        response = self.client.get('/organizations/?ordering=update_date')
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        results = response.data['results']
+        self.assertEqual(len(results), 3)
+        # org1 was created first, so it should come first
+        acronyms = [r['acronym'] for r in results]
+        self.assertEqual(acronyms[0], 'ZO')
+        self.assertEqual(acronyms[1], 'AO')
+        self.assertEqual(acronyms[2], 'BO')
+
+    def test_organizations_ordering_by_update_date_desc(self):
+        response = self.client.get('/organizations/?ordering=-update_date')
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        results = response.data['results']
+        self.assertEqual(len(results), 3)
+        # org3 was created last, so it should come first when descending
+        acronyms = [r['acronym'] for r in results]
+        self.assertEqual(acronyms[0], 'BO')
+        self.assertEqual(acronyms[1], 'AO')
+        self.assertEqual(acronyms[2], 'ZO')

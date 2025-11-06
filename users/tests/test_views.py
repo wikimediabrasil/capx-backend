@@ -965,3 +965,25 @@ class StatisticsViewTestCase(TestCase):
         self.assertGreaterEqual(response.data['total_capacities'], 1)
         self.assertGreaterEqual(response.data['total_messages'], 1)
         self.assertGreaterEqual(response.data['total_organizations'], 1)
+
+
+class UsersOrderingTestCase(TestCase):
+    def setUp(self):
+        self.client = APIClient()
+        # Create multiple users with different attributes
+        self.user1 = CustomUser.objects.create_user(username='alpha_user', password=str(secrets.randbits(16)))
+        self.user2 = CustomUser.objects.create_user(username='beta_user', password=str(secrets.randbits(16)))
+        self.user3 = CustomUser.objects.create_user(username='gamma_user', password=str(secrets.randbits(16)))
+        
+    def test_users_ordering_by_last_update_desc(self):
+        # Since last_update has auto_now=True, we need to update the profile to trigger a new timestamp
+        # The last user to be saved will have the most recent last_update
+        self.user3.profile.about = 'Updated bio for user3'
+        self.user3.profile.save()
+        
+        response = self.client.get('/users/?ordering=-last_update')
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        results = response.data['results']
+        self.assertGreaterEqual(len(results), 3)
+        # user3 should be first as it was updated most recently
+        self.assertEqual(results[0]['user']['username'], 'gamma_user')
