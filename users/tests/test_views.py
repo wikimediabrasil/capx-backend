@@ -650,6 +650,95 @@ class UsersFilterTestCase(TestCase):
         self.assertEqual(len(response.data['results']), 1)
 
 
+class UsersNameSearchTestCase(TestCase):
+    def setUp(self):
+        self.user1 = CustomUser.objects.create_user(username='albertoleoncio', password=str(secrets.randbits(16)))
+        self.user1.profile.display_name = 'Alberto Leoncio'
+        self.user1.profile.save()
+        
+        self.user2 = CustomUser.objects.create_user(username='johndoe', password=str(secrets.randbits(16)))
+        self.user2.profile.display_name = 'John Doe'
+        self.user2.profile.save()
+        
+        self.user3 = CustomUser.objects.create_user(username='marialeonardo', password=str(secrets.randbits(16)))
+        self.user3.profile.display_name = 'Maria Da Silva'
+        self.user3.profile.save()
+        
+        self.user4 = CustomUser.objects.create_user(username='testuser', password=str(secrets.randbits(16)))
+        self.user4.profile.display_name = 'Test User'
+        self.user4.profile.save()
+        
+        self.client = APIClient()
+        self.client.force_authenticate(self.user1)
+
+    def test_search_by_name_partial_match_username(self):
+        # Search for "leo" should match usernames containing "leo"
+        response = self.client.get('/users/', {'name': 'leo'})
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        usernames = [result['user']['username'] for result in response.data['results']]
+        self.assertIn('albertoleoncio', usernames)
+        self.assertIn('marialeonardo', usernames)
+        self.assertEqual(len(response.data['results']), 2)
+
+    def test_search_by_name_full_match_username(self):
+        # Search for "alberto" should match username "albertoleoncio"
+        response = self.client.get('/users/', {'name': 'alberto'})
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        usernames = [result['user']['username'] for result in response.data['results']]
+        self.assertIn('albertoleoncio', usernames)
+        self.assertEqual(len(response.data['results']), 1)
+
+    def test_search_by_name_case_insensitive(self):
+        # Search should be case-insensitive
+        response = self.client.get('/users/', {'name': 'JOHN'})
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        usernames = [result['user']['username'] for result in response.data['results']]
+        self.assertIn('johndoe', usernames)
+        self.assertEqual(len(response.data['results']), 1)
+
+    def test_search_by_name_no_matches(self):
+        # Search for something that doesn't match
+        response = self.client.get('/users/', {'name': 'xyz123'})
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(len(response.data['results']), 0)
+
+    def test_search_by_name_empty_string(self):
+        # Empty search should return all users
+        response = self.client.get('/users/', {'name': ''})
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(len(response.data['results']), 4)
+
+    def test_search_by_name_partial_substring(self):
+        # Search for "doe" should match "johndoe"
+        response = self.client.get('/users/', {'name': 'doe'})
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        usernames = [result['user']['username'] for result in response.data['results']]
+        self.assertIn('johndoe', usernames)
+        self.assertEqual(len(response.data['results']), 1)
+
+    def test_search_by_name_only_searches_username(self):
+        # Search should only match username, not display_name
+        response = self.client.get('/users/', {'name': 'test'})
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        usernames = [result['user']['username'] for result in response.data['results']]
+        # Should only match username "testuser", not display names
+        self.assertIn('testuser', usernames)
+        self.assertEqual(len(response.data['results']), 1)
+
+    def test_search_by_name_combined_with_other_filters(self):
+        # Combine name search with skills filter
+        skill = Skill.objects.create(skill_wikidata_item="Q123456789")
+        self.user1.profile.skills_known.add(skill)
+        
+        response = self.client.get('/users/', {'name': 'leo', 'has_skills_known': 'true'})
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        usernames = [result['user']['username'] for result in response.data['results']]
+        self.assertIn('albertoleoncio', usernames)
+        # Maria should not be in results because she doesn't have skills
+        self.assertNotIn('marialeonardo', usernames)
+        self.assertEqual(len(response.data['results']), 1)
+
+
 class SavedItemViewSetTestCase(TestCase):
     def setUp(self):
         self.user = CustomUser.objects.create_user(username='test', password=str(secrets.randbits(16)))
@@ -876,3 +965,148 @@ class StatisticsViewTestCase(TestCase):
         self.assertGreaterEqual(response.data['total_capacities'], 1)
         self.assertGreaterEqual(response.data['total_messages'], 1)
         self.assertGreaterEqual(response.data['total_organizations'], 1)
+
+
+class RecommendationViewTestCase(TestCase):
+    def setUp(self):
+        self.user = CustomUser.objects.create_user(username='test', password=str(secrets.randbits(16)))
+        self.client = APIClient()
+        self.client.force_authenticate(self.user)
+        self.profile = Profile.objects.get(user=self.user)
+        
+        # Create skills
+        self.skill1 = Skill.objects.create(skill_wikidata_item='Q28865')
+        self.skill2 = Skill.objects.create(skill_wikidata_item='Q186135')
+        self.skill3 = Skill.objects.create(skill_wikidata_item='Q2005')
+        
+        # Set up user profile with skills
+        self.profile.skills_known.add(self.skill1)
+        self.profile.skills_available.add(self.skill1)
+        self.profile.skills_wanted.add(self.skill2)
+        
+    def test_recommendation_endpoint_authenticated(self):
+        response = self.client.get('/recommendation/')
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertIn('share_with', response.data)
+        self.assertIn('learn_from', response.data)
+        self.assertIn('same_language', response.data)
+        self.assertIn('share_with_orgs', response.data)
+        self.assertIn('learn_from_orgs', response.data)
+        self.assertIn('new_skills', response.data)
+        self.assertIn('events', response.data)
+
+    def test_recommendation_endpoint_unauthenticated(self):
+        client = APIClient()
+        response = client.get('/recommendation/')
+        self.assertEqual(response.status_code, status.HTTP_401_UNAUTHORIZED)
+
+    def test_recommendation_share_with_orgs(self):
+        # Create an organization that wants a skill the user can teach
+        org_type = OrganizationType.objects.create(type_code='UG', type_name='User Group')
+        org = Organization.objects.create(
+            display_name='Test Organization',
+            acronym='TO',
+            type=org_type
+        )
+        org.managers.add(self.user)
+        org.wanted_capacities.add(self.skill1)  # Org wants what user can teach
+        
+        response = self.client.get('/recommendation/')
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(len(response.data['share_with_orgs']), 1)
+        self.assertEqual(response.data['share_with_orgs'][0]['id'], org.id)
+        self.assertEqual(response.data['share_with_orgs'][0]['display_name'], 'Test Organization')
+        self.assertEqual(response.data['share_with_orgs'][0]['matches'], 1)
+
+    def test_recommendation_learn_from_orgs(self):
+        # Create an organization that can teach a skill the user wants
+        org_type = OrganizationType.objects.create(type_code='UG', type_name='User Group')
+        org = Organization.objects.create(
+            display_name='Teaching Organization',
+            acronym='TEACH',
+            type=org_type
+        )
+        org.managers.add(self.user)
+        org.available_capacities.add(self.skill2)  # Org can teach what user wants
+        
+        response = self.client.get('/recommendation/')
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(len(response.data['learn_from_orgs']), 1)
+        self.assertEqual(response.data['learn_from_orgs'][0]['id'], org.id)
+        self.assertEqual(response.data['learn_from_orgs'][0]['display_name'], 'Teaching Organization')
+        self.assertEqual(response.data['learn_from_orgs'][0]['matches'], 1)
+
+    def test_recommendation_orgs_without_managers_excluded(self):
+        # Create an organization without managers (should be excluded)
+        org_type = OrganizationType.objects.create(type_code='UG', type_name='User Group')
+        org = Organization.objects.create(
+            display_name='No Manager Org',
+            acronym='NM',
+            type=org_type
+        )
+        org.wanted_capacities.add(self.skill1)
+        
+        response = self.client.get('/recommendation/')
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(len(response.data['share_with_orgs']), 0)
+
+    def test_recommendation_limit_parameter(self):
+        # Create multiple organizations
+        org_type = OrganizationType.objects.create(type_code='UG', type_name='User Group')
+        for i in range(15):
+            org = Organization.objects.create(
+                display_name=f'Test Org {i}',
+                acronym=f'TO{i}',
+                type=org_type
+            )
+            org.managers.add(self.user)
+            org.wanted_capacities.add(self.skill1)
+        
+        # Test with limit=5
+        response = self.client.get('/recommendation/?limit=5')
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertLessEqual(len(response.data['share_with_orgs']), 5)
+
+    def test_recommendation_multiple_skill_matches(self):
+        # Create an organization that matches multiple skills
+        org_type = OrganizationType.objects.create(type_code='UG', type_name='User Group')
+        org = Organization.objects.create(
+            display_name='Multi-skill Org',
+            acronym='MSO',
+            type=org_type
+        )
+        org.managers.add(self.user)
+        
+        # Add more skills to user
+        self.profile.skills_available.add(self.skill2, self.skill3)
+        
+        # Org wants multiple skills the user can teach
+        org.wanted_capacities.add(self.skill1, self.skill2, self.skill3)
+        
+        response = self.client.get('/recommendation/')
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(len(response.data['share_with_orgs']), 1)
+        # Should match 3 skills: skill1, skill2, skill3
+        self.assertEqual(response.data['share_with_orgs'][0]['matches'], 3)
+        
+
+class UsersOrderingTestCase(TestCase):
+    def setUp(self):
+        self.client = APIClient()
+        # Create multiple users with different attributes
+        self.user1 = CustomUser.objects.create_user(username='alpha_user', password=str(secrets.randbits(16)))
+        self.user2 = CustomUser.objects.create_user(username='beta_user', password=str(secrets.randbits(16)))
+        self.user3 = CustomUser.objects.create_user(username='gamma_user', password=str(secrets.randbits(16)))
+        
+    def test_users_ordering_by_last_update_desc(self):
+        # Since last_update has auto_now=True, we need to update the profile to trigger a new timestamp
+        # The last user to be saved will have the most recent last_update
+        self.user3.profile.about = 'Updated bio for user3'
+        self.user3.profile.save()
+        
+        response = self.client.get('/users/?ordering=-last_update')
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        results = response.data['results']
+        self.assertGreaterEqual(len(results), 3)
+        # user3 should be first as it was updated most recently
+        self.assertEqual(results[0]['user']['username'], 'gamma_user')

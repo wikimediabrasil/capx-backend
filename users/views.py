@@ -1,6 +1,6 @@
 from .models import Profile, Territory, Language, WikimediaProject, Avatar, SavedItem, Badge, UserBadge
 from orgs.models import Organization
-from .serializers import ProfileSerializer, TerritorySerializer, LanguageSerializer, WikimediaProjectSerializer, UsersBySkillSerializer, UsersByTagSerializer, AvatarSerializer, SavedItemSerializer, BadgeSerializer, UserBadgeSerializer
+from .serializers import ProfileSerializer, TerritorySerializer, LanguageSerializer, WikimediaProjectSerializer, UsersBySkillSerializer, UsersByTagSerializer, AvatarSerializer, SavedItemSerializer, BadgeSerializer, UserBadgeSerializer, RecommendationUserSerializer, RecommendationOrganizationSerializer
 from skills.models import Skill
 from events.models import Events
 from projects.models import Project
@@ -55,6 +55,18 @@ from django.db.models import Count, F
                 required=False,
                 type=OpenApiTypes.INT,
             ),
+            OpenApiParameter(
+                name='name',
+                description='Fuzzy search for users by username. Case-insensitive partial matching.',
+                required=False,
+                type=OpenApiTypes.STR,
+            ),
+            OpenApiParameter(
+                name='ordering',
+                description='Sort users by field. Prefix with "-" for descending order. Options: last_update.',
+                required=False,
+                type=OpenApiTypes.STR,
+            ),
         ],
     ),
     retrieve=extend_schema(
@@ -65,7 +77,8 @@ from django.db.models import Count, F
 class UsersViewSet(viewsets.ReadOnlyModelViewSet):
     serializer_class = ProfileSerializer
     queryset = Profile.objects.all()
-    filter_backends = [DjangoFilterBackend]
+    filter_backends = [DjangoFilterBackend, filters.OrderingFilter]
+    ordering_fields = ['last_update']
     filterset_fields = [
         'user__username',
         'about',
@@ -85,6 +98,7 @@ class UsersViewSet(viewsets.ReadOnlyModelViewSet):
         has_skills_wanted = self.request.query_params.get('has_skills_wanted')
         has_any_skills = self.request.query_params.get('has_any_skills')
         territory_id = self.request.query_params.get('territory')
+        name_search = self.request.query_params.get('name')
 
         if territory_id:
             # Include profiles in the specified territory or its child territories
@@ -93,6 +107,13 @@ class UsersViewSet(viewsets.ReadOnlyModelViewSet):
                 models.Q(parent_territory__id=territory_id)
             ).values_list('id', flat=True)
             queryset = queryset.filter(territory__id__in=child_territories)
+
+        if name_search and name_search.strip():
+            # Fuzzy search: case-insensitive partial match on username or profile wiki_alt
+            queryset = queryset.filter(
+                models.Q(user__username__icontains=name_search) |
+                models.Q(wiki_alt__icontains=name_search)
+            ).distinct()
 
         if has_skills_known is not None:
             if has_skills_known.lower() == 'true':
@@ -744,7 +765,7 @@ class RecommendationView(APIView):
 
     @extend_schema(
         summary='Get personalized recommendations for the logged-in user.',
-        description='Returns people to share skills with or learn from, people with the same language(s), new skills to consider, and upcoming events related to user skills.',
+        description='Returns people to share skills with or learn from, people with the same language(s), organizations to share with or learn from, new skills to consider, and upcoming events related to user skills.',
         parameters=[
             OpenApiParameter(
                 name='limit',
@@ -759,6 +780,8 @@ class RecommendationView(APIView):
                 'share_with': {'type': 'array', 'items': {'type': 'object'}},
                 'learn_from': {'type': 'array', 'items': {'type': 'object'}},
                 'same_language': {'type': 'array', 'items': {'type': 'object'}},
+                'share_with_orgs': {'type': 'array', 'items': {'type': 'object'}},
+                'learn_from_orgs': {'type': 'array', 'items': {'type': 'object'}},
                 'new_skills': {'type': 'array', 'items': {'type': 'object'}},
                 'events': {'type': 'array', 'items': {'type': 'object'}},
             }
@@ -773,6 +796,8 @@ class RecommendationView(APIView):
                 'share_with': [],
                 'learn_from': [],
                 'same_language': [],
+                'share_with_orgs': [],
+                'learn_from_orgs': [],
                 'new_skills': [],
                 'events': [],
             })
@@ -791,22 +816,52 @@ class RecommendationView(APIView):
         all_user_skill_ids = skills_known_ids | skills_available_ids | skills_wanted_ids
 
         # People to share skills with: others who want what I can teach
-        share_with_qs = Profile.objects.filter(
-            skills_wanted__id__in=list(skills_available_ids)
-        ).exclude(pk=profile.pk).distinct()[:limit]
+        share_with_qs = (
+            Profile.objects.exclude(pk=profile.pk)
+            .annotate(
+                match_count=Count(
+                    'skills_wanted',
+                    filter=models.Q(skills_wanted__id__in=list(skills_available_ids)),
+                    distinct=True,
+                )
+            )
+            .filter(match_count__gt=0)
+            .order_by('-match_count', '?')[:limit]
+        )
 
         # People to learn from: others who can teach what I want
-        learn_from_qs = Profile.objects.filter(
-            skills_available__id__in=list(skills_wanted_ids)
-        ).exclude(pk=profile.pk).distinct()[:limit]
+        learn_from_qs = (
+            Profile.objects.exclude(pk=profile.pk)
+            .annotate(
+                match_count=Count(
+                    'skills_available',
+                    filter=models.Q(skills_available__id__in=list(skills_wanted_ids)),
+                    distinct=True,
+                )
+            )
+            .filter(match_count__gt=0)
+            .order_by('-match_count', '?')[:limit]
+        )
 
-        # Same language people: share any language (exclude proficiency 0)
+        # Same language people: rank by number of shared languages (exclude proficiency 0), randomize ties
         lang_ids = list(
             profile.languageproficiency_set.exclude(proficiency=0).values_list('language_id', flat=True)
         )
-        same_lang_qs = Profile.objects.filter(
-            languageproficiency__language_id__in=lang_ids
-        ).exclude(languageproficiency__proficiency=0).exclude(pk=profile.pk).distinct()[:limit]
+        same_lang_qs = (
+            Profile.objects.exclude(pk=profile.pk)
+            .annotate(
+                match_count=Count(
+                    'languageproficiency',
+                    filter=(
+                        models.Q(languageproficiency__language_id__in=lang_ids)
+                        & ~models.Q(languageproficiency__proficiency=0)
+                    ),
+                    distinct=True,
+                )
+            )
+            .filter(match_count__gt=0)
+            .order_by('-match_count', '?')[:limit]
+        )
 
         # New skills: popular skills the user doesn't have/want yet
         new_skills_qs = (
@@ -816,7 +871,7 @@ class RecommendationView(APIView):
                 available_count=Count('user_available_skills', distinct=True),
             )
             .annotate(popularity=F('known_count') + F('available_count'))
-            .order_by('-popularity', 'id')[:limit]
+            .order_by('-popularity', '?')[:limit]
         )
 
         # Events: upcoming events related to my skills
@@ -829,15 +884,44 @@ class RecommendationView(APIView):
             ).order_by('time_begin').distinct()[:limit]
         )
 
+        # Organizations to share skills with: organizations that want what I can teach
+        share_with_orgs_qs = (
+            Organization.objects.filter(managers__isnull=False)
+            .annotate(
+                match_count=Count(
+                    'wanted_capacities',
+                    filter=models.Q(wanted_capacities__id__in=list(skills_available_ids)),
+                    distinct=True,
+                )
+            )
+            .filter(match_count__gt=0)
+            .order_by('-match_count', '?')[:limit]
+        )
+
+        # Organizations to learn from: organizations that can teach what I want
+        learn_from_orgs_qs = (
+            Organization.objects.filter(managers__isnull=False)
+            .annotate(
+                match_count=Count(
+                    'available_capacities',
+                    filter=models.Q(available_capacities__id__in=list(skills_wanted_ids)),
+                    distinct=True,
+                )
+            )
+            .filter(match_count__gt=0)
+            .order_by('-match_count', '?')[:limit]
+        )
+
         # Serialize
-        users_serializer = UsersByTagSerializer
         from skills.serializers import SkillSerializer  # local import to avoid cycles
         from events.serializers import EventSerializer
 
         data = {
-            'share_with': users_serializer(share_with_qs, many=True).data,
-            'learn_from': users_serializer(learn_from_qs, many=True).data,
-            'same_language': users_serializer(same_lang_qs, many=True).data,
+            'share_with': RecommendationUserSerializer(share_with_qs, many=True).data,
+            'learn_from': RecommendationUserSerializer(learn_from_qs, many=True).data,
+            'same_language': RecommendationUserSerializer(same_lang_qs, many=True).data,
+            'share_with_orgs': RecommendationOrganizationSerializer(share_with_orgs_qs, many=True).data,
+            'learn_from_orgs': RecommendationOrganizationSerializer(learn_from_orgs_qs, many=True).data,
             'new_skills': SkillSerializer(new_skills_qs, many=True).data,
             'events': EventSerializer(events_qs, many=True).data,
         }
