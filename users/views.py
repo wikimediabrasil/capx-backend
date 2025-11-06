@@ -57,7 +57,7 @@ from django.db.models import Count, F
             ),
             OpenApiParameter(
                 name='ordering',
-                description='Sort users by field. Prefix with "-" for descending order. Options: display_name, last_update, user__date_joined.',
+                description='Sort users by field. Prefix with "-" for descending order. Options: last_update.',
                 required=False,
                 type=OpenApiTypes.STR,
             ),
@@ -72,7 +72,7 @@ class UsersViewSet(viewsets.ReadOnlyModelViewSet):
     serializer_class = ProfileSerializer
     queryset = Profile.objects.all()
     filter_backends = [DjangoFilterBackend, filters.OrderingFilter]
-    ordering_fields = ['display_name', 'last_update', 'user__date_joined']
+    ordering_fields = ['last_update']
     filterset_fields = [
         'user__username',
         'about',
