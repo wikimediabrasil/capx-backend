@@ -44,6 +44,12 @@ from events.models import Events
                 required=False,
                 type=OpenApiTypes.INT,
             ),
+            OpenApiParameter(
+                name='ordering',
+                description='Sort organizations by field. Prefix with "-" for descending order. Options: display_name, update_date.',
+                required=False,
+                type=OpenApiTypes.STR,
+            ),
         ]
     ),
     retrieve=extend_schema(
