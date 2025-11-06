@@ -876,3 +876,67 @@ class StatisticsViewTestCase(TestCase):
         self.assertGreaterEqual(response.data['total_capacities'], 1)
         self.assertGreaterEqual(response.data['total_messages'], 1)
         self.assertGreaterEqual(response.data['total_organizations'], 1)
+
+
+class UsersOrderingTestCase(TestCase):
+    def setUp(self):
+        self.client = APIClient()
+        # Create multiple users with different attributes
+        self.user1 = CustomUser.objects.create_user(username='alpha_user', password=str(secrets.randbits(16)))
+        self.user2 = CustomUser.objects.create_user(username='beta_user', password=str(secrets.randbits(16)))
+        self.user3 = CustomUser.objects.create_user(username='gamma_user', password=str(secrets.randbits(16)))
+        
+        # Update profiles with display names
+        self.user1.profile.display_name = 'Zoe Smith'
+        self.user1.profile.save()
+        self.user2.profile.display_name = 'Alice Johnson'
+        self.user2.profile.save()
+        self.user3.profile.display_name = 'Bob Williams'
+        self.user3.profile.save()
+
+    def test_users_ordering_by_display_name_asc(self):
+        response = self.client.get('/users/?ordering=display_name')
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        results = response.data['results']
+        self.assertGreaterEqual(len(results), 3)
+        # Alice should come before Bob, and Bob before Zoe
+        display_names = [r['display_name'] for r in results]
+        self.assertEqual(display_names[0], 'Alice Johnson')
+        self.assertEqual(display_names[1], 'Bob Williams')
+        self.assertEqual(display_names[2], 'Zoe Smith')
+
+    def test_users_ordering_by_display_name_desc(self):
+        response = self.client.get('/users/?ordering=-display_name')
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        results = response.data['results']
+        self.assertGreaterEqual(len(results), 3)
+        # Zoe should come before Bob, and Bob before Alice
+        display_names = [r['display_name'] for r in results]
+        self.assertEqual(display_names[0], 'Zoe Smith')
+        self.assertEqual(display_names[1], 'Bob Williams')
+        self.assertEqual(display_names[2], 'Alice Johnson')
+
+    def test_users_ordering_by_last_update_desc(self):
+        # Update profile of user1 to make it the most recently updated
+        import time
+        time.sleep(0.01)  # Small delay to ensure different timestamps
+        self.user1.profile.about = 'Updated bio'
+        self.user1.profile.save()
+        
+        response = self.client.get('/users/?ordering=-last_update')
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        results = response.data['results']
+        self.assertGreaterEqual(len(results), 3)
+        # user1 should be first as it was updated most recently
+        self.assertEqual(results[0]['user']['username'], 'alpha_user')
+
+    def test_users_ordering_by_date_joined_asc(self):
+        response = self.client.get('/users/?ordering=user__date_joined')
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        results = response.data['results']
+        self.assertGreaterEqual(len(results), 3)
+        # Users should be ordered by join date (ascending)
+        usernames = [r['user']['username'] for r in results]
+        self.assertEqual(usernames[0], 'alpha_user')
+        self.assertEqual(usernames[1], 'beta_user')
+        self.assertEqual(usernames[2], 'gamma_user')
