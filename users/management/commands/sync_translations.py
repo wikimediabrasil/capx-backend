@@ -1,6 +1,8 @@
 import os
 import re
 import time
+import json
+from datetime import datetime
 import requests
 from urllib.parse import urlparse
 from django.conf import settings
@@ -45,7 +47,7 @@ class Command(BaseCommand):
             applied = self._apply_todos(todos, mb_session, mb_token, mw_session, mw_token)
             self.stdout.write(f"Applied edits: {applied}")
 
-        self._process_mismatches(metabase, metawiki, dry_run)
+        self._process_mismatches(metabase, metawiki, dry_run, mb_session, mb_token, mw_session, mw_token)
 
     def _init_sessions(self, dry_run):
         mb_session = mb_token = mw_session = mw_token = None
@@ -79,24 +81,245 @@ class Command(BaseCommand):
                 self.stderr.write(f"Error applying {qid}/{lang} {field} to {side}: {e}")
         return applied
 
-    def _process_mismatches(self, metabase, metawiki, dry_run):
+    def _process_mismatches(self, metabase, metawiki, dry_run, mb_session=None, mb_token=None, mw_session=None, mw_token=None):
+        """
+        For each mismatch (both sides have values but differ), pick the most recently
+        updated source and sync the other side. If we cannot determine recency for an
+        entry, fall back to filing a bug (one bug per QID, containing unresolved entries).
+        """
         mismatches = self.find_mismatches(metabase, metawiki)
-        if mismatches:
-            created = 0
-            skipped = 0
-            for qid, entries in mismatches.items():
-                if self._skip_existing_bug(qid):
-                    skipped += 1
-                    continue
-                if self.verbosity >= 2:
-                    self.stdout.write(f"Creating bug for {qid} with {len(entries)} mismatches...")
-                if not dry_run:
-                    self.ensure_bug_for_mismatches(qid, entries, dry_run=False)
-                created += 1
-            self.stdout.write(f"Mismatch bugs created: {created}, existing: {skipped}")
-        else:
+        if not mismatches:
             if self.verbosity >= 1:
                 self.stdout.write("No mismatches found.")
+            return
+
+        total = 0
+        resolved = 0
+        bug_created = 0
+        skipped_existing_bug = 0
+
+        for qid, entries in mismatches.items():
+            unresolved_for_bug = []
+            metabase_id = self.get_metabase_id_for_qid(metabase, qid)
+            if self.verbosity >= 2:
+                self.stdout.write(f"Processing mismatches for {qid} (Metabase item: {metabase_id or 'unknown'})...")
+
+            for e in entries:
+                total += 1
+                lang = e["lang"]
+                field = e["field"]  # 'label' | 'description'
+                mb_value = e.get("metabase")
+                mw_value = e.get("metawiki")
+
+                try:
+                    t_mw = self.get_metawiki_term_last_modified(qid, field, lang, session=mw_session)
+                except Exception as ex:
+                    t_mw = None
+                    if self.verbosity >= 2:
+                        self.stderr.write(f"Failed to fetch MetaWiki timestamp for {qid}/{lang} {field}: {ex}")
+
+                try:
+                    t_mb = self.get_metabase_term_last_modified(metabase_id, field, lang, session=mb_session)
+                except Exception as ex:
+                    t_mb = None
+                    if self.verbosity >= 2:
+                        self.stderr.write(f"Failed to fetch Metabase timestamp for {qid}/{lang} {field}: {ex}")
+
+                decision = None
+                if t_mw and t_mb:
+                    decision = "metawiki" if t_mw > t_mb else "metabase"
+                elif t_mw and not t_mb:
+                    decision = "metawiki"
+                elif t_mb and not t_mw:
+                    decision = "metabase"
+
+                if decision == "metawiki":
+                    # Metawiki newer -> push to Metabase
+                    if self.verbosity >= 1:
+                        when = t_mw.isoformat() if t_mw else "unknown"
+                        self.stdout.write(f"[{qid}/{lang} {field}] MetaWiki is newer ({when}); syncing to Metabase...")
+                    if not dry_run and metabase_id:
+                        try:
+                            self.set_metabase_term(mb_session, mb_token, metabase_id, lang, field, mw_value, qid)
+                            resolved += 1
+                            time.sleep(10)
+                        except requests.HTTPError as http_ex:
+                            self.stderr.write(f"HTTP error setting Metabase term for {qid}/{lang} {field}: {http_ex}")
+                            unresolved_for_bug.append(e)
+                        except Exception as ex:
+                            self.stderr.write(f"Error setting Metabase term for {qid}/{lang} {field}: {ex}")
+                            unresolved_for_bug.append(e)
+                    else:
+                        # Dry run or missing metabase_id
+                        resolved += 1 if dry_run else 0
+                        if dry_run and self.verbosity >= 2:
+                            self.stdout.write(f"DRY-RUN: would set Metabase {field} ({lang}) for {qid} -> '{mw_value}'")
+                        if not metabase_id and not dry_run:
+                            unresolved_for_bug.append(e)
+                elif decision == "metabase":
+                    # Metabase newer -> push to MetaWiki
+                    if self.verbosity >= 1:
+                        when = t_mb.isoformat() if t_mb else "unknown"
+                        self.stdout.write(f"[{qid}/{lang} {field}] Metabase is newer ({when}); syncing to MetaWiki...")
+                    if not dry_run:
+                        try:
+                            self.set_metawiki_translation(mw_session, mw_token, qid, lang, field, mb_value, metabase_id)
+                            resolved += 1
+                            time.sleep(10)
+                        except requests.HTTPError as http_ex:
+                            self.stderr.write(f"HTTP error setting MetaWiki translation for {qid}/{lang} {field}: {http_ex}")
+                            unresolved_for_bug.append(e)
+                        except Exception as ex:
+                            self.stderr.write(f"Error setting MetaWiki translation for {qid}/{lang} {field}: {ex}")
+                            unresolved_for_bug.append(e)
+                    else:
+                        resolved += 1
+                        if self.verbosity >= 2:
+                            self.stdout.write(f"DRY-RUN: would set MetaWiki {field} ({lang}) for {qid} -> '{mb_value}'")
+                else:
+                    # Cannot decide which is newer
+                    if self.verbosity >= 1:
+                        self.stdout.write(f"[{qid}/{lang} {field}] Could not determine recency; will file a bug entry.")
+                    unresolved_for_bug.append(e)
+
+            # Create bug only for unresolved entries of this QID
+            if unresolved_for_bug:
+                if self._skip_existing_bug(qid):
+                    skipped_existing_bug += 1
+                else:
+                    if self.verbosity >= 2:
+                        self.stdout.write(f"Creating bug for {qid} with {len(unresolved_for_bug)} unresolved mismatches...")
+                    if not dry_run:
+                        self.ensure_bug_for_mismatches(qid, unresolved_for_bug, dry_run=False)
+                    bug_created += 1
+
+        self.stdout.write(
+            f"Mismatch resolution: total={total}, resolved={resolved}, bugs_created={bug_created}, existing_bugs_skipped={skipped_existing_bug}"
+        )
+
+    def _parse_ts(self, ts: str):
+        if not ts:
+            return None
+        try:
+            # Convert MW '...Z' to ISO with timezone
+            return datetime.fromisoformat(ts.replace('Z', '+00:00'))
+        except Exception:
+            return None
+
+    def get_metawiki_term_last_modified(self, qid: str, field: str, lang: str, session: requests.Session | None = None):
+        """Return the timestamp (datetime) of the latest edit to the MetaWiki translation page."""
+        title = self.compose_metawiki_title(qid, field, lang)
+        s = session or requests.Session()
+        s.headers.update({"User-Agent": USER_AGENT})
+        params = {
+            "action": "query",
+            "format": "json",
+            "prop": "revisions",
+            "titles": title,
+            "rvlimit": 1,
+            "rvprop": "timestamp",
+            "formatversion": "2",
+        }
+        r = s.get(METAWIKI_API_ENDPOINT, params=params, timeout=30)
+        r.raise_for_status()
+        j = r.json()
+        pages = j.get("query", {}).get("pages", [])
+        if not pages:
+            return None
+        revs = pages[0].get("revisions", [])
+        if not revs:
+            return None
+        return self._parse_ts(revs[0].get("timestamp"))
+
+    def get_metabase_term_last_modified(self, metabase_id: str | None, field: str, lang: str, session: requests.Session | None = None, max_revisions: int = 400):
+        """
+        Return the timestamp (datetime) when the current label/description value for a language
+        on the Wikibase item was introduced (i.e., the latest change time for that term).
+        If metabase_id is None or value not present, returns None.
+        """
+        if not metabase_id:
+            return None
+
+        s = session or requests.Session()
+        s.headers.update({"User-Agent": USER_AGENT})
+
+        # First, get the current term value to compare against history
+        r = s.get(METABASE_API_ENDPOINT, params={
+            "action": "wbgetentities",
+            "format": "json",
+            "ids": metabase_id,
+            "props": f"{field}s",
+            "languages": lang,
+        }, timeout=30)
+        r.raise_for_status()
+        j = r.json()
+        entity = j.get("entities", {}).get(metabase_id, {})
+        terms = entity.get(f"{field}s", {})
+        cur_term = terms.get(lang)
+        cur_value = (cur_term or {}).get("value")
+        if not cur_value:
+            return None
+
+        # Walk revisions of the item page to find when this value first appeared
+        title = f"Item:{metabase_id}"
+        params = {
+            "action": "query",
+            "format": "json",
+            "formatversion": "2",
+            "prop": "revisions",
+            "titles": title,
+            "rvslots": "main",
+            "rvprop": "ids|timestamp|content",
+            # default order: newest first
+            "rvlimit": "50",
+        }
+        processed = 0
+        last_equal_ts = None
+        cont = None
+
+        def extract_value_from_rev(rev):
+            slots = rev.get("slots", {})
+            main = slots.get("main", {})
+            content = main.get("*") or main.get("content") or rev.get("*")
+            if not content:
+                return None
+            try:
+                data = json.loads(content)
+            except Exception:
+                return None
+            d = data.get(f"{field}s", {})
+            v = d.get(lang, {})
+            return v.get("value")
+
+        while True:
+            params2 = dict(params)
+            if cont:
+                params2["rvcontinue"] = cont
+            r = s.get(METABASE_API_ENDPOINT, params=params2, timeout=60)
+            r.raise_for_status()
+            j = r.json()
+            pages = j.get("query", {}).get("pages", [])
+            if not pages:
+                break
+            revs = pages[0].get("revisions", [])
+            for rev in revs:
+                processed += 1
+                ts = self._parse_ts(rev.get("timestamp"))
+                val = extract_value_from_rev(rev)
+                if val == cur_value:
+                    last_equal_ts = ts
+                else:
+                    # We crossed the boundary where term changed: the next newer revision
+                    # (which we've already seen) is when the current value first appeared.
+                    return last_equal_ts
+                if processed >= max_revisions:
+                    return last_equal_ts
+
+            cont = j.get("continue", {}).get("rvcontinue")
+            if not cont:
+                break
+
+        return last_equal_ts
 
     def _skip_existing_bug(self, qid):
         existing = Bug.objects.filter(title=self.bug_title_for_qid(qid)).first()
