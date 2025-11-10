@@ -773,6 +773,13 @@ class RecommendationView(APIView):
                 required=False,
                 type=OpenApiTypes.INT,
             ),
+            OpenApiParameter(
+                name='ignore_saved',
+                description='When true, ignore users and organizations the requester has saved (default: true).',
+                required=False,
+                type=OpenApiTypes.BOOL,
+                default=True,
+            ),
         ],
         responses={(200, 'application/json'): {
             'type': 'object',
@@ -809,6 +816,22 @@ class RecommendationView(APIView):
             limit = 10
         limit = max(1, min(limit, 50))
 
+        # Whether to ignore already-saved users/orgs (default True)
+        ignore_saved_param = str(request.query_params.get('ignore_saved', 'true')).lower()
+        ignore_saved = ignore_saved_param not in ('false', '0', 'no')
+
+        saved_user_ids = []
+        saved_org_ids = []
+        if ignore_saved:
+            saved_user_ids = list(
+                SavedItem.objects.filter(user=user, entity='user')
+                .values_list('related_user_id', flat=True)
+            )
+            saved_org_ids = list(
+                SavedItem.objects.filter(user=user, entity='org')
+                .values_list('related_org_id', flat=True)
+            )
+
         # Collect user's skills
         skills_known_ids = set(profile.skills_known.values_list('id', flat=True))
         skills_available_ids = set(profile.skills_available.values_list('id', flat=True))
@@ -818,6 +841,7 @@ class RecommendationView(APIView):
         # People to share skills with: others who want what I can teach
         share_with_qs = (
             Profile.objects.exclude(pk=profile.pk)
+            .exclude(user__id__in=saved_user_ids)
             .annotate(
                 match_count=Count(
                     'skills_wanted',
@@ -832,6 +856,7 @@ class RecommendationView(APIView):
         # People to learn from: others who can teach what I want
         learn_from_qs = (
             Profile.objects.exclude(pk=profile.pk)
+            .exclude(user__id__in=saved_user_ids)
             .annotate(
                 match_count=Count(
                     'skills_available',
@@ -849,6 +874,7 @@ class RecommendationView(APIView):
         )
         same_lang_qs = (
             Profile.objects.exclude(pk=profile.pk)
+            .exclude(user__id__in=saved_user_ids)
             .annotate(
                 match_count=Count(
                     'languageproficiency',
@@ -887,6 +913,7 @@ class RecommendationView(APIView):
         # Organizations to share skills with: organizations that want what I can teach
         share_with_orgs_qs = (
             Organization.objects.filter(managers__isnull=False)
+            .exclude(id__in=saved_org_ids)
             .annotate(
                 match_count=Count(
                     'wanted_capacities',
@@ -901,6 +928,7 @@ class RecommendationView(APIView):
         # Organizations to learn from: organizations that can teach what I want
         learn_from_orgs_qs = (
             Organization.objects.filter(managers__isnull=False)
+            .exclude(id__in=saved_org_ids)
             .annotate(
                 match_count=Count(
                     'available_capacities',
