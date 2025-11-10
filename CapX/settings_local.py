@@ -39,6 +39,10 @@ def configure_settings():
                 'PASSWORD': os.environ.get("TOOL_TOOLSDB_PASSWORD"),
                 'HOST': 'tools.db.svc.wikimedia.cloud',
                 'PORT': '',
+                'OPTIONS': {
+                    'charset': 'utf8mb4',
+                    'init_command': "SET NAMES 'utf8mb4' COLLATE 'utf8mb4_unicode_ci'",
+                }
             }
         }
 
@@ -69,6 +73,10 @@ def configure_settings():
                     'PASSWORD': 'runner',
                     'HOST': 'localhost',
                     'PORT': '3306',
+                    'OPTIONS': {
+                        'charset': 'utf8mb4',
+                        'init_command': "SET NAMES 'utf8mb4' COLLATE 'utf8mb4_unicode_ci'",
+                    }
                 }
             }
         except Exception as e:
