@@ -114,7 +114,7 @@ class Organization(models.Model):
 
     def __str__(self):
         name_en = self.i18n_names.filter(language_code='en').first()
-        return name_en.name if name_en else f"Organization {self.pk}"
+        return f"{name_en.name} ({self.acronym})" if name_en else f"Organization {self.pk}"
 
 
 class Management(models.Model):
