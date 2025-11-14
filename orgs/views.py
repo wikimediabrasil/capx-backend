@@ -1,13 +1,45 @@
 from rest_framework import viewsets, status, permissions
 from rest_framework.response import Response
-from .models import Organization, OrganizationType, TagDiff, Document
-from .serializers import OrganizationSerializer, OrganizationTypeSerializer, TagDiffSerializer, DocumentSerializer
+from .models import Organization, OrganizationType, TagDiff, Document, OrganizationName
+from .serializers import (
+    OrganizationSerializer,
+    OrganizationTypeSerializer,
+    TagDiffSerializer,
+    DocumentSerializer,
+    OrganizationNameSerializer,
+)
 from users.models import CustomUser as User, Territory
 from django_filters.rest_framework import DjangoFilterBackend
+from django_filters import rest_framework as filters
 from rest_framework.filters import OrderingFilter
 from drf_spectacular.utils import extend_schema, extend_schema_view, OpenApiParameter, OpenApiTypes
 from django.db import models
+from django.db.models import Subquery, OuterRef
 from events.models import Events
+
+PATCH_NOT_ALLOWED_MSG = "PATCH method not allowed"
+
+class OrganizationFilter(filters.FilterSet):
+    # Backward-compatible filter: match any translation of the name
+    display_name = filters.CharFilter(method='filter_display_name')
+
+    def filter_display_name(self, queryset, name, value):
+        if not value:
+            return queryset
+        return queryset.filter(i18n_names__name__icontains=value).distinct()
+
+    class Meta:
+        model = Organization
+        fields = {
+            'acronym': ['exact'],
+            'type': ['exact'],
+            'managers': ['exact'],
+            'known_capacities': ['exact'],
+            'available_capacities': ['exact'],
+            'wanted_capacities': ['exact'],
+            # 'display_name' is handled via method filter above
+        }
+
 
 @extend_schema_view(
     list=extend_schema(
@@ -69,73 +101,73 @@ class OrganizationViewSet(viewsets.ModelViewSet):
     queryset = Organization.objects.all()
     serializer_class = OrganizationSerializer
     filter_backends = [DjangoFilterBackend, OrderingFilter]
+    # Include display_name for backward-compatible ordering (uses English translation via annotation)
     ordering_fields = ['display_name', 'update_date']
-    filterset_fields = [
-        'display_name',
-        'acronym',
-        'type',
-        'managers',
-        'known_capacities',
-        'available_capacities',
-        'wanted_capacities',
-    ]
-
+    filterset_class = OrganizationFilter
 
     def get_queryset(self):
-        has_capacities_known = self.request.query_params.get('has_capacities_known', None)
-        has_capacities_wanted = self.request.query_params.get('has_capacities_wanted', None)
-        has_capacities_available = self.request.query_params.get('has_capacities_available', None)
-        has_any_capacities = self.request.query_params.get('has_any_capacities', None)
-        territory_id = self.request.query_params.get('territory')
-
+        query_params = self.request.query_params
         user = self.request.user
-        if user.is_staff:
-            queryset = Organization.objects.all()
-        else:
-            # Filter organizations that have at least one manager and ensure distinct results
-            queryset = Organization.objects.filter(managers__isnull=False).distinct()
-        
+        # Filter organizations that have at least one manager and ensure distinct results
+        queryset = Organization.objects.all() if user.is_staff else Organization.objects.filter(managers__isnull=False).distinct()
+        query_filters = []
+
+        territory_id = query_params.get('territory')
         if territory_id:
             # Include organizations in the specified territory or its child territories
-            child_territories = Territory.objects.filter(
-                models.Q(id=territory_id) | 
-                models.Q(parent_territory__id=territory_id)
+            child_territory_ids = Territory.objects.filter(
+                models.Q(id=territory_id) | models.Q(parent_territory__id=territory_id)
             ).values_list('id', flat=True)
-            queryset = queryset.filter(territory__id__in=child_territories)
+            query_filters.append(models.Q(territory__id__in=child_territory_ids))
 
-        if has_capacities_known is not None:
-            if has_capacities_known.lower() == 'true':
-                queryset = queryset.filter(known_capacities__isnull=False).distinct()
-            elif has_capacities_known.lower() == 'false':
-                queryset = queryset.filter(known_capacities__isnull=True).distinct()
+        def capacity_filter(param_name: str, capacity_field: str):
+            value = query_params.get(param_name)
+            if value is None:
+                return None
+            value_lower = value.lower()
+            if value_lower == 'true':
+                return models.Q(**{f"{capacity_field}__isnull": False})
+            if value_lower == 'false':
+                return models.Q(**{f"{capacity_field}__isnull": True})
+            return None
 
-        if has_capacities_wanted is not None:
-            if has_capacities_wanted.lower() == 'true':
-                queryset = queryset.filter(wanted_capacities__isnull=False).distinct()
-            elif has_capacities_wanted.lower() == 'false':
-                queryset = queryset.filter(wanted_capacities__isnull=True).distinct()
+        for param_name, capacity_field in [
+            ('has_capacities_known', 'known_capacities'),
+            ('has_capacities_available', 'available_capacities'),
+            ('has_capacities_wanted', 'wanted_capacities'),
+        ]:
+            capacity_q = capacity_filter(param_name, capacity_field)
+            if capacity_q:
+                query_filters.append(capacity_q)
 
-        if has_capacities_available is not None:
-            if has_capacities_available.lower() == 'true':
-                queryset = queryset.filter(available_capacities__isnull=False).distinct()
-            elif has_capacities_available.lower() == 'false':
-                queryset = queryset.filter(available_capacities__isnull=True).distinct()
-
-        if has_any_capacities is not None:
-            if has_any_capacities.lower() == 'true':
-                queryset = queryset.filter(
+        has_any_capacities_param = query_params.get('has_any_capacities')
+        if has_any_capacities_param:
+            if has_any_capacities_param.lower() == 'true':
+                query_filters.append(
                     models.Q(known_capacities__isnull=False) |
                     models.Q(available_capacities__isnull=False) |
                     models.Q(wanted_capacities__isnull=False)
-                ).distinct()
-            elif has_any_capacities.lower() == 'false':
-                queryset = queryset.filter(
+                )
+            elif has_any_capacities_param.lower() == 'false':
+                query_filters.append(
                     models.Q(known_capacities__isnull=True) &
                     models.Q(available_capacities__isnull=True) &
                     models.Q(wanted_capacities__isnull=True)
-                ).distinct()
+                )
 
-        return queryset
+        if query_filters:
+            combined_filter = query_filters[0]
+            for extra_filter in query_filters[1:]:
+                combined_filter &= extra_filter
+            queryset = queryset.filter(combined_filter)
+
+        # Annotate English name for backward-compatible ordering by display_name
+        en_name_subquery = OrganizationName.objects.filter(
+            organization=OuterRef('pk'), language_code='en'
+        ).values('name')[:1]
+        queryset = queryset.annotate(display_name=Subquery(en_name_subquery))
+
+        return queryset.prefetch_related('i18n_names').distinct()
 
     def _validate_choose_events(self, organization, choose_events):
         """
@@ -185,7 +217,7 @@ class OrganizationViewSet(viewsets.ModelViewSet):
         
     @extend_schema(exclude=True)        
     def partial_update(self, request, *args, **kwargs):
-        return Response("PATCH method not allowed", status=status.HTTP_405_METHOD_NOT_ALLOWED)
+        return Response(PATCH_NOT_ALLOWED_MSG, status=status.HTTP_405_METHOD_NOT_ALLOWED)
 
     @extend_schema(
         summary='Delete an organization.',
@@ -240,7 +272,7 @@ class TagDiffViewSet(viewsets.ModelViewSet):
 
     @extend_schema(exclude=True)
     def partial_update(self, request, *args, **kwargs):
-        return Response("PATCH method not allowed", status=status.HTTP_405_METHOD_NOT_ALLOWED)
+        return Response(PATCH_NOT_ALLOWED_MSG, status=status.HTTP_405_METHOD_NOT_ALLOWED)
 
 @extend_schema_view(
     list=extend_schema(
@@ -270,4 +302,81 @@ class DocumentViewSet(viewsets.ModelViewSet):
 
     @extend_schema(exclude=True)
     def partial_update(self, request, *args, **kwargs):
-        return Response("PATCH method not allowed", status=status.HTTP_405_METHOD_NOT_ALLOWED)
+        return Response(PATCH_NOT_ALLOWED_MSG, status=status.HTTP_405_METHOD_NOT_ALLOWED)
+
+
+@extend_schema_view(
+    list=extend_schema(
+        summary='List organization display name translations.',
+        description='Lists all organization name translations. Filter by organization or language code.',
+        parameters=[
+            OpenApiParameter(
+                name='organization', description='Filter by organization ID.', required=False, type=OpenApiTypes.INT
+            ),
+            OpenApiParameter(
+                name='language_code', description='Filter by language code.', required=False, type=OpenApiTypes.STR
+            ),
+            OpenApiParameter(
+                name='ordering', description='Order by language_code or name.', required=False, type=OpenApiTypes.STR
+            ),
+        ]
+    ),
+    retrieve=extend_schema(
+        summary='Retrieve a translated organization name.',
+        description='Fetch a single organization name translation by ID.'
+    ),
+    create=extend_schema(
+        summary='Create a translation for an organization name.',
+        description='Create a new translation row. Staff or managers of the organization only.'
+    ),
+    update=extend_schema(
+        summary='Update a translation for an organization name.',
+        description='Update an existing translation. Staff or managers of the organization only.'
+    ),
+    destroy=extend_schema(
+        summary='Delete a translation for an organization name.',
+        description='Delete an organization name translation. Staff or managers only.'
+    ),
+)
+class OrganizationNameViewSet(viewsets.ModelViewSet):
+    queryset = OrganizationName.objects.select_related('organization').all()
+    serializer_class = OrganizationNameSerializer
+    filter_backends = [DjangoFilterBackend, OrderingFilter]
+    filterset_fields = ['organization', 'language_code']
+    ordering_fields = ['language_code', 'name']
+
+    def _user_can_modify(self, user, org: Organization) -> bool:
+        if user.is_staff:
+            return True
+        return org.managers.filter(pk=user.pk).exists()
+
+    def create(self, request, *args, **kwargs):
+        org_id = request.data.get('organization')
+        if not org_id:
+            return Response({'organization': 'This field is required.'}, status=status.HTTP_400_BAD_REQUEST)
+        try:
+            org = Organization.objects.get(pk=org_id)
+        except Organization.DoesNotExist:
+            return Response({'organization': 'Organization not found.'}, status=status.HTTP_404_NOT_FOUND)
+        if not self._user_can_modify(request.user, org):
+            return Response('You do not have permission to add a translation for this organization.', status=status.HTTP_403_FORBIDDEN)
+        return super().create(request, *args, **kwargs)
+
+    def update(self, request, *args, **kwargs):
+        instance = self.get_object()
+        if not self._user_can_modify(request.user, instance.organization):
+            return Response('You do not have permission to update this translation.', status=status.HTTP_403_FORBIDDEN)
+        return super().update(request, *args, **kwargs)
+
+    def destroy(self, request, *args, **kwargs):
+        instance = self.get_object()
+        if not self._user_can_modify(request.user, instance.organization):
+            return Response('You do not have permission to delete this translation.', status=status.HTTP_403_FORBIDDEN)
+        # Stop deletion of the english translation. It can be deleted only by deleting the organization.
+        if instance.language_code == 'en':
+            return Response('The English translation cannot be deleted separately. Delete the organization to remove it.', status=status.HTTP_400_BAD_REQUEST)
+        return super().destroy(request, *args, **kwargs)
+
+    @extend_schema(exclude=True)
+    def partial_update(self, request, *args, **kwargs):
+        return Response(PATCH_NOT_ALLOWED_MSG, status=status.HTTP_405_METHOD_NOT_ALLOWED)

@@ -28,7 +28,7 @@ from users.views import (
 )
 from users.letsconnect import LetsConnectViewSet
 from bugs.views import BugViewSet, AttachmentViewSet
-from orgs.views import OrganizationViewSet, OrganizationTypeViewSet, TagDiffViewSet, DocumentViewSet
+from orgs.views import OrganizationViewSet, OrganizationTypeViewSet, TagDiffViewSet, DocumentViewSet, OrganizationNameViewSet
 from events.views import EventViewSet
 from message.views import MessageViewSet
 from projects.views import ProjectViewSet, ProjectMemberViewSet, ProjectMemberAcceptanceViewSet
@@ -46,6 +46,7 @@ router.register('avatar', AvatarViewSet, basename='avatar')
 router.register('saved_item', SavedItemViewSet, basename='saved_item')
 router.register('organizations', OrganizationViewSet, basename='organizations')
 router.register('organization_type', OrganizationTypeViewSet, basename='organization_type')
+router.register('organization_name', OrganizationNameViewSet, basename='organization_name')
 router.register('tag_diff', TagDiffViewSet, basename='tag_diff')
 router.register('document', DocumentViewSet, basename='document')
 router.register('bugs', BugViewSet, basename='bugs')
