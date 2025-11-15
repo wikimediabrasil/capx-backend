@@ -3,7 +3,7 @@ from django.core.exceptions import ValidationError
 from django.utils import timezone
 from projects.models import Project, ProjectMember, ProjectMemberAcceptance
 from users.models import CustomUser
-from orgs.models import Organization, OrganizationType
+from orgs.models import Organization, OrganizationType, OrganizationName
 from skills.models import Skill
 
 import secrets
@@ -18,10 +18,10 @@ class ProjectModelTest(TestCase):
             type_name='Orgs'
         )
         self.organization = Organization.objects.create(
-            display_name='Organization for Testing',
             acronym='OT',
             type=self.organization_type
         )
+        OrganizationName.objects.create(organization=self.organization, name='Organization for Testing', language_code='en')
         self.organization.managers.add(self.user)
         self.project = Project.objects.create(
             display_name='Test Project',

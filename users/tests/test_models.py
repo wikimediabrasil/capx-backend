@@ -260,7 +260,7 @@ class SavedItemModelTest(TestCase):
         )
 
         org_type = OrganizationType.objects.create(type_name="TestType")
-        org = Organization.objects.create(display_name='Test Org', acronym='TO', type=org_type)
+        org = Organization.objects.create(acronym='TO', type=org_type)
         saved_item = SavedItem.objects.create(
             user=self.user,
             relation="sharer",
@@ -269,7 +269,7 @@ class SavedItemModelTest(TestCase):
         )
         self.assertEqual(
             str(saved_item),
-            f"{self.user.username}: sharer - Organization - Test Org"
+            f"{self.user.username}: sharer - Organization - TO"
         )
 
     def test_unique_saved_item(self):
@@ -282,7 +282,7 @@ class SavedItemModelTest(TestCase):
             )
 
         org_type = OrganizationType.objects.create(type_name="TestType")
-        org = Organization.objects.create(display_name='Test Org', acronym='TO', type=org_type)
+        org = Organization.objects.create(acronym='TO', type=org_type)
         SavedItem.objects.create(
             user=self.user,
             relation="sharer",
@@ -311,7 +311,7 @@ class SavedItemModelTest(TestCase):
 
     def test_both_related_org_and_related_user(self):
         org_type = OrganizationType.objects.create(type_name="TestType")
-        org = Organization.objects.create(display_name='Test Org', acronym='TO', type=org_type)
+        org = Organization.objects.create(acronym='TO', type=org_type)
         with self.assertRaises(ValidationError):
             SavedItem.objects.create(
                 user=self.user,

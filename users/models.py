@@ -316,7 +316,7 @@ class SavedItem(models.Model):
 
     def __str__(self):
         if self.related_org:
-            return f"{self.user.username}: {self.relation} - Organization - {self.related_org.display_name}"
+            return f"{self.user.username}: {self.relation} - Organization - {self.related_org.acronym}"
         elif self.related_user:
             return f"{self.user.username}: {self.relation} - User - {self.related_user.username}"
 

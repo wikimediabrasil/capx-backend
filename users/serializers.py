@@ -198,6 +198,7 @@ class RecommendationUserSerializer(serializers.ModelSerializer):
 
 class RecommendationOrganizationSerializer(serializers.ModelSerializer):
     matches = serializers.IntegerField(source='match_count')
+    display_name = serializers.SerializerMethodField()
 
     class Meta:
         model = Organization
@@ -208,6 +209,10 @@ class RecommendationOrganizationSerializer(serializers.ModelSerializer):
             'acronym',
             'matches',
         ]
+
+    def get_display_name(self, obj):
+        en = obj.i18n_names.filter(language_code='en').first()
+        return en.name if en else ''
 
 @extend_schema_field({
     'type': 'integer',

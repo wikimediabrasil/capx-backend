@@ -14,10 +14,6 @@ class OrganizationType(models.Model):
 
 
 class Organization(models.Model):
-    display_name = models.CharField(
-        max_length=255,
-        help_text='The full name of the organization.',
-    )
     profile_image = models.URLField(
         blank=True, null=True,
         max_length=512,
@@ -117,10 +113,9 @@ class Organization(models.Model):
     update_date = models.DateTimeField(default=timezone.now)
 
     def __str__(self):
-        if self.acronym:
-            return self.display_name + " (" + self.acronym + ")"
-        else:
-            return self.display_name
+        name_en = self.i18n_names.filter(language_code='en').first()
+        return f"{name_en.name}" if name_en else f"Organization {self.pk}"
+
 
 class Management(models.Model):
     organization = models.ForeignKey(
@@ -156,3 +151,35 @@ class Document(models.Model):
 
     def __str__(self):
         return self.url.split('/')[-1].replace('_', ' ')
+
+
+class OrganizationName(models.Model):
+    """Normalized translations for Organization.
+
+    Each row stores the display name for a specific language.
+    """
+    organization = models.ForeignKey(
+        'orgs.Organization',
+        on_delete=models.CASCADE,
+        related_name='i18n_names',
+        help_text='The organization this translation belongs to.'
+    )
+    language_code = models.CharField(
+        max_length=10,
+        help_text='BCP 47 / ISO language code (e.g. en, pt-BR).'
+    )
+    name = models.CharField(
+        max_length=255,
+        help_text='Localized display name for the organization.'
+    )
+
+    class Meta:
+        constraints = [
+            models.UniqueConstraint(fields=['organization', 'language_code'], name='uniq_org_lang_display_name'),
+        ]
+        indexes = [
+            models.Index(fields=['organization', 'language_code']),
+        ]
+
+    def __str__(self):
+        return f"{self.organization_id}:{self.language_code}={self.name}"

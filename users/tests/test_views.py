@@ -8,7 +8,7 @@ from users.models import Profile, CustomUser, LanguageProficiency, SavedItem, Ba
 from users.submodels import Territory, Language, WikimediaProject
 from users.serializers import ProfileSerializer, TerritorySerializer, LanguageSerializer, WikimediaProjectSerializer, SavedItemSerializer, BadgeSerializer, UserBadgeSerializer
 from skills.models import Skill
-from orgs.models import Organization, OrganizationType
+from orgs.models import Organization, OrganizationType, OrganizationName
 from events.models import Events
 from projects.models import Project
 from django.utils import timezone
@@ -153,7 +153,7 @@ class ProfileViewSetTestCase(TestCase):
 
     def test_update_too_many_affiliation(self):
         # Create 11 organizations
-        organizations = [Organization.objects.create(display_name=f"Organization {i}", acronym=f"Org{i}") for i in range(11)]
+        organizations = [Organization.objects.create(acronym=f"Org{i}") for i in range(11)]
         url = '/profile/' + str(self.user.pk) + '/'
         data = self.client.get(url).data
         self.assertEqual(data['affiliation'], [])
@@ -202,19 +202,31 @@ class QuickListViewSetTestCase(TestCase):
         self.client.force_authenticate(self.user)
 
         organization = Organization.objects.create(
-            display_name='New Organization',
             acronym='NO',
             type=test_org_type,
         )
+        OrganizationName.objects.create(
+            organization=organization,
+            language_code='en',
+            name='New Organization'
+        )
         organization.territory.set([test_territory])
-        Organization.objects.create(
-            display_name='New Organization 2',
+        other_organization = Organization.objects.create(
             acronym='NO2', 
             type=test_org_type,
         )
-        organization.territory.set([test_territory])
+        OrganizationName.objects.create(
+            organization=other_organization,
+            language_code='en',
+            name='Another Organization'
+        )
+        other_organization.territory.set([test_territory])
         organizations = Organization.objects.all()
-        expected_data = {organization.pk: organization.display_name + ' (' + organization.acronym + ')' for organization in organizations}
+        # Expect only the English name (no acronym suffix) per simplified __str__
+        expected_data = {
+            organization.pk: organization.i18n_names.filter(language_code='en').first().name
+            for organization in organizations
+        }
         response = self.client.get('/list/affiliation/')
         self.assertEqual(response.data, expected_data)
 
@@ -261,7 +273,6 @@ class QuickListViewSetTestCase(TestCase):
     def test_list_event(self):
         test_org_type = OrganizationType.objects.create(type_name='Type 1', type_code='TYPE1')
         organization = Organization.objects.create(
-            display_name='New Organization',
             acronym='NO',
             type=test_org_type,
         )
@@ -556,9 +567,9 @@ class UsersByTagTestCase(TestCase):
 
     def test_get_users_by_tag_affiliation(self):
         organization = Organization.objects.create(
-            display_name='New Organization',
             acronym='NO'
         )
+        OrganizationName.objects.create(organization=organization, name='New Organization', language_code='en')
         profile = Profile.objects.get(user=self.user)
         profile.affiliation.set([organization])
 
@@ -743,13 +754,14 @@ class SavedItemViewSetTestCase(TestCase):
     def setUp(self):
         self.user = CustomUser.objects.create_user(username='test', password=str(secrets.randbits(16)))
         CustomUser.objects.create_user(username='test2', password=str(secrets.randbits(16)))
-        Organization.objects.create(display_name='Test Org', acronym='TO', type=OrganizationType.objects.create(type_name='Type 1', type_code='TYPE1'))
+        org = Organization.objects.create(acronym='TO', type=OrganizationType.objects.create(type_name='Type 1', type_code='TYPE1'))
+        OrganizationName.objects.create(organization=org, name='Test Org', language_code='en')
         self.client = APIClient()
         self.client.force_authenticate(self.user)
 
     def test_list_saved_items(self):
         SavedItem.objects.create(user=self.user, relation='sharer', entity='user', related_user=CustomUser.objects.get(username='test2'))
-        SavedItem.objects.create(user=self.user, relation='learner', entity='org', related_org=Organization.objects.get(display_name='Test Org'))
+        SavedItem.objects.create(user=self.user, relation='learner', entity='org', related_org=Organization.objects.get(acronym='TO'))
 
         response = self.client.get('/saved_item/')
         self.assertEqual(response.status_code, status.HTTP_200_OK)
@@ -775,11 +787,11 @@ class SavedItemViewSetTestCase(TestCase):
         saved_item = SavedItem.objects.get(user=self.user, relation='sharer', entity='user', related_user=CustomUser.objects.get(username='test2'))
         self.assertIsNotNone(saved_item)
 
-        data = {'relation': 'learner', 'entity': 'org', 'entity_id': Organization.objects.get(display_name='Test Org').pk}
+        data = {'relation': 'learner', 'entity': 'org', 'entity_id': Organization.objects.get(acronym='TO').pk}
         response = self.client.post('/saved_item/', data, format='json')
         self.assertEqual(response.status_code, status.HTTP_201_CREATED)
 
-        saved_item = SavedItem.objects.get(user=self.user, relation='learner', entity='org', related_org=Organization.objects.get(display_name='Test Org'))
+        saved_item = SavedItem.objects.get(user=self.user, relation='learner', entity='org', related_org=Organization.objects.get(acronym='TO'))
         self.assertIsNotNone(saved_item)
 
     def test_create_saved_item_not_existing_entity(self):
@@ -814,7 +826,7 @@ class SavedItemViewSetTestCase(TestCase):
 
     def test_update_saved_item(self):
         saved_item = SavedItem.objects.create(user=self.user, relation='sharer', entity='user', related_user=CustomUser.objects.get(username='test2'))
-        data = {'relation': 'learner', 'entity': 'org', 'entity_id': Organization.objects.get(display_name='Test Org').pk}
+        data = {'relation': 'learner', 'entity': 'org', 'entity_id': Organization.objects.get(acronym='TO').pk}
 
         response = self.client.put(f'/saved_item/{saved_item.pk}/', data, format='json')
         self.assertEqual(response.status_code, status.HTTP_405_METHOD_NOT_ALLOWED)
@@ -955,7 +967,8 @@ class StatisticsViewTestCase(TestCase):
 
         # Create an organization with managers and management joined this month
         org_type = OrganizationType.objects.create(type_name='Type', type_code='T')
-        org = Organization.objects.create(display_name='Org', acronym='O', type=org_type)
+        org = Organization.objects.create(acronym='O', type=org_type)
+        OrganizationName.objects.create(organization=org, name='Org', language_code='en')
         org.managers.add(self.user)
         org.save()
 
@@ -1004,10 +1017,10 @@ class RecommendationViewTestCase(TestCase):
         # Create an organization that wants a skill the user can teach
         org_type = OrganizationType.objects.create(type_code='UG', type_name='User Group')
         org = Organization.objects.create(
-            display_name='Test Organization',
             acronym='TO',
             type=org_type
         )
+        OrganizationName.objects.create(organization=org, name='Test Organization', language_code='en')
         org.managers.add(self.user)
         org.wanted_capacities.add(self.skill1)  # Org wants what user can teach
         
@@ -1022,10 +1035,10 @@ class RecommendationViewTestCase(TestCase):
         # Create an organization that can teach a skill the user wants
         org_type = OrganizationType.objects.create(type_code='UG', type_name='User Group')
         org = Organization.objects.create(
-            display_name='Teaching Organization',
             acronym='TEACH',
             type=org_type
         )
+        OrganizationName.objects.create(organization=org, name='Teaching Organization', language_code='en') 
         org.managers.add(self.user)
         org.available_capacities.add(self.skill2)  # Org can teach what user wants
         
@@ -1040,10 +1053,10 @@ class RecommendationViewTestCase(TestCase):
         # Create an organization without managers (should be excluded)
         org_type = OrganizationType.objects.create(type_code='UG', type_name='User Group')
         org = Organization.objects.create(
-            display_name='No Manager Org',
             acronym='NM',
             type=org_type
         )
+        OrganizationName.objects.create(organization=org, name='No Manager Org', language_code='en')
         org.wanted_capacities.add(self.skill1)
         
         response = self.client.get('/recommendation/')
@@ -1055,10 +1068,10 @@ class RecommendationViewTestCase(TestCase):
         org_type = OrganizationType.objects.create(type_code='UG', type_name='User Group')
         for i in range(15):
             org = Organization.objects.create(
-                display_name=f'Test Org {i}',
                 acronym=f'TO{i}',
                 type=org_type
             )
+            OrganizationName.objects.create(organization=org, name=f'Test Org {i}', language_code='en')
             org.managers.add(self.user)
             org.wanted_capacities.add(self.skill1)
         
@@ -1071,10 +1084,10 @@ class RecommendationViewTestCase(TestCase):
         # Create an organization that matches multiple skills
         org_type = OrganizationType.objects.create(type_code='UG', type_name='User Group')
         org = Organization.objects.create(
-            display_name='Multi-skill Org',
             acronym='MSO',
             type=org_type
         )
+        OrganizationName.objects.create(organization=org, name='Multi-skill Org', language_code='en')
         org.managers.add(self.user)
         
         # Add more skills to user

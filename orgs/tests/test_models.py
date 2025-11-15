@@ -1,5 +1,5 @@
 from django.test import TestCase
-from ..models import Organization, OrganizationType, TagDiff, Document, Management
+from ..models import Organization, OrganizationType, TagDiff, Document, Management, OrganizationName
 from users.models import CustomUser
 import secrets
 
@@ -25,29 +25,37 @@ class OrganizationModelTest(TestCase):
             type_name='Organization'
         )
         self.organization = Organization.objects.create(
-            display_name='Sample Organization',
             acronym='SO',
             type=self.organization_type,
+        )
+        OrganizationName.objects.create(
+            organization=self.organization,
+            name='Sample Organization',
+            language_code='en'
         )
         self.user = CustomUser.objects.create_user(username='test', password=str(secrets.randbits(16)))
 
     def test_organization_creation(self):
         organization = self.organization
-        expected_display_name = f'{organization.display_name}'
         expected_acronym = f'{organization.acronym}'
         expected_type = f'{organization.type}'
 
-        self.assertEqual(expected_display_name, 'Sample Organization')
         self.assertEqual(expected_acronym, 'SO')
         self.assertEqual(expected_type, 'Organization')
+        # Ensure the English translation exists
+        self.assertTrue(organization.i18n_names.filter(language_code='en', name='Sample Organization').exists())
 
     def test_organization_str_method_with_acronym(self):
         organization = self.organization
-        self.assertEqual(str(organization), "Sample Organization (SO)")
+        # __str__ now uses the English name only
+        self.assertEqual(str(organization), "Sample Organization")
 
     def test_organization_str_method_without_acronym(self):
-        organization = Organization.objects.create(
-            display_name="Organization 2"
+        organization = Organization.objects.create()
+        OrganizationName.objects.create(
+            organization=organization,
+            name='Organization 2',
+            language_code='en'
         )
         self.assertEqual(str(organization), "Organization 2")
 
@@ -66,4 +74,5 @@ class OrganizationModelTest(TestCase):
         )
         self.assertEqual(management.organization, self.organization)
         self.assertEqual(management.user, self.user)
-        self.assertEqual(str(management), f"{self.user.username} manages {self.organization.display_name} ({self.organization.acronym})")
+        # __str__ uses the organization's __str__ (English name only)
+        self.assertEqual(str(management), f"{self.user.username} manages {self.organization}")
