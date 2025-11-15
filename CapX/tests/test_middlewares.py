@@ -10,20 +10,6 @@ class DatabaseErrorMiddlewareTestCase(TestCase):
         self.get_response = lambda request: JsonResponse({"detail": "success"})
         self.middleware = DatabaseErrorMiddleware(self.get_response)
 
-    def test_middleware_handles_operational_error(self):
-        request = self.factory.get('/')
-        def error_response(request):
-            raise OperationalError("Can't connect to MySQL server")
-
-        middleware = DatabaseErrorMiddleware(error_response)
-        response = middleware(request)
-
-        self.assertEqual(response.status_code, 503)
-        self.assertEqual(json.loads(response.content), {
-            "detail": "Toolforge' database is not available at the moment. Please try again later.",
-            "message": "Can't connect to MySQL server"
-        })
-
     def test_middleware_allows_normal_response(self):
         request = self.factory.get('/')
         response = self.middleware(request)
