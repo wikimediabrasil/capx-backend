@@ -2,7 +2,7 @@ from rest_framework.test import APITestCase
 from rest_framework import status
 from django.urls import reverse
 from projects.models import Project, ProjectMember, ProjectMemberAcceptance
-from orgs.models import Organization, OrganizationType
+from orgs.models import Organization, OrganizationType, OrganizationName
 from users.models import CustomUser
 from skills.models import Skill
 from rest_framework.test import APIClient
@@ -18,10 +18,10 @@ class BaseTestCase(APITestCase):
             type_name='Organization'
         )
         self.organization = Organization.objects.create(
-            display_name='Test Organization',
             acronym='TO',
             type=self.organization_type
         )
+        OrganizationName.objects.create(organization=self.organization, name='Test Organization', language_code='en')
         self.organization.managers.add(self.user)
         self.client = APIClient()
         self.client.force_authenticate(self.user)
@@ -53,10 +53,10 @@ class ProjectViewSetTests(BaseTestCase):
 
     def test_create_project_not_manager(self):
         organization2 = Organization.objects.create(
-            display_name='Test Organization 2',
             acronym='TO2',
             type=self.organization_type
         )
+        OrganizationName.objects.create(organization=organization2, name='Test Organization 2', language_code='en')
         data = {
             'display_name': 'New Project',
             'organization': organization2.id,
@@ -103,10 +103,10 @@ class ProjectViewSetTests(BaseTestCase):
             creator=self.user
         )
         organization2 = Organization.objects.create(
-            display_name='Test Organization 2',
             acronym='TO2',
             type=self.organization_type
         )
+        OrganizationName.objects.create(organization=organization2, name='Test Organization 2', language_code='en')
         project.related_skills.add(self.skill)
         project_member = ProjectMember.objects.create(project=project, organization=organization2)
         ProjectMemberAcceptance.objects.create(project_member=project_member, accepted=True)
@@ -148,10 +148,10 @@ class ProjectViewSetTests(BaseTestCase):
             creator=self.user
         )
         organization2 = Organization.objects.create(
-            display_name='Test Organization 2',
             acronym='TO2',
             type=self.organization_type
-        )
+        )   
+        OrganizationName.objects.create(organization=organization2, name='Test Organization 2', language_code='en')
         project.related_skills.add(self.skill)
         project_member = ProjectMember.objects.create(project=project, organization=organization2)
         ProjectMemberAcceptance.objects.create(project_member=project_member, accepted=True)
@@ -206,10 +206,10 @@ class ProjectMemberViewSetTests(BaseTestCase):
         project_member = ProjectMember.objects.create(project=self.project, organization=self.organization)
         ProjectMemberAcceptance.objects.create(project_member=project_member, accepted=True)
         organization2 = Organization.objects.create(
-            display_name='Test Organization 2',
             acronym='TO2',
             type=self.organization_type
         )
+        OrganizationName.objects.create(organization=organization2, name='Test Organization 2', language_code='en')
         organization2.managers.add(self.user)
         data = {
             'project': self.project.id,
@@ -227,10 +227,10 @@ class ProjectMemberViewSetTests(BaseTestCase):
         project_member = ProjectMember.objects.create(project=self.project, organization=self.organization)
         ProjectMemberAcceptance.objects.create(project_member=project_member, accepted=True)
         organization2 = Organization.objects.create(
-            display_name='Test Organization 2',
             acronym='TO2',
             type=self.organization_type
         )
+        OrganizationName.objects.create(organization=organization2, name='Test Organization 2', language_code='en')
         organization2.managers.add(self.user)
         project_member2 = ProjectMember.objects.create(project=self.project, organization=organization2)
         ProjectMemberAcceptance.objects.create(project_member=project_member2, accepted=True)
@@ -287,10 +287,10 @@ class ProjectMemberAcceptanceViewSetTests(BaseTestCase):
 
     def test_create_project_member_acceptance_not_manager(self):
         organization2 = Organization.objects.create(
-            display_name='Test Organization 2',
             acronym='TO2',
             type=self.organization_type
         )
+        OrganizationName.objects.create(organization=organization2, name='Test Organization 2', language_code='en')
         project = Project.objects.create(
             display_name='Test project 2',
             profile_image='https://commons.wikimedia.org/wiki/File:test.jpg',

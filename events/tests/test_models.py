@@ -4,7 +4,7 @@ from django.core.validators import RegexValidator
 from django.contrib.auth import get_user_model
 from events.models import Events
 from users.models import CustomUser
-from orgs.models import Organization, OrganizationType
+from orgs.models import Organization, OrganizationType, OrganizationName
 from skills.models import Skill
 import secrets
 
@@ -18,9 +18,14 @@ class EventsModelTest(TestCase):
         
         self.organization_type = OrganizationType.objects.create(type_name='Type 1', type_code='TYPE1')
         self.organization = Organization.objects.create(
-            display_name='New Organization',
             acronym='NO',
             type=self.organization_type,
+        )
+        # Add English translation for organization name
+        OrganizationName.objects.create(
+            organization=self.organization,
+            language_code='en',
+            name='New Organization'
         )
 
     def test_event_creation(self):
