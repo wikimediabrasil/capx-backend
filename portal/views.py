@@ -10,7 +10,7 @@ from django.urls import reverse
 from django.conf import settings
 from .models import Partner, PartnerMembership
 from social_django.utils import load_strategy, load_backend
-from users.submodels import AuthExtraInfo
+from users.models import AuthExtraInfo
 from django.views.decorators.http import require_GET, require_POST
 from users.models import CustomUser, Profile, UserBadge, Badge
 from knox.models import AuthToken

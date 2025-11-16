@@ -1,5 +1,5 @@
 from django.db import models
-from users.submodels import Territory
+from users.models.reference import Territory
 from django.core.validators import RegexValidator
 from django.utils import timezone as timezone
 from skills.models import Skill

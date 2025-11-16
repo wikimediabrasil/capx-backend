@@ -5,7 +5,7 @@ from rest_framework.permissions import IsAuthenticated
 from django_filters.rest_framework import DjangoFilterBackend
 from drf_spectacular.utils import extend_schema_view, extend_schema, OpenApiParameter, OpenApiTypes
 from users.models import Profile
-from users.submodels import Territory
+from users.models import Territory
 from users.serializers import ProfileSerializer
 
 

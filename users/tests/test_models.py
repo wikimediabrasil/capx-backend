@@ -4,9 +4,9 @@ from django.db import IntegrityError
 from django.core.exceptions import ValidationError
 from django.db.models.signals import post_save
 from orgs.models import Organization, OrganizationType
-from ..models import Territory, Language, WikimediaProject, CustomUser, \
-    Profile, LanguageProficiency, Avatar, create_user_profile, DataHash, \
-    SavedItem, Badge, UserBadge
+from users.models import Territory, Language, WikimediaProject, CustomUser, \
+    Profile, LanguageProficiency, Avatar, DataHash, SavedItem, Badge, UserBadge
+from users.models.profile import create_user_profile
 
 
 class TerritoryModelTest(TestCase):

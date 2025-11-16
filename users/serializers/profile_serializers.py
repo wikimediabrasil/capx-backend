@@ -4,7 +4,7 @@ from drf_spectacular.types import OpenApiTypes
 from django.shortcuts import get_object_or_404
 
 from users.models import Profile, CustomUser, LanguageProficiency, UserBadge
-from users.submodels import Language
+from users.models import Language
 from orgs.models import Organization
 from knox.models import AuthToken
 

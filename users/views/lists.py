@@ -3,9 +3,10 @@ from rest_framework.response import Response
 from rest_framework.permissions import IsAuthenticated
 from drf_spectacular.utils import extend_schema, OpenApiParameter, OpenApiTypes
 from django.shortcuts import get_object_or_404
-from users.models import Profile, Skill, Language, Badge
+from users.models import Profile, Language, Badge
+from skills.models import Skill
 from users.serializers import UsersBySkillSerializer, UsersByTagSerializer, ProfileSerializer
-from users.submodels import Territory, WikimediaProject
+from users.models import Territory, WikimediaProject
 from orgs.models import Organization
 from events.models import Events
 from projects.models import Project

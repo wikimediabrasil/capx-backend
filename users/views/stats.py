@@ -5,8 +5,9 @@ from rest_framework.views import APIView
 from rest_framework.response import Response
 from drf_spectacular.utils import extend_schema
 from knox.models import AuthToken
-from users.models import Profile, Skill, Language
-from users.submodels import Territory
+from users.models import Profile, Language
+from skills.models import Skill
+from users.models import Territory
 from message.models import Message
 from orgs.models import Organization
 

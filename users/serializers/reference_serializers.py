@@ -1,6 +1,6 @@
 from rest_framework import serializers
 
-from users.submodels import Territory, Language, WikimediaProject, Avatar
+from users.models import Territory, Language, WikimediaProject, Avatar
 from orgs.models import Organization
 
 
