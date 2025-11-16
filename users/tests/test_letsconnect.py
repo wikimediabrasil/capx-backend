@@ -50,9 +50,9 @@ class TestLetsConnectViewSet(APITestCase):
         self.assertEqual(response.data[0]["confirmation"], "12345")
         self.assertEqual(response.data[1]["confirmation"], "67890")
 
-    @patch("users.letsconnect.open", new_callable=mock_open, read_data="mocked_private_key_data")
-    @patch("users.letsconnect.serialization.load_pem_private_key")
-    @patch("users.letsconnect.requests.post")
+    @patch("users.views.letsconnect.open", new_callable=mock_open, read_data="mocked_private_key_data")
+    @patch("users.views.letsconnect.serialization.load_pem_private_key")
+    @patch("users.views.letsconnect.requests.post")
     def test_create_success(self, mock_post, mock_load_key, mock_open_file):
         mock_load_key.return_value = self.private_key
         mock_post.return_value = MagicMock(
@@ -67,9 +67,9 @@ class TestLetsConnectViewSet(APITestCase):
         self.assertEqual(response.data["confirmation"], "12345")
         self.assertTrue(LetsConnectLog.objects.filter(user=self.user, confirmation="12345").exists())
 
-    @patch("users.letsconnect.open", new_callable=mock_open, read_data="mocked_private_key_data")
-    @patch("users.letsconnect.serialization.load_pem_private_key")
-    @patch("users.letsconnect.requests.post")
+    @patch("users.views.letsconnect.open", new_callable=mock_open, read_data="mocked_private_key_data")
+    @patch("users.views.letsconnect.serialization.load_pem_private_key")
+    @patch("users.views.letsconnect.requests.post")
     def test_create_empty_values_optional(self, mock_post, mock_load_key, mock_open_file):
         mock_load_key.return_value = self.private_key
         mock_post.return_value = MagicMock(
@@ -91,9 +91,9 @@ class TestLetsConnectViewSet(APITestCase):
         self.assertTrue(LetsConnectLog.objects.filter(user=self.user, confirmation="12345").exists())
         
 
-    @patch("users.letsconnect.open", new_callable=mock_open, read_data="mocked_private_key_data")
-    @patch("users.letsconnect.serialization.load_pem_private_key")
-    @patch("users.letsconnect.requests.post")
+    @patch("users.views.letsconnect.open", new_callable=mock_open, read_data="mocked_private_key_data")
+    @patch("users.views.letsconnect.serialization.load_pem_private_key")
+    @patch("users.views.letsconnect.requests.post")
     def test_create_failure(self, mock_post, mock_load_key, mock_open_file):
         mock_load_key.return_value = self.private_key
         mock_post.return_value = MagicMock(
@@ -113,7 +113,7 @@ class TestLetsConnectViewSet(APITestCase):
         self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
         self.assertIn("role", response.data)
 
-    @patch("users.letsconnect.serialization.load_pem_private_key")
+    @patch("users.views.letsconnect.serialization.load_pem_private_key")
     def test_create_private_key_missing(self, mock_load_key):
         mock_load_key.side_effect = FileNotFoundError
         response = self.client.post("/letsconnect/", self.valid_payload, format="json")
@@ -122,9 +122,9 @@ class TestLetsConnectViewSet(APITestCase):
         self.assertEqual(response.data["success"], False)
         self.assertEqual(response.data["error"], "Private key not found")
 
-    @patch("users.letsconnect.open", new_callable=mock_open, read_data="mocked_private_key_data")
-    @patch("users.letsconnect.serialization.load_pem_private_key")
-    @patch("users.letsconnect.requests.post")
+    @patch("users.views.letsconnect.open", new_callable=mock_open, read_data="mocked_private_key_data")
+    @patch("users.views.letsconnect.serialization.load_pem_private_key")
+    @patch("users.views.letsconnect.requests.post")
     def test_process_response_json_decode_error(self, mock_post, mock_load_key, mock_open_file):
         mock_load_key.return_value = self.private_key
         mock_response = MagicMock()

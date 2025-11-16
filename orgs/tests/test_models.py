@@ -76,3 +76,27 @@ class OrganizationModelTest(TestCase):
         self.assertEqual(management.user, self.user)
         # __str__ uses the organization's __str__ (English name only)
         self.assertEqual(str(management), f"{self.user.username} manages {self.organization}")
+
+class OrganizationNameModelTest(TestCase):
+    def setUp(self):
+        self.organization_type = OrganizationType.objects.create(
+            type_code='org',
+            type_name='Organization'
+        )
+        self.organization = Organization.objects.create(
+            acronym='SO',
+            type=self.organization_type,
+        )
+
+    def test_organization_name_creation(self):
+        org_name = OrganizationName.objects.create(
+            organization=self.organization,
+            name='Sample Organization',
+            language_code='en'
+        )
+        expected_name = f'{org_name.name}'
+        expected_language_code = f'{org_name.language_code}'
+
+        self.assertEqual(expected_name, 'Sample Organization')
+        self.assertEqual(expected_language_code, 'en')
+        self.assertEqual(str(org_name), f"{self.organization.pk}:en=Sample Organization")

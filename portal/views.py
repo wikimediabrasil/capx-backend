@@ -29,16 +29,12 @@ def portal_login_required(view_func=None, *, redirect_field_name: str = REDIRECT
     return decorator(view_func) if view_func else decorator
 
 def is_portal_user(user):
-    if not user.is_authenticated:
-        return False
     # Any user who belongs to at least one partner has portal access
     return PartnerMembership.objects.filter(user=user).exists()
 
-
 def is_portal_admin(user):
     # Use the CustomUser.is_staff flag as requested
-    return user.is_authenticated and getattr(user, 'is_staff', False)
-
+    return getattr(user, 'is_staff', False)
 
 def require_portal_access(view_func):
     def _wrapped(request, *args, **kwargs):
@@ -46,7 +42,6 @@ def require_portal_access(view_func):
             return HttpResponseForbidden("You don't have access to this portal.")
         return view_func(request, *args, **kwargs)
     return portal_login_required(_wrapped)
-
 
 @require_GET
 def login_view(request):
@@ -59,13 +54,11 @@ def login_view(request):
     oauth_begin_url = reverse('portal:oauth_begin')
     return render(request, 'portal/login.html', {'social_login_url': oauth_begin_url})
 
-
 @require_GET
 def logout_view(request):
     logout(request)
     messages.success(request, 'You have been logged out.')
     return redirect('portal:login')
-
 
 @require_GET
 @require_portal_access
@@ -140,7 +133,7 @@ def dashboard(request):
 
     # Prepare manager organization per user to avoid N+1
     managers_map = {}
-    for uid, oname in Management.objects.select_related('organization').values_list('user_id', 'organization__display_name'):
+    for uid, oname in Management.objects.select_related('organization').filter(organization__i18n_names__language_code='en').values_list('user_id', 'organization__i18n_names__name'):
         managers_map.setdefault(uid, []).append(oname)
 
     # Prepare displayed badges per user
