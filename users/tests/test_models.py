@@ -360,7 +360,7 @@ class UserBadgeModelTest(TestCase):
         cls.user = CustomUser.objects._create_user(
             username="TestUser",
             email="testuser@example.com",
-            password="password"
+            password=str(secrets.randbits(16)),
         )
         cls.badge = Badge.objects.create(
             name="Test Badge",

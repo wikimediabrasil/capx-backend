@@ -5,13 +5,13 @@ from unittest.mock import patch, MagicMock, mock_open
 from users.models import LetsConnectLog
 from cryptography.hazmat.primitives.asymmetric import rsa
 from cryptography.hazmat.backends import default_backend
-import json
+import json, secrets
 from json.decoder import JSONDecodeError
 
 class TestLetsConnectViewSet(APITestCase):
     def setUp(self):
         usermodel = get_user_model()
-        self.user = usermodel.objects.create_user(username="testuser", password="testpassword")
+        self.user = usermodel.objects.create_user(username="testuser", password=str(secrets.randbits(16)))
         self.client.force_authenticate(user=self.user)
         self.valid_payload = {
             "full_name": "John Doe",
