@@ -4,8 +4,8 @@ This allows imports like `from users.views import ProfileViewSet, UsersViewSet, 
 to continue working after splitting views into multiple modules.
 """
 
-# People and profile views
-from .people import UsersViewSet, ProfileViewSet
+# Account and profile views
+from .account import UsersViewSet, ProfileViewSet
 
 # Lists and tags
 from .lists import QuickListViewSet, UsersBySkillViewSet, UsersByTagViewSet
@@ -34,7 +34,7 @@ from .letsconnect import LetsConnectViewSet
 from .oauth import UserAuthView, AuthView, CheckView
 
 __all__ = [
-	# people
+	# account
 	"UsersViewSet",
 	"ProfileViewSet",
 	# lists

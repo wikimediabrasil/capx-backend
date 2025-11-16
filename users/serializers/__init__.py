@@ -3,7 +3,7 @@
 The public import surface remains `users.serializers`.
 """
 
-from users.serializers.profile_serializers import (
+from users.serializers.account_serializers import (
     UserSerializer,
     ProfileSerializer,
     LanguageProficiencySerializer,

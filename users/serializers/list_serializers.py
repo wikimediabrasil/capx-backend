@@ -1,7 +1,7 @@
 from rest_framework import serializers
 
 from users.models import Profile
-from .profile_serializers import UserSerializer
+from .account_serializers import UserSerializer
 
 
 class UsersBySkillSerializer(serializers.ModelSerializer):
