@@ -33,14 +33,14 @@ class PortalViewsTests(TestCase):
 
     def test_login_view_redirects_for_portal_member(self):
         # user1 is a partner member -> should redirect to dashboard
-        self.client.login(username="u1", password=str(secrets.randbits(16)))
+        self.client.force_login(user=self.user1)
         url = reverse("portal:login")
         resp = self.client.get(url)
         self.assertEqual(resp.status_code, 302)
         self.assertEqual(resp.url, reverse("portal:dashboard"))
 
     def test_login_view_shows_message_for_non_portal_user(self):
-        self.client.login(username="u2", password=str(secrets.randbits(16)))
+        self.client.force_login(user=self.user2)
         url = reverse("portal:login")
         resp = self.client.get(url)
         # Not authorized for portal; stays on login page with error message queued
@@ -54,13 +54,13 @@ class PortalViewsTests(TestCase):
         self.assertIn("/portal/login/", resp.url)
 
         # Logged in but not a portal user nor admin -> 403
-        self.client.login(username="u2", password=str(secrets.randbits(16)))
+        self.client.force_login(user=self.user2)
         resp = self.client.get(reverse("portal:dashboard"))
         self.assertEqual(resp.status_code, 403)
 
         # Staff can access even without membership
         self.client.logout()
-        self.client.login(username="admin", password=str(secrets.randbits(16)))
+        self.client.force_login(user=self.admin)
         resp = self.client.get(reverse("portal:dashboard"))
         self.assertEqual(resp.status_code, 200)
 
@@ -74,7 +74,7 @@ class PortalViewsTests(TestCase):
 
     def test_partner_badge_assign_staff_multiple_users(self):
         # Staff can assign any partner badge
-        self.client.login(username="admin", password=str(secrets.randbits(16)))
+        self.client.force_login(user=self.admin)
         url = reverse("portal:partner_badge_assign")
         payload = {
             "username": f"{self.user1.username},{self.user2.username},{self.missing_username}",
@@ -90,7 +90,7 @@ class PortalViewsTests(TestCase):
 
     def test_partner_badge_assign_non_member_forbidden(self):
         # user2 is not staff and not a member of partner -> cannot assign
-        self.client.login(username="u2", password=str(secrets.randbits(16)))
+        self.client.force_login(user=self.user2)
         url = reverse("portal:partner_badge_assign")
         payload = {"username": self.user1.username, "badge_id": str(self.badge.id)}
         resp = self.client.post(url, data=payload)
@@ -98,7 +98,7 @@ class PortalViewsTests(TestCase):
 
     def test_partner_badge_create_permissions(self):
         # Non-member cannot create for partner they don't belong to
-        self.client.login(username="u2", password=str(secrets.randbits(16)))
+        self.client.force_login(user=self.user2)
         url = reverse("portal:partner_badge_create")
         payload = {"name": "X", "picture": "https://x", "partner_id": str(self.partner.id)}
         resp = self.client.post(url, data=payload)
@@ -106,19 +106,19 @@ class PortalViewsTests(TestCase):
 
         # Member can create for their own partner
         self.client.logout()
-        self.client.login(username="u1", password=str(secrets.randbits(16)))
+        self.client.force_login(user=self.user1)
         resp = self.client.post(url, data=payload, follow=True)
         self.assertEqual(resp.status_code, 200)
 
     def test_logout_view_redirects_to_login(self):
-        self.client.login(username="u1", password=str(secrets.randbits(16)))
+        self.client.force_login(user=self.user1)
         resp = self.client.get(reverse("portal:logout"))
         self.assertEqual(resp.status_code, 302)
         self.assertEqual(resp.url, reverse("portal:login"))
 
     def test_partner_membership_add_and_remove_as_staff(self):
         # Add membership for user2 then remove it
-        self.client.login(username="admin", password=str(secrets.randbits(16)))
+        self.client.force_login(user=self.admin)
         add_url = reverse("portal:partner_membership_add")
         rem_url = reverse("portal:partner_membership_remove")
         data = {"partner_id": str(self.partner.id), "username": self.user2.username}
@@ -131,7 +131,7 @@ class PortalViewsTests(TestCase):
 
     def test_partner_badge_remove_delete_update(self):
         # Assign badge to user1, then remove it; delete badge; create another and update
-        self.client.login(username="admin", password=str(secrets.randbits(16)))
+        self.client.force_login(user=self.admin)
         # Assign first
         assign_url = reverse("portal:partner_badge_assign")
         self.client.post(assign_url, data={"username": self.user1.username, "badge_id": str(self.badge.id)})
