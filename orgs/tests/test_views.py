@@ -3,7 +3,7 @@ from rest_framework.test import APITestCase, APIClient
 from rest_framework import status
 from orgs.models import OrganizationType, Organization, TagDiff, Document, OrganizationName
 from users.models import CustomUser
-from users.submodels import Territory
+from users.models import Territory
 from skills.models import Skill
 from django.db import models
 from events.models import Events

@@ -4,7 +4,7 @@ from rest_framework import status
 from datetime import timedelta
 from django.utils.timezone import now
 from drf_spectacular.utils import extend_schema
-from .submodels import AuthExtraInfo
+from users.models import AuthExtraInfo
     
 
 class AuthView(SocialKnoxOnlyAuthView):

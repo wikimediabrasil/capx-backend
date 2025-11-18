@@ -1,17 +1,18 @@
 from django.db import models
 
+
 class Territory(models.Model):
     territory_name = models.CharField(
-        verbose_name="Territory name", 
-        max_length=128, 
+        verbose_name="Territory name",
+        max_length=128,
         unique=True,
-        help_text="Name of the territory"    
+        help_text="Name of the territory"
     )
     parent_territory = models.ManyToManyField(
-        "self", 
-        verbose_name="Parent territory", 
+        "self",
+        verbose_name="Parent territory",
         symmetrical=False,
-        related_name="territory_parent", 
+        related_name="territory_parent",
         blank=True,
         help_text="Parent territory of the territory"
     )
@@ -22,19 +23,19 @@ class Territory(models.Model):
 
 class Language(models.Model):
     language_name = models.CharField(
-        verbose_name="Language name", 
+        verbose_name="Language name",
         max_length=128,
         help_text="Name of the language (in English)"
     )
     language_autonym = models.CharField(
-        verbose_name="Language autonym", 
-        max_length=128, 
+        verbose_name="Language autonym",
+        max_length=128,
         blank=True,
         help_text="Name of the language in the language itself"
     )
     language_code = models.CharField(
-        verbose_name="Language code", 
-        max_length=10, 
+        verbose_name="Language code",
+        max_length=10,
         unique=True,
         help_text="Code of the language"
     )
@@ -90,6 +91,7 @@ class AuthExtraInfo(models.Model):
         verbose_name="Created at",
         auto_now_add=True
     )
+
 
 class DataHash(models.Model):
     data_type = models.CharField(max_length=50, unique=True)

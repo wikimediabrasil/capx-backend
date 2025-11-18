@@ -24,16 +24,15 @@ from skills.views import SkillViewSet, SkillByTypeViewSet
 from users.views import (
     ProfileViewSet, UsersViewSet, QuickListViewSet, AvatarViewSet, SavedItemViewSet,
     UsersBySkillViewSet, UsersByTagViewSet, TerritoryViewSet, WikimediaProjectViewSet,
-    BadgeViewSet, UserBadgeViewSet, StatisticsView, RecommendationView
+    BadgeViewSet, UserBadgeViewSet, StatisticsView, RecommendationView, LetsConnectViewSet,
+    UserAuthView, AuthView, CheckView
 )
-from users.letsconnect import LetsConnectViewSet
 from bugs.views import BugViewSet, AttachmentViewSet
 from orgs.views import OrganizationViewSet, OrganizationTypeViewSet, TagDiffViewSet, DocumentViewSet, OrganizationNameViewSet
 from events.views import EventViewSet
 from message.views import MessageViewSet
 from projects.views import ProjectViewSet, ProjectMemberViewSet, ProjectMemberAcceptanceViewSet
 from drf_spectacular.views import SpectacularAPIView, SpectacularSwaggerView
-from users.oauth import UserAuthView, AuthView, CheckView
 
 
 router = DefaultRouter()

@@ -5,7 +5,7 @@ from django.test import TestCase
 from rest_framework import status
 from rest_framework.test import APIClient
 from users.models import Profile, CustomUser, LanguageProficiency, SavedItem, Badge, UserBadge
-from users.submodels import Territory, Language, WikimediaProject
+from users.models import Territory, Language, WikimediaProject
 from users.serializers import ProfileSerializer, TerritorySerializer, LanguageSerializer, WikimediaProjectSerializer, SavedItemSerializer, BadgeSerializer, UserBadgeSerializer
 from skills.models import Skill
 from orgs.models import Organization, OrganizationType, OrganizationName

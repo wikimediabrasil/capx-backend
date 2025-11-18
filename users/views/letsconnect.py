@@ -10,8 +10,8 @@ from django.conf import settings
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
 from rest_framework import status
-from .serializers import LetsConnectLogSerializer
-from .models import LetsConnectLog
+from users.serializers import LetsConnectLogSerializer
+from users.models import LetsConnectLog
 from drf_spectacular.utils import extend_schema, OpenApiParameter, OpenApiTypes
 from rest_framework import filters
 
