@@ -72,6 +72,7 @@ def dashboard(request):
         Profile.objects.select_related('user')
         .prefetch_related(
             'affiliation',
+            'affiliation__i18n_names',
             'territory',
             'wikimedia_project',
             'skills_known',
@@ -142,6 +143,15 @@ def dashboard(request):
     for uid, bname in UserBadge.objects.select_related('badge').filter(user_id__in=user_ids, is_displayed=True, progress=100).values_list('user_id', 'badge__name'):
         badges_map.setdefault(uid, []).append(bname)
 
+    def _org_en_name(org: Organization):
+        # Find pre-fetched English name without additional queries
+        for n in getattr(org, 'i18n_names_all', None) or org.i18n_names.all():
+            if n.language_code == 'en':
+                return n.name
+        # Fallback: try filtering (should be cached by prefetch)
+        en = org.i18n_names.filter(language_code='en').first()
+        return en.name if en else f"Organization {org.pk}"
+
     users_table = []
     for p in profiles:
         u = p.user
@@ -151,7 +161,7 @@ def dashboard(request):
         last_login = last_token.created if last_token else None
 
         # String representations for multi-relations
-        aff_str = ', '.join([org.display_name for org in p.affiliation.all()]) if p.affiliation.exists() else ''
+        aff_str = ', '.join([_org_en_name(org) for org in p.affiliation.all()]) if p.affiliation.exists() else ''
         terr_str = ', '.join([t.territory_name for t in p.territory.all()]) if p.territory.exists() else ''
         proj_str = ', '.join([wp.wikimedia_project_name for wp in p.wikimedia_project.all()]) if p.wikimedia_project.exists() else ''
         skills_known_str = ', '.join([skill_labels.get(s.skill_wikidata_item, s.skill_wikidata_item) for s in p.skills_known.all()]) if p.skills_known.exists() else ''
