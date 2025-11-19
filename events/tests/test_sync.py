@@ -12,7 +12,6 @@ class TestSyncCommand(TestCase):
         # Setup mock data
         test_org_type = OrganizationType.objects.create(type_name='Type 1', type_code='TYPE1')
         organization = Organization.objects.create(
-            display_name='New Organization',
             acronym='NO',
             type=test_org_type,
         )
@@ -54,7 +53,6 @@ class TestSyncCommand(TestCase):
         # Setup mock data
         test_org_type = OrganizationType.objects.create(type_name='Type 1', type_code='TYPE1')
         organization = Organization.objects.create(
-            display_name='New Organization',
             acronym='NO',
             type=test_org_type,
         )
@@ -83,7 +81,6 @@ class TestSyncCommand(TestCase):
         # Setup mock data
         test_org_type = OrganizationType.objects.create(type_name='Type 1', type_code='TYPE1')
         organization = Organization.objects.create(
-            display_name='New Organization',
             acronym='NO',
             type=test_org_type,
         )

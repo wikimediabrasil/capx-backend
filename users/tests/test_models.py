@@ -4,9 +4,9 @@ from django.db import IntegrityError
 from django.core.exceptions import ValidationError
 from django.db.models.signals import post_save
 from orgs.models import Organization, OrganizationType
-from ..models import Territory, Language, WikimediaProject, CustomUser, \
-    Profile, LanguageProficiency, Avatar, create_user_profile, DataHash, \
-    SavedItem, Badge, UserBadge
+from users.models import Territory, Language, WikimediaProject, CustomUser, \
+    Profile, LanguageProficiency, Avatar, DataHash, SavedItem, Badge, UserBadge
+from users.models.profile import create_user_profile
 
 
 class TerritoryModelTest(TestCase):
@@ -260,7 +260,7 @@ class SavedItemModelTest(TestCase):
         )
 
         org_type = OrganizationType.objects.create(type_name="TestType")
-        org = Organization.objects.create(display_name='Test Org', acronym='TO', type=org_type)
+        org = Organization.objects.create(acronym='TO', type=org_type)
         saved_item = SavedItem.objects.create(
             user=self.user,
             relation="sharer",
@@ -269,7 +269,7 @@ class SavedItemModelTest(TestCase):
         )
         self.assertEqual(
             str(saved_item),
-            f"{self.user.username}: sharer - Organization - Test Org"
+            f"{self.user.username}: sharer - Organization - TO"
         )
 
     def test_unique_saved_item(self):
@@ -282,7 +282,7 @@ class SavedItemModelTest(TestCase):
             )
 
         org_type = OrganizationType.objects.create(type_name="TestType")
-        org = Organization.objects.create(display_name='Test Org', acronym='TO', type=org_type)
+        org = Organization.objects.create(acronym='TO', type=org_type)
         SavedItem.objects.create(
             user=self.user,
             relation="sharer",
@@ -311,7 +311,7 @@ class SavedItemModelTest(TestCase):
 
     def test_both_related_org_and_related_user(self):
         org_type = OrganizationType.objects.create(type_name="TestType")
-        org = Organization.objects.create(display_name='Test Org', acronym='TO', type=org_type)
+        org = Organization.objects.create(acronym='TO', type=org_type)
         with self.assertRaises(ValidationError):
             SavedItem.objects.create(
                 user=self.user,
@@ -360,7 +360,7 @@ class UserBadgeModelTest(TestCase):
         cls.user = CustomUser.objects._create_user(
             username="TestUser",
             email="testuser@example.com",
-            password="password"
+            password=str(secrets.randbits(16)),
         )
         cls.badge = Badge.objects.create(
             name="Test Badge",

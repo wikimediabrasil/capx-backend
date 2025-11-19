@@ -2,8 +2,8 @@ import secrets
 from django.test import TestCase
 from rest_framework import status
 from rest_framework.test import APIClient
-from ..oauth import AuthView, UserAuthView
-from ..submodels import AuthExtraInfo
+from users.views.oauth import AuthView, UserAuthView
+from users.models.reference import AuthExtraInfo
 from users.models import CustomUser
 from unittest.mock import patch
 

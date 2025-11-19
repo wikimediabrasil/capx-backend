@@ -46,6 +46,7 @@ INSTALLED_APPS = [
 ]
 
 MIDDLEWARE = [
+    'CapX.middlewares.DatabaseErrorMiddleware',
     'django.middleware.security.SecurityMiddleware',
     'whitenoise.middleware.WhiteNoiseMiddleware',
     'django.contrib.sessions.middleware.SessionMiddleware',
@@ -55,7 +56,6 @@ MIDDLEWARE = [
     'django.contrib.messages.middleware.MessageMiddleware',
     'django.middleware.clickjacking.XFrameOptionsMiddleware',
     'social_django.middleware.SocialAuthExceptionMiddleware',
-    'CapX.middlewares.DatabaseErrorMiddleware',
 ]
 
 ROOT_URLCONF = 'CapX.urls'
@@ -168,7 +168,7 @@ REST_KNOX = {'TOKEN_TTL': timedelta(days=30)}
 SPECTACULAR_SETTINGS = {
     'TITLE': 'Capacity Exchange (CapX) API',
     'DESCRIPTION': 'The Capacity Exchange (CapX) is a platform for finding and connecting with fellow Wikimedians to exchange knowledge, skills, and services on a global level.',
-    'VERSION': '2.1.49',
+    'VERSION': '2.1.50',
     'SERVE_INCLUDE_SCHEMA': True,
     'SWAGGER_UI_DIST': 'SIDECAR',
     'SWAGGER_UI_FAVICON_HREF': 'SIDECAR',

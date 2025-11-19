@@ -6,7 +6,7 @@ from django.utils.timezone import now
 from datetime import timedelta
 from message.models import Message
 from orgs.models import Organization
-from users.letsconnect import LetsConnectLog
+from users.views.letsconnect import LetsConnectLog
 import requests
 
 class Command(BaseCommand):

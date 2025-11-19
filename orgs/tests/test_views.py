@@ -1,9 +1,9 @@
 import secrets
 from rest_framework.test import APITestCase, APIClient
 from rest_framework import status
-from orgs.models import OrganizationType, Organization, TagDiff, Document
+from orgs.models import OrganizationType, Organization, TagDiff, Document, OrganizationName
 from users.models import CustomUser
-from users.submodels import Territory
+from users.models import Territory
 from skills.models import Skill
 from django.db import models
 from events.models import Events
@@ -61,10 +61,10 @@ class OrganizationViewSetTestCase(APITestCase):
         self.client.force_authenticate(self.user)
 
         organization = Organization.objects.create(
-            display_name='New Organization',
             acronym='NO',
             type=self.organization_type,
         )
+        OrganizationName.objects.create(organization=organization, language_code='en', name='New Organization')
         event = Events.objects.create(
             name='Test Event', 
             organization=organization,
@@ -94,19 +94,19 @@ class OrganizationViewSetTestCase(APITestCase):
         self.assertEqual(response.status_code, status.HTTP_200_OK)
 
         organization = Organization.objects.create(
-            display_name='New Organization',
             acronym='NO',
             type=self.organization_type,
         )
+        OrganizationName.objects.create(organization=organization, language_code='en', name='New Organization')
         organization.territory.set([self.territory])
         response = self.client.get('/organizations/')
         self.assertEqual(len(response.data['results']), 0)
 
-        Organization.objects.create(
-            display_name='New Organization 2',
+        org2 = Organization.objects.create(
             acronym='NO2', 
             type=self.organization_type,
         )
+        OrganizationName.objects.create(organization=org2, language_code='en', name='New Organization 2')
         organization.territory.set([self.territory])    
         organization.managers.set([self.user])
         response = self.client.get('/organizations/')
@@ -134,10 +134,10 @@ class OrganizationViewSetTestCase(APITestCase):
         self.client.force_authenticate(self.user)
 
         organization = Organization.objects.create(
-            display_name='New Organization',
             acronym='NO',
             type=self.organization_type,
         )
+        OrganizationName.objects.create(organization=organization, language_code='en', name='New Organization')
         organization.territory.set([self.territory])
         response = self.client.get(f'/organizations/{organization.pk}/')
         self.assertEqual(response.status_code, status.HTTP_404_NOT_FOUND)
@@ -155,10 +155,10 @@ class OrganizationViewSetTestCase(APITestCase):
 
     def test_retrieve_org_multiple_managers(self):
         organization = Organization.objects.create(
-            display_name='New Organization',
             acronym='NO',
             type=self.organization_type,
         )
+        OrganizationName.objects.create(organization=organization, language_code='en', name='New Organization')
         organization.territory.set([self.territory])
         manager = CustomUser.objects.create_user(username='manager', password=str(secrets.randbits(16)))
         organization.managers.set([self.user, manager])
@@ -171,10 +171,10 @@ class OrganizationViewSetTestCase(APITestCase):
         self.client.force_authenticate(self.user)
 
         organization = Organization.objects.create(
-            display_name='New Organization',
             acronym='NO',
             type=self.organization_type,
         )
+        OrganizationName.objects.create(organization=organization, language_code='en', name='New Organization')
         manager = CustomUser.objects.create_user(username='manager', password=str(secrets.randbits(16)))
         organization.managers.set([manager])
         organization.territory.set([self.territory])
@@ -195,15 +195,15 @@ class OrganizationViewSetTestCase(APITestCase):
         self.client.force_authenticate(self.user)
 
         organization = Organization.objects.create(
-            display_name='New Organization',
             acronym='NO',
             type=self.organization_type,
         )
+        OrganizationName.objects.create(organization=organization, language_code='en', name='New Organization')
         organization2 = Organization.objects.create(
-            display_name='New Organization 2',
             acronym='NO2',
             type=self.organization_type,
         )
+        OrganizationName.objects.create(organization=organization2, language_code='en', name='New Organization 2')
         event = Events.objects.create(
             name='Test Event', 
             organization=organization2,
@@ -228,10 +228,10 @@ class OrganizationViewSetTestCase(APITestCase):
         self.client.force_authenticate(self.user)
 
         organization = Organization.objects.create(
-            display_name='New Organization',
             acronym='NO',
             type=self.organization_type,
         )
+        OrganizationName.objects.create(organization=organization, language_code='en', name='New Organization')
         organization.territory.set([self.territory])
         response = self.client.patch(f'/organizations/{organization.pk}/', {'display_name': 'New Name'})
         self.assertEqual(response.status_code, status.HTTP_405_METHOD_NOT_ALLOWED)
@@ -249,10 +249,10 @@ class OrganizationViewSetTestCase(APITestCase):
         self.client.force_authenticate(self.user)
 
         organization = Organization.objects.create(
-            display_name='New Organization',
             acronym='NO',
             type=self.organization_type,
         )
+        OrganizationName.objects.create(organization=organization, language_code='en', name='New Organization')
         manager = CustomUser.objects.create_user(username='manager', password=str(secrets.randbits(16)))
         organization.managers.set([manager])
         organization.territory.set([self.territory])
@@ -316,7 +316,8 @@ class OrganizationFilterViewSetTestCase(APITestCase):
         self.user = CustomUser.objects.create_user(username='test', password=str(secrets.randbits(16)))
         self.staff_user = CustomUser.objects.create_user(username='staff', password=str(secrets.randbits(16)), is_staff=True)
         self.client = APIClient()
-        self.organization = Organization.objects.create(display_name='Test Organization', acronym='TO')
+        self.organization = Organization.objects.create(acronym='TO')
+        OrganizationName.objects.create(organization=self.organization, language_code='en', name='Test Organization')
         self.organization.managers.add(self.user)
 
     def test_get_queryset_as_staff(self):
@@ -416,27 +417,27 @@ class OrganizationOrderingTestCase(APITestCase):
         now = timezone.now()
         
         self.org1 = Organization.objects.create(
-            display_name='Zulu Organization',
             acronym='ZO',
             type=self.organization_type,
             update_date=now - timedelta(minutes=2)
         )
+        OrganizationName.objects.create(organization=self.org1, language_code='en', name='Zulu Organization')
         self.org1.managers.add(self.user)
         
         self.org2 = Organization.objects.create(
-            display_name='Alpha Organization',
             acronym='AO',
             type=self.organization_type,
             update_date=now - timedelta(minutes=1)
         )
+        OrganizationName.objects.create(organization=self.org2, language_code='en', name='Alpha Organization')
         self.org2.managers.add(self.user)
         
         self.org3 = Organization.objects.create(
-            display_name='Beta Organization',
             acronym='BO',
             type=self.organization_type,
             update_date=now
         )
+        OrganizationName.objects.create(organization=self.org3, language_code='en', name='Beta Organization')
         self.org3.managers.add(self.user)
 
     def test_organizations_ordering_by_display_name_asc(self):

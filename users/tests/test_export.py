@@ -158,7 +158,7 @@ class CommandTestCase(TestCase):
         self.assertEqual(result, expected_output)
 
     def test_create_output_capacities(self):
-        formatted_data = [[1, 'Skill1', 'Description1']]
+        formatted_data = [[1, {"en": "Skill1"}, {"en": "Description1"}, "Q1"]]
         result = self.command.create_output_capacities(formatted_data)
         expected_output = {
             "license": "CC0-1.0",
@@ -167,8 +167,8 @@ class CommandTestCase(TestCase):
             "schema": {
                 "fields": [
                     {"name": "id", "type": "number"},
-                    {"name": "name", "type": "string"},
-                    {"name": "description", "type": "string"},
+                    {"name": "name", "type": "localized"},
+                    {"name": "description", "type": "localized"},
                     {"name": "wikidata_item", "type": "string"}
                 ],
             },
@@ -347,8 +347,8 @@ class CommandTestCase(TestCase):
              patch('users.management.commands.export.Command.process_profiles') as mock_process_profiles, \
              patch('users.management.commands.export.Command.create_output_users') as mock_create_output_users, \
              patch('users.management.commands.export.Command.get_skill_dict') as mock_get_skill_dict, \
-             patch('users.management.commands.export.Command.get_sparql_query') as mock_get_sparql_query, \
-             patch('users.management.commands.export.Command.process_sparql_response') as mock_process_sparql_response, \
+             patch('users.management.commands.export.Command.fetch_localized_capacities') as mock_fetch_localized_capacities, \
+             patch('users.management.commands.export.Command.build_localized_capacities_rows') as mock_build_localized_capacities_rows, \
              patch('users.management.commands.export.Command.create_output_capacities') as mock_create_output_capacities, \
              patch('users.management.commands.export.Command.create_output_badges') as mock_create_output_badges, \
              patch('users.management.commands.export.Command.get_login_token') as mock_get_login_token, \
@@ -362,9 +362,8 @@ class CommandTestCase(TestCase):
             mock_process_profiles.return_value = ([], [], [])
             mock_create_output_users.return_value = {}
             mock_get_skill_dict.return_value = {}
-            mock_get_sparql_query.return_value = 'sparql_query'
-            mock_requests_get.return_value.json.return_value = {'results': {'bindings': []}}
-            mock_process_sparql_response.return_value = []
+            mock_fetch_localized_capacities.return_value = {}
+            mock_build_localized_capacities_rows.return_value = []
             mock_create_output_capacities.return_value = {}
             mock_create_output_badges.return_value = {}
             mock_get_login_token.return_value = 'test_login_token'
@@ -381,15 +380,56 @@ class CommandTestCase(TestCase):
             mock_process_profiles.assert_called_once()
             mock_create_output_users.assert_called_once()
             mock_get_skill_dict.assert_called_once()
-            mock_get_sparql_query.assert_called_once()
-            mock_requests_get.assert_called_once()
-            mock_process_sparql_response.assert_called_once()
+            mock_fetch_localized_capacities.assert_called_once()
+            mock_build_localized_capacities_rows.assert_called_once()
             mock_create_output_capacities.assert_called_once()
             mock_create_output_badges.assert_called_once()
             mock_get_login_token.assert_called_once()
             mock_login.assert_called_once()
             mock_get_csrf_token.assert_called()
             mock_edit_page.assert_called()
+
+    def test_build_localized_capacities_rows(self):
+        skill_dict = {'Q1': 10, 'Q2': 2}
+        localized_terms = {
+            'Q1': {'en': {'label': 'Alpha', 'description': 'Desc Alpha'}, 'fr': {'label': 'Alpha FR', 'description': None}},
+            'Q2': {'en': {'label': 'Beta', 'description': 'Desc Beta'}}
+        }
+        rows = self.command.build_localized_capacities_rows(list(skill_dict.keys()), skill_dict, localized_terms)
+        # Order by Skill id (2 then 10) -> Q2 then Q1
+        self.assertEqual(rows[0][0], 2)
+        self.assertEqual(rows[0][1], {'en': 'Beta'})
+        self.assertEqual(rows[0][2], {'en': 'Desc Beta'})
+        self.assertEqual(rows[0][3], 'Q2')
+        self.assertEqual(rows[1][0], 10)
+        self.assertEqual(rows[1][1], {'en': 'Alpha', 'fr': 'Alpha FR'})
+        self.assertEqual(rows[1][2], {'en': 'Desc Alpha'})
+        self.assertEqual(rows[1][3], 'Q1')
+
+    @patch('users.management.commands.export.requests.get')
+    def test_fetch_localized_capacities_truncation(self, mock_get):
+        long_text = 'A' * 405
+        mock_response = MagicMock()
+        mock_response.json.return_value = {
+            'results': {
+                'bindings': [
+                    {
+                        'value': {'value': 'Q1'},
+                        'language': {'value': 'en'},
+                        'label': {'value': long_text},
+                        'description': {'value': long_text}
+                    }
+                ]
+            }
+        }
+        mock_get.return_value = mock_response
+        res = self.command.fetch_localized_capacities(['Q1'])
+        self.assertIn('Q1', res)
+        en = res['Q1']['en']
+        self.assertTrue(len(en['label']) <= 400)
+        self.assertTrue(en['label'].endswith('...'))
+        self.assertTrue(len(en['description']) <= 400)
+        self.assertTrue(en['description'].endswith('...'))
 
 class AddArgumentsTestCase(TestCase):
     def test_add_arguments_dry_run(self):

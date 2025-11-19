@@ -10,6 +10,9 @@ on:
 jobs:
   release:
     runs-on: ubuntu-latest
+    outputs:
+      version: ${{ steps.check_version_change.outputs.version }}
+      changed: ${{ steps.check_version_change.outputs.changed }}
 
     steps:
       - name: Checkout code
@@ -26,20 +29,25 @@ jobs:
         id: check_version_change
         run: |
           git fetch origin stable
-          PREV_VERSION=$(git show origin/stable:CapX/settings.py | grep -oP "'VERSION': '\K[0-9]+\.[0-9]+\.[0-9]+(?=')")
+          PREV_VERSION=$(git show origin/stable:CapX/settings.py 2>/dev/null | grep -oP "'VERSION': '\K[0-9]+\.[0-9]+\.[0-9]+(?=')")
           NEW_VERSION=$(grep -oP "'VERSION': '\K[0-9]+\.[0-9]+\.[0-9]+(?=')" CapX/settings.py)
+          echo "version=$NEW_VERSION" >> $GITHUB_OUTPUT
           if [ "$PREV_VERSION" = "$NEW_VERSION" ]; then
+            echo "changed=false" >> $GITHUB_OUTPUT
             echo "No version change detected. Exiting."
             exit 0
           fi
+          echo "changed=true" >> $GITHUB_OUTPUT
           echo "version=$NEW_VERSION" >> $GITHUB_ENV
 
       - name: Configure Git
+        if: steps.check_version_change.outputs.changed == 'true'
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
 
       - name: Merge dev into stable
+        if: steps.check_version_change.outputs.changed == 'true'
         run: |
           git fetch origin stable
           git checkout stable
@@ -55,13 +63,14 @@ jobs:
     name: Deploy to SSH Server
     runs-on: ubuntu-latest
     needs: release
+    if: needs.release.outputs.changed == 'true'
 
     steps:
       - name: Checkout code
         uses: actions/checkout@v3
 
       - name: Run deployment script
-        uses: appleboy/ssh-action@v1.0.3
+        uses: appleboy/ssh-action@91f3272fc5907f4699dcf59761eb622a07342f5a
         with:
           host: ${{ secrets.HOST }}
           username: ${{ secrets.USERNAME }}

@@ -9,7 +9,7 @@ import secrets
 class EventViewSetTestCase(TestCase):
     def setUp(self):
         self.user = CustomUser.objects.create_user(username='test', password=str(secrets.randbits(16)))
-        self.organization = Organization.objects.create(display_name='Test Org')
+        self.organization = Organization.objects.create(acronym='TO')
         self.organization.managers.add(self.user)
         self.event = Events.objects.create(
             name='Test Event',

@@ -172,6 +172,92 @@ class Command(BaseCommand):
             self.stdout.write(f"SPARQL response data: {formatted_data}")
         return formatted_data
 
+    def fetch_localized_capacities(self, quids):
+        """
+        Fetch localized labels and descriptions from Metabase for given QIDs.
+        Returns a mapping: { qid: { lang: { 'label': str|None, 'description': str|None } } }
+        """
+        quids = [q for q in quids if q]
+        if not quids:
+            return {}
+        item_ids = " ".join(f"'{qid}'" for qid in quids)
+        query = f"""PREFIX wbt:<https://metabase.wikibase.cloud/prop/direct/>
+            PREFIX wb: <https://metabase.wikibase.cloud/entity/>
+            PREFIX rdfs: <http://www.w3.org/2000/01/rdf-schema#>
+            PREFIX schema: <http://schema.org/>
+            SELECT ?item ?value ?language (SAMPLE(?label) AS ?label) (SAMPLE(?description) AS ?description) WHERE {{  
+                VALUES ?value {{ {item_ids} }}
+                ?item wbt:P5 wb:Q34531.
+                ?item wbt:P67/wbt:P1 ?value.  
+                {{
+                    ?item rdfs:label ?label.
+                    BIND(LANG(?label) AS ?language)
+                }}
+                UNION
+                {{
+                    ?item schema:description ?description.
+                    BIND(LANG(?description) AS ?language)
+                }}
+            }}
+            GROUP BY ?item ?value ?language
+            ORDER BY ?language
+            """
+        headers = {'User-Agent': self.get_user_agent(), 'Accept': 'application/sparql-results+json'}
+        response = requests.get(
+            'https://metabase.wikibase.cloud/query/sparql',
+            params={'query': query},
+            headers=headers,
+            timeout=60,
+        )
+        response.raise_for_status()
+        data = response.json()
+        if self.verbosity >= 2:
+            self.stdout.write(f"Localized capacities SPARQL rows: {len(data.get('results', {}).get('bindings', []))}")
+        localized: dict[str, dict[str, dict[str, str | None]]] = {}
+        for b in data.get('results', {}).get('bindings', []):
+            qid = b.get('value', {}).get('value')
+            lang = b.get('language', {}).get('value')
+            label = b.get('label', {}).get('value')
+            description = b.get('description', {}).get('value')
+            if not qid or not lang:
+                continue
+            entry = localized.setdefault(qid, {}).setdefault(lang, {'label': None, 'description': None})
+            if label is not None:
+                entry['label'] = label
+            if description is not None:
+                entry['description'] = description
+        # Enforce max length per localized string (truncate to 397 + '...')
+        MAX_LEN = 400
+        ELLIPSIS = '...'
+        TRUNC_LEN = MAX_LEN - len(ELLIPSIS)
+        for qid, lang_map in localized.items():
+            for lang, vals in lang_map.items():
+                for field in ('label', 'description'):
+                    v = vals.get(field)
+                    if v and len(v) > MAX_LEN:
+                        vals[field] = v[:TRUNC_LEN].rstrip() + ELLIPSIS
+                        if self.verbosity >= 2:
+                            self.stdout.write(f"Truncated {field} for {qid}/{lang} to {MAX_LEN} chars")
+        if self.verbosity >= 2:
+            self.stdout.write(f"Localized capacities map keys (qids): {list(localized.keys())}")
+        return localized
+
+    def build_localized_capacities_rows(self, quids, skill_dict, localized_terms):
+        """
+        Build rows: [id, {lang: label}, {lang: description}, qid]
+        """
+        rows = []
+        # stable order by Skill id when possible
+        for qid in sorted(skill_dict.keys(), key=lambda q: skill_dict[q]):
+            sid = skill_dict[qid]
+            langs = localized_terms.get(qid, {})
+            name_obj = {lang: terms['label'] for lang, terms in langs.items() if terms.get('label')}
+            desc_obj = {lang: terms['description'] for lang, terms in langs.items() if terms.get('description')}
+            rows.append([sid, name_obj, desc_obj, qid])
+        if self.verbosity >= 2:
+            self.stdout.write(f"Localized capacities rows built: {len(rows)}")
+        return rows
+
     def create_output_users(self, formatted_data):
         output_users = {
             "license": "CC0-1.0",
@@ -199,8 +285,8 @@ class Command(BaseCommand):
             "schema": {
                 "fields": [
                     {"name": "id", "type": "number"},
-                    {"name": "name", "type": "string"},
-                    {"name": "description", "type": "string"},
+                    {"name": "name", "type": "localized"},
+                    {"name": "description", "type": "localized"},
                     {"name": "wikidata_item", "type": "string"}
                 ],
             },
@@ -322,14 +408,10 @@ class Command(BaseCommand):
 
         skill_dict = self.get_skill_dict(skills)
         quids = list(skill_dict.keys())
-        sparql_query = self.get_sparql_query(quids)
-        response = requests.get(
-            'https://metabase.wikibase.cloud/query/sparql',
-            params={'query': sparql_query, 'format': 'json'},
-            headers={'User-Agent': self.get_user_agent()}
-        )
-        formatted_data = self.process_sparql_response(response, skill_dict)
-        output_capacities = self.create_output_capacities(formatted_data)
+        # Fetch all localized terms for capacities in one go and build localized rows
+        localized_terms = self.fetch_localized_capacities(quids)
+        capacities_rows = self.build_localized_capacities_rows(quids, skill_dict, localized_terms)
+        output_capacities = self.create_output_capacities(capacities_rows)
         output_badges = self.create_output_badges(badges_meta)
 
         # Hash current data
