@@ -11,7 +11,7 @@ class ProfileInline(admin.StackedInline):
 class AccountUserAdmin(AuthUserAdmin):
     list_display = ('username', 'is_staff', 'is_active')
     # Override default search_fields to remove first_name/last_name which are not present
-    search_fields = ('username')
+    search_fields = ['username']
     # Use a custom add form template to display a very prominent warning banner.
     add_form_template = 'admin/users/customuser/add_form.html'
 
