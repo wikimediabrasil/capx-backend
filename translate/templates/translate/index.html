@@ -1,0 +1,408 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <title>Translate – Capacities</title>
+  <link rel="stylesheet" href="/static/styles.css">
+  <style>
+    body { font-family: system-ui, Arial, sans-serif; margin: 0; background:#f6f7f8; }
+    header { background:#2d4b69; color:#fff; padding:1rem 1.5rem; }
+    h1 { margin:0; font-size:1.4rem; }
+    main { padding:1.25rem; }
+    .controls { display:flex; flex-wrap:wrap; gap:1rem; align-items:flex-end; margin-bottom:1rem; }
+    .controls label { font-size:.85rem; font-weight:600; text-transform:uppercase; color:#444; }
+    .controls input, .controls select { padding:.4rem .55rem; border:1px solid #bbb; border-radius:4px; }
+    button { cursor:pointer; background:#1d70b8; color:#fff; border:none; padding:.5rem .9rem; border-radius:4px; font-size:.85rem; }
+    button[disabled] { opacity:.6; cursor:wait; }
+    table { width:100%; border-collapse: collapse; background:#fff; box-shadow:0 1px 2px rgba(0,0,0,.08); }
+    th { background:#fafafa; position:sticky; top:0; z-index:2; }
+    th, td { border:1px solid #e0e0e0; padding:6px; vertical-align:top; }
+    tbody tr.missing { background:#fff8e1; }
+    tbody tr.ok { background:#f5fff7; }
+    td textarea, td input { width:100%; font-size:.85rem; }
+    td textarea { resize:vertical; min-height:60px; }
+    .fallback { font-size:.75rem; color:#555; }
+    .fallback strong { display:block; color:#222; }
+    .status { font-size:.7rem; font-weight:600; text-transform:uppercase; letter-spacing:.5px; }
+    .status.missing { color:#b34d00; }
+    .status.ok { color:#317031; }
+    .status.pending { color:#946200; }
+    .filter-bar { margin:.5rem 0 1rem; font-size:.75rem; display:flex; gap:1rem; align-items:center; }
+    .pill { display:inline-block; padding:.15rem .4rem; border-radius:12px; background:#eee; font-size:.65rem; margin-left:.4rem; }
+    .row-actions { display:flex; flex-direction:column; gap:.35rem; }
+    .save-all { background:#007a33; }
+    .loading-indicator { display:none; margin-left:.75rem; }
+    .loading-indicator.active { display:inline-flex; align-items:center; }
+    .spinner { width:16px; height:16px; border:3px solid #c4d3e2; border-top-color:#1d70b8; border-radius:50%; animation:spin .8s linear infinite; }
+    @keyframes spin { to { transform: rotate(360deg); } }
+    .changed-marker { border:2px solid #ff9800 !important; }
+    .search-box { flex:1; }
+    .license-note { font-size:.7rem; color:#444; background:#fff; padding:.5rem .75rem; border-left:4px solid #1d70b8; margin:.75rem 0 0; line-height:1.3; }
+  </style>
+</head>
+<body>
+  <header>
+    <h1>Capacities Translation Workspace</h1>
+  </header>
+  <main>
+    <p style="margin-top:0; font-size:.85rem; line-height:1.4">Translate capacity labels and descriptions across languages. Missing entries are highlighted. Changes are saved using the CapacityExchange bot. Fallback shows English for context.</p>
+
+    <div class="controls">
+      <div>
+        <label for="lang">Language code</label><br>
+        <input id="lang" value="pt-br" list="lang-suggestions" />
+        <datalist id="lang-suggestions">
+          <option>pt-br</option>
+          <option>fr</option>
+          <option>es</option>
+          <option>de</option>
+        </datalist>
+      </div>
+      <div>
+        <label for="fallback">Fallback</label><br>
+        <select id="fallback">
+          <option value="en" selected>English (en)</option>
+          <option value="pt-br">Portuguese (pt-br)</option>
+          <option value="es">Spanish (es)</option>
+        </select>
+      </div>
+      <div class="search-box">
+        <label for="search">Search</label><br>
+        <input id="search" placeholder="Filter by QID or fallback label..." />
+      </div>
+      <div>
+        <button id="load">Load</button>
+        <span id="loading" class="loading-indicator"><span class="spinner" aria-label="Loading"></span></span>
+      </div>
+      <div>
+        <button id="save-all" class="save-all" disabled>Save All Changed</button>
+      </div>
+      <div style="margin-left:auto; font-size:.7rem; text-align:right;">
+        <span id="stats"></span>
+      </div>
+    </div>
+    <p class="license-note">By submitting translations you agree to release them under the <strong>CC0 1.0 Universal Public Domain Dedication</strong>, consistent with Metabase/Wikidata. Do not submit translations you cannot freely dedicate to the public domain.</p>
+
+    <div class="filter-bar">
+      <label><input type="checkbox" id="filter-missing" > Show only missing</label>
+      <label><input type="checkbox" id="filter-changed" > Show only changed</label>
+    </div>
+
+    <table id="tbl" style="display:none;">
+      <thead>
+        <tr>
+          <th style="width:80px;">QID</th>
+          <th style="width:18%;">Label <span class="pill" title="Current language">L</span></th>
+          <th style="width:30%;">Description <span class="pill">D</span></th>
+          <th style="width:22%;">Fallback</th>
+          <th style="width:140px;">Actions</th>
+        </tr>
+      </thead>
+      <tbody></tbody>
+    </table>
+  </main>
+  <script>
+    // --- CSRF helper (Django session auth)
+    function getCookie(name) {
+      const value = `; ${document.cookie}`;
+      const parts = value.split(`; ${name}=`);
+      if (parts.length === 2) return parts.pop().split(';').shift();
+    }
+    const csrftoken = getCookie('csrftoken');
+
+    const loadBtn = document.getElementById('load');
+    const tbl = document.getElementById('tbl');
+    const tbody = tbl.querySelector('tbody');
+    const statsEl = document.getElementById('stats');
+    const filterMissingEl = document.getElementById('filter-missing');
+    const filterChangedEl = document.getElementById('filter-changed');
+    const saveAllBtn = document.getElementById('save-all');
+    const searchEl = document.getElementById('search');
+    const loadingEl = document.getElementById('loading');
+
+    let currentItems = [];
+    let changedQIDs = new Set();
+    let pendingQIDs = new Map(); // qid -> timestamp saved
+    const PENDING_REFRESH_MS = 30000; // 30 seconds default propagation window
+
+    function updateStatsOnly() {
+      const statsEl = document.getElementById('stats');
+      statsEl.textContent = `${document.querySelectorAll('#tbl tbody tr').length} displayed / ${currentItems.length} total | Changed: ${changedQIDs.size}`;
+      saveAllBtn.disabled = changedQIDs.size === 0;
+    }
+
+    function markRowChanged(qid) {
+      // Do not allow modifications while pending propagation
+      if (pendingQIDs.has(qid)) return;
+      changedQIDs.add(qid);
+      const row = tbody.querySelector(`tr[data-qid="${qid}"]`);
+      if (!row) return;
+      const labelEl = row.querySelector('input[data-field="label"]');
+      const descEl = row.querySelector('textarea[data-field="description"]');
+      if (labelEl) labelEl.classList.add('changed-marker');
+      if (descEl) descEl.classList.add('changed-marker');
+      const missing = !(labelEl && labelEl.value.trim()) || !(descEl && descEl.value.trim());
+      const statusSpan = row.querySelector('.status');
+      if (statusSpan) {
+        statusSpan.textContent = missing ? 'Missing' : 'Complete';
+        statusSpan.className = `status ${missing ? 'missing' : 'ok'}`;
+      }
+      const resetBtn = row.querySelector('button[data-action="reset"]');
+      if (resetBtn) resetBtn.disabled = false;
+      updateStatsOnly();
+    }
+
+    function renderRows() {
+      const lang = document.getElementById('lang').value.trim();
+      const showMissingOnly = filterMissingEl.checked;
+      const showChangedOnly = filterChangedEl.checked;
+      const searchTerm = searchEl.value.trim().toLowerCase();
+      tbody.innerHTML = '';
+      let visible = 0;
+      for (const it of currentItems) {
+        const missing = (!it.label || !it.description);
+        const changed = changedQIDs.has(it.qid);
+        const pending = pendingQIDs.has(it.qid);
+        if (showMissingOnly && !missing) continue;
+        if (showChangedOnly && !changed) continue;
+        if (searchTerm) {
+          const fallbackCombo = `${it.fallback_label || ''} ${it.qid}`.toLowerCase();
+          if (!fallbackCombo.includes(searchTerm)) continue;
+        }
+        const tr = document.createElement('tr');
+        tr.className = missing ? 'missing' : 'ok';
+        tr.dataset.qid = it.qid;
+        const statusClass = pending ? 'pending' : (missing ? 'missing' : 'ok');
+        const statusText = pending ? 'Pending' : (missing ? 'Missing' : 'Complete');
+        const disabledAttr = pending ? 'disabled' : '';
+        tr.innerHTML = `
+          <td><strong>${it.qid}</strong><br><span class="status ${statusClass}">${statusText}</span></td>
+          <td><input ${disabledAttr} data-field="label" data-qid="${it.qid}" value="${it.label || ''}" placeholder="Label (${lang})"/></td>
+          <td><textarea ${disabledAttr} data-field="description" data-qid="${it.qid}" placeholder="Description (${lang})">${it.description || ''}</textarea></td>
+          <td class="fallback"><strong>${it.fallback_label || ''}</strong>${it.fallback_description ? '<br>'+escapeHtml(it.fallback_description) : ''}</td>
+          <td class="row-actions">
+            <button ${disabledAttr} data-action="save" data-qid="${it.qid}" class="save-one">Save</button>
+            <button ${disabledAttr} data-action="reset" data-qid="${it.qid}" ${changed ? '' : 'disabled'}>Reset</button>
+          </td>
+        `;
+        tbody.appendChild(tr);
+        visible++;
+        // Mark changed styling
+        if (changed) {
+          tr.querySelector('input[data-field="label"]').classList.add('changed-marker');
+          tr.querySelector('textarea[data-field="description"]').classList.add('changed-marker');
+        }
+      }
+      tbl.style.display = visible ? 'table' : 'none';
+      statsEl.textContent = `${visible} displayed / ${currentItems.length} total | Changed: ${changedQIDs.size}`;
+      saveAllBtn.disabled = changedQIDs.size === 0;
+    }
+
+    function escapeHtml(s) {
+      return (s || '').replace(/[&<>]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;'}[c]));
+    }
+
+    async function load() {
+      const lang = document.getElementById('lang').value.trim();
+      if (lang === 'en') {
+        alert('English (en) is the base language and cannot be edited. Please choose another language.');
+        return;
+      }
+      const fallback = document.getElementById('fallback').value.trim();
+      loadingEl.classList.add('active');
+      try {
+        const resp = await fetch(`/translating/?lang=${encodeURIComponent(lang)}&fallback=${encodeURIComponent(fallback)}`);
+        const data = await resp.json();
+        currentItems = data.results || [];
+        changedQIDs.clear();
+        renderRows();
+      } catch (e) {
+        alert('Failed to load: ' + e);
+      } finally {
+        loadingEl.classList.remove('active');
+      }
+    }
+
+    // Incremental change tracking to avoid full re-render (which caused scroll/focus jump)
+    tbody.addEventListener('input', (ev) => {
+      const fieldEl = ev.target.closest('[data-field]');
+      if (!fieldEl) return;
+      markRowChanged(fieldEl.dataset.qid);
+    });
+
+    tbody.addEventListener('click', async (ev) => {
+      const btn = ev.target.closest('button[data-action]');
+      if (!btn) return;
+      const action = btn.dataset.action;
+      const qid = btn.dataset.qid;
+      if (action === 'reset') {
+        // Reset to original loaded values
+        const original = currentItems.find(it => it.qid === qid);
+        if (!original) return;
+        const labelEl = tbody.querySelector(`input[data-field="label"][data-qid="${qid}"]`);
+        const descEl = tbody.querySelector(`textarea[data-field="description"][data-qid="${qid}"]`);
+        if (labelEl) labelEl.value = original.label || '';
+        if (descEl) descEl.value = original.description || '';
+        changedQIDs.delete(qid);
+        // Remove change markers
+        if (labelEl) labelEl.classList.remove('changed-marker');
+        if (descEl) descEl.classList.remove('changed-marker');
+        // Recompute missing status for this row only
+        const missingNow = !original.label || !original.description;
+        const row = tbody.querySelector(`tr[data-qid="${qid}"]`);
+        if (row) {
+          const pending = pendingQIDs.has(qid);
+          row.className = pending ? 'pending' : (missingNow ? 'missing' : 'ok');
+          const statusSpan = row.querySelector('.status');
+          if (statusSpan) {
+            if (pending) {
+              statusSpan.textContent = 'Pending';
+              statusSpan.className = 'status pending';
+            } else {
+              statusSpan.textContent = missingNow ? 'Missing' : 'Complete';
+              statusSpan.className = `status ${missingNow ? 'missing' : 'ok'}`;
+            }
+          }
+          const resetBtn = row.querySelector('button[data-action="reset"]');
+          if (resetBtn) resetBtn.disabled = true;
+        }
+        updateStatsOnly();
+        return;
+      }
+      if (action === 'save') {
+        await saveSingle(qid, btn);
+      }
+    });
+
+    async function saveSingle(qid, btn) {
+      const lang = document.getElementById('lang').value.trim();
+      if (lang === 'en') {
+        alert('English (en) is not editable.');
+        return;
+      }
+      const labelEl = tbody.querySelector(`input[data-field="label"][data-qid="${qid}"]`);
+      const descEl  = tbody.querySelector(`textarea[data-field="description"][data-qid="${qid}"]`);
+      const row = tbody.querySelector(`tr[data-qid="${qid}"]`);
+      const resetBtn = row ? row.querySelector('button[data-action="reset"]') : null;
+      const payload = { qid, lang };
+      payload.label = labelEl ? labelEl.value : undefined;
+      payload.description = descEl ? descEl.value : undefined;
+      btn.disabled = true;
+      btn.textContent = 'Saving…';
+      // Immediately block editing while request is in flight
+      if (labelEl) labelEl.disabled = true;
+      if (descEl) descEl.disabled = true;
+      if (resetBtn) resetBtn.disabled = true;
+      try {
+        const resp = await fetch('/translating/', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'X-CSRFToken': csrftoken || ''
+          },
+            body: JSON.stringify(payload)
+        });
+        if (!resp.ok) throw new Error(await resp.text());
+        changedQIDs.delete(qid);
+        // Optimistically mark as pending without full reload
+        pendingQIDs.set(qid, Date.now());
+        // Update currentItems local copy for qid
+        const item = currentItems.find(i => i.qid === qid);
+        if (item) {
+          if (payload.label !== undefined) item.label = payload.label;
+          if (payload.description !== undefined) item.description = payload.description;
+        }
+        markRowPending(qid);
+        schedulePendingAutoRefresh();
+      } catch (e) {
+        alert('Failed to submit: ' + e);
+        // Re-enable editing controls since save failed
+        if (labelEl) labelEl.disabled = false;
+        if (descEl) descEl.disabled = false;
+        if (resetBtn) resetBtn.disabled = !changedQIDs.has(qid); // restore previous state
+        btn.disabled = false;
+      } finally {
+        // If pending state applied, keep disabled; else restore button
+        if (pendingQIDs.has(qid)) {
+          btn.disabled = true;
+          btn.textContent = 'Save';
+        } else if (!btn.disabled) {
+          btn.textContent = 'Save';
+        }
+      }
+    }
+
+    function markRowPending(qid) {
+      const row = tbody.querySelector(`tr[data-qid="${qid}"]`);
+      if (!row) return;
+      const statusSpan = row.querySelector('.status');
+      if (statusSpan) {
+        statusSpan.textContent = 'Pending';
+        statusSpan.className = 'status pending';
+      }
+      // Disable editing controls while pending
+      const labelEl = row.querySelector('input[data-field="label"]');
+      const descEl = row.querySelector('textarea[data-field="description"]');
+      const saveBtn = row.querySelector('button[data-action="save"]');
+      const resetBtn = row.querySelector('button[data-action="reset"]');
+      if (labelEl) labelEl.disabled = true;
+      if (descEl) descEl.disabled = true;
+      if (saveBtn) saveBtn.disabled = true;
+      if (resetBtn) resetBtn.disabled = true;
+      updateStatsOnly();
+    }
+
+    function schedulePendingAutoRefresh() {
+      // If already scheduled, skip (simple approach: one timeout)
+      if (schedulePendingAutoRefresh._scheduled) return;
+      schedulePendingAutoRefresh._scheduled = true;
+      setTimeout(() => {
+        schedulePendingAutoRefresh._scheduled = false;
+        // Remove any pending older than threshold and trigger a reload to fetch updated values
+        if (pendingQIDs.size) {
+          load(); // this will clear pending map after reload
+          pendingQIDs.clear();
+          updateStatsOnly();
+        }
+      }, PENDING_REFRESH_MS);
+    }
+
+
+    saveAllBtn.addEventListener('click', async () => {
+      if (changedQIDs.size === 0) return;
+      saveAllBtn.disabled = true;
+      saveAllBtn.textContent = 'Saving…';
+      try {
+        // Pre-lock all changed rows immediately for clearer UX
+        for (const qid of Array.from(changedQIDs)) {
+          const row = tbody.querySelector(`tr[data-qid="${qid}"]`);
+          if (!row) continue;
+          const labelEl = row.querySelector('input[data-field="label"]');
+          const descEl = row.querySelector('textarea[data-field="description"]');
+          const saveBtn = row.querySelector('button[data-action="save"]');
+          const resetBtn = row.querySelector('button[data-action="reset"]');
+          if (labelEl) labelEl.disabled = true;
+          if (descEl) descEl.disabled = true;
+          if (saveBtn) saveBtn.disabled = true; // will be re-enabled in saveSingle catch if failure
+          if (resetBtn) resetBtn.disabled = true;
+        }
+        // Sequential to avoid rate limits
+        for (const qid of Array.from(changedQIDs)) {
+          const rowBtn = tbody.querySelector(`button[data-action="save"][data-qid="${qid}"]`);
+          await saveSingle(qid, rowBtn || { disabled:false, textContent:'Save' });
+        }
+      } finally {
+        saveAllBtn.textContent = 'Save All Changed';
+        saveAllBtn.disabled = changedQIDs.size === 0;
+      }
+    });
+
+    filterMissingEl.addEventListener('change', renderRows);
+    filterChangedEl.addEventListener('change', renderRows);
+    searchEl.addEventListener('input', renderRows);
+    loadBtn.addEventListener('click', load);
+    // Initial load
+    load();
+  </script>
+</body>
+</html>
