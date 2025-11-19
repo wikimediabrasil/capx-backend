@@ -6,6 +6,7 @@ from django.contrib import messages
 from django.urls import reverse
 from django.views.decorators.http import require_GET
 from social_django.utils import load_strategy, load_backend
+from users.models import AuthExtraInfo
 
 INDEX_URL_NAME = 'translate:index'
 
@@ -51,6 +52,15 @@ def oauth_begin(request):
     strategy.session_set('next', translate_return_path)
     backend = load_backend(strategy, 'mediawiki', redirect_uri=None)
     response = backend.start()
+
+    oauth_url = getattr(response, 'url', None)
+    oauth_token = oauth_url.split('oauth_token=')[1].split('&')[0]  # Extract token from URL
+    if oauth_token:
+        index_url = request.build_absolute_uri(translate_return_path).split("://", 1)[-1].rstrip('/')
+        AuthExtraInfo.objects.update_or_create(
+            token=oauth_token,
+            defaults={'extra': index_url}
+        )
     return response
 
 
