@@ -123,7 +123,7 @@
     let currentItems = [];
     let changedQIDs = new Set();
     let pendingQIDs = new Map(); // qid -> timestamp saved
-    const PENDING_REFRESH_MS = 90000; // 1.5 minutes default propagation window
+    const PENDING_REFRESH_MS = 30000; // 30 seconds default propagation window
 
     function updateStatsOnly() {
       const statsEl = document.getElementById('stats');
@@ -132,6 +132,8 @@
     }
 
     function markRowChanged(qid) {
+      // Do not allow modifications while pending propagation
+      if (pendingQIDs.has(qid)) return;
       changedQIDs.add(qid);
       const row = tbody.querySelector(`tr[data-qid="${qid}"]`);
       if (!row) return;
@@ -140,19 +142,11 @@
       if (labelEl) labelEl.classList.add('changed-marker');
       if (descEl) descEl.classList.add('changed-marker');
       const missing = !(labelEl && labelEl.value.trim()) || !(descEl && descEl.value.trim());
-      // Update status text without rebuilding the row
       const statusSpan = row.querySelector('.status');
       if (statusSpan) {
-        // If already pending keep pending label
-        if (pendingQIDs.has(qid)) {
-          statusSpan.textContent = 'Pending';
-          statusSpan.className = 'status pending';
-        } else {
-          statusSpan.textContent = missing ? 'Missing' : 'Complete';
-          statusSpan.className = `status ${missing ? 'missing' : 'ok'}`;
-        }
+        statusSpan.textContent = missing ? 'Missing' : 'Complete';
+        statusSpan.className = `status ${missing ? 'missing' : 'ok'}`;
       }
-      // Enable reset button
       const resetBtn = row.querySelector('button[data-action="reset"]');
       if (resetBtn) resetBtn.disabled = false;
       updateStatsOnly();
@@ -180,14 +174,15 @@
         tr.dataset.qid = it.qid;
         const statusClass = pending ? 'pending' : (missing ? 'missing' : 'ok');
         const statusText = pending ? 'Pending' : (missing ? 'Missing' : 'Complete');
+        const disabledAttr = pending ? 'disabled' : '';
         tr.innerHTML = `
           <td><strong>${it.qid}</strong><br><span class="status ${statusClass}">${statusText}</span></td>
-          <td><input data-field="label" data-qid="${it.qid}" value="${it.label || ''}" placeholder="Label (${lang})"/></td>
-          <td><textarea data-field="description" data-qid="${it.qid}" placeholder="Description (${lang})">${it.description || ''}</textarea></td>
+          <td><input ${disabledAttr} data-field="label" data-qid="${it.qid}" value="${it.label || ''}" placeholder="Label (${lang})"/></td>
+          <td><textarea ${disabledAttr} data-field="description" data-qid="${it.qid}" placeholder="Description (${lang})">${it.description || ''}</textarea></td>
           <td class="fallback"><strong>${it.fallback_label || ''}</strong>${it.fallback_description ? '<br>'+escapeHtml(it.fallback_description) : ''}</td>
           <td class="row-actions">
-            <button data-action="save" data-qid="${it.qid}" class="save-one">Save</button>
-            <button data-action="reset" data-qid="${it.qid}" ${changed ? '' : 'disabled'}>Reset</button>
+            <button ${disabledAttr} data-action="save" data-qid="${it.qid}" class="save-one">Save</button>
+            <button ${disabledAttr} data-action="reset" data-qid="${it.qid}" ${changed ? '' : 'disabled'}>Reset</button>
           </td>
         `;
         tbody.appendChild(tr);
@@ -287,11 +282,17 @@
       }
       const labelEl = tbody.querySelector(`input[data-field="label"][data-qid="${qid}"]`);
       const descEl  = tbody.querySelector(`textarea[data-field="description"][data-qid="${qid}"]`);
+      const row = tbody.querySelector(`tr[data-qid="${qid}"]`);
+      const resetBtn = row ? row.querySelector('button[data-action="reset"]') : null;
       const payload = { qid, lang };
       payload.label = labelEl ? labelEl.value : undefined;
       payload.description = descEl ? descEl.value : undefined;
       btn.disabled = true;
       btn.textContent = 'Saving…';
+      // Immediately block editing while request is in flight
+      if (labelEl) labelEl.disabled = true;
+      if (descEl) descEl.disabled = true;
+      if (resetBtn) resetBtn.disabled = true;
       try {
         const resp = await fetch('/translating/', {
           method: 'POST',
@@ -315,9 +316,19 @@
         schedulePendingAutoRefresh();
       } catch (e) {
         alert('Failed to submit: ' + e);
-      } finally {
+        // Re-enable editing controls since save failed
+        if (labelEl) labelEl.disabled = false;
+        if (descEl) descEl.disabled = false;
+        if (resetBtn) resetBtn.disabled = !changedQIDs.has(qid); // restore previous state
         btn.disabled = false;
-        btn.textContent = 'Save';
+      } finally {
+        // If pending state applied, keep disabled; else restore button
+        if (pendingQIDs.has(qid)) {
+          btn.disabled = true;
+          btn.textContent = 'Save';
+        } else if (!btn.disabled) {
+          btn.textContent = 'Save';
+        }
       }
     }
 
@@ -329,6 +340,15 @@
         statusSpan.textContent = 'Pending';
         statusSpan.className = 'status pending';
       }
+      // Disable editing controls while pending
+      const labelEl = row.querySelector('input[data-field="label"]');
+      const descEl = row.querySelector('textarea[data-field="description"]');
+      const saveBtn = row.querySelector('button[data-action="save"]');
+      const resetBtn = row.querySelector('button[data-action="reset"]');
+      if (labelEl) labelEl.disabled = true;
+      if (descEl) descEl.disabled = true;
+      if (saveBtn) saveBtn.disabled = true;
+      if (resetBtn) resetBtn.disabled = true;
       updateStatsOnly();
     }
 
@@ -353,6 +373,19 @@
       saveAllBtn.disabled = true;
       saveAllBtn.textContent = 'Saving…';
       try {
+        // Pre-lock all changed rows immediately for clearer UX
+        for (const qid of Array.from(changedQIDs)) {
+          const row = tbody.querySelector(`tr[data-qid="${qid}"]`);
+          if (!row) continue;
+          const labelEl = row.querySelector('input[data-field="label"]');
+          const descEl = row.querySelector('textarea[data-field="description"]');
+          const saveBtn = row.querySelector('button[data-action="save"]');
+          const resetBtn = row.querySelector('button[data-action="reset"]');
+          if (labelEl) labelEl.disabled = true;
+          if (descEl) descEl.disabled = true;
+          if (saveBtn) saveBtn.disabled = true; // will be re-enabled in saveSingle catch if failure
+          if (resetBtn) resetBtn.disabled = true;
+        }
         // Sequential to avoid rate limits
         for (const qid of Array.from(changedQIDs)) {
           const rowBtn = tbody.querySelector(`button[data-action="save"][data-qid="${qid}"]`);
