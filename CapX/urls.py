@@ -33,6 +33,7 @@ from events.views import EventViewSet
 from message.views import MessageViewSet
 from projects.views import ProjectViewSet, ProjectMemberViewSet, ProjectMemberAcceptanceViewSet
 from drf_spectacular.views import SpectacularAPIView, SpectacularSwaggerView
+from translate.views_api import CapacityTranslationViewSet
 
 
 router = DefaultRouter()
@@ -61,6 +62,7 @@ router.register('list', QuickListViewSet, basename='list')
 router.register('letsconnect', LetsConnectViewSet, basename='letsconnect')
 router.register('badges', BadgeViewSet, basename='badges')
 router.register('user_badge', UserBadgeViewSet, basename='user_badge')
+router.register('translating', CapacityTranslationViewSet, basename='translating')
 
 urlpatterns = [
     path('admin/', admin.site.urls),

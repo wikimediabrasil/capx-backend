@@ -216,7 +216,7 @@
       const fallback = document.getElementById('fallback').value.trim();
       loadingEl.classList.add('active');
       try {
-        const resp = await fetch(`/translate/api/capacities/?lang=${encodeURIComponent(lang)}&fallback=${encodeURIComponent(fallback)}`);
+        const resp = await fetch(`/translating/?lang=${encodeURIComponent(lang)}&fallback=${encodeURIComponent(fallback)}`);
         const data = await resp.json();
         currentItems = data.results || [];
         changedQIDs.clear();
@@ -293,7 +293,7 @@
       btn.disabled = true;
       btn.textContent = 'Saving…';
       try {
-        const resp = await fetch('/translate/api/submit/', {
+        const resp = await fetch('/translating/', {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',
