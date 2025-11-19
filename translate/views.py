@@ -23,7 +23,6 @@ def translate_login_required(view_func=None, *, redirect_field_name: str = REDIR
 @require_GET
 @translate_login_required
 def index(request):
-    # Minimal shell page; the API provides data. We'll resembled MW Translate later.
     return render(request, 'translate/index.html', {
         'user': request.user,
     })
