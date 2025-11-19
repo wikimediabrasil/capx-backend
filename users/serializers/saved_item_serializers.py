@@ -3,7 +3,9 @@ from orgs.models import Organization
 
 from users.models import SavedItem, CustomUser
 
+from drf_spectacular.utils import extend_schema_field, OpenApiTypes
 
+@extend_schema_field(OpenApiTypes.INT)
 class EntityIdField(serializers.Field):
     @staticmethod
     def _get_user_id(instance):
