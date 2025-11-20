@@ -2,6 +2,7 @@ from django.core.management.base import BaseCommand
 from users.models import CustomUser
 from django.conf import settings
 import requests
+from social_django.models import UserSocialAuth
 
 class Command(BaseCommand):
     help = 'Check if Wikimedia usernames are locked and deactivate them locally'
@@ -17,7 +18,7 @@ class Command(BaseCommand):
             params = {
                 'action': 'query',
                 'meta': 'globaluserinfo',
-                'guiuser': user.username,
+                'guiid': UserSocialAuth.objects.filter(user=user, provider='mediawiki').first().uid if UserSocialAuth.objects.filter(user=user, provider='mediawiki').exists() else '',
                 'format': 'json',
                 'formatversion': '2',
             }
