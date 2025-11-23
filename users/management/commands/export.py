@@ -4,6 +4,7 @@ from users.models import Profile, DataHash
 from skills.models import Skill
 from users.models import CustomUser, UserBadge
 from CapX.useragent import get_user_agent
+from django.conf import settings
 import json
 import requests
 import hashlib
