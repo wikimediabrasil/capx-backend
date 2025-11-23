@@ -16,7 +16,8 @@ METABASE_API_ENDPOINT = "https://metabase.wikibase.cloud/w/api.php"
 METABASE_SPARQL_ENDPOINT = "https://metabase.wikibase.cloud/query/sparql"
 METAWIKI_API_ENDPOINT = "https://meta.wikimedia.org/w/api.php"
 
-USER_AGENT = "CapX/1.0"
+from CapX.useragent import get_user_agent
+USER_AGENT = get_user_agent("SyncTranslations")
 
 class Command(BaseCommand):
     help = (

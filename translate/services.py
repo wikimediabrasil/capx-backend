@@ -5,10 +5,11 @@ from typing import Dict, Optional
 
 import requests
 from django.conf import settings
+from CapX.useragent import get_user_agent
 
 METABASE_API_ENDPOINT = "https://metabase.wikibase.cloud/w/api.php"
 METABASE_SPARQL_ENDPOINT = "https://metabase.wikibase.cloud/query/sparql"
-USER_AGENT = "CapX/Translate/1.0"
+USER_AGENT = get_user_agent("Translate")
 
 
 class MetabaseClient:

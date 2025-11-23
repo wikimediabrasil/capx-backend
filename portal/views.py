@@ -11,6 +11,7 @@ from django.conf import settings
 from .models import Partner, PartnerMembership
 from social_django.utils import load_strategy, load_backend
 from users.models import AuthExtraInfo
+from CapX.useragent import get_user_agent
 from django.views.decorators.http import require_GET, require_POST
 from users.models import CustomUser, Profile, UserBadge, Badge
 from knox.models import AuthToken
@@ -103,7 +104,7 @@ def dashboard(request):
             resp = requests.get(
                 'https://metabase.wikibase.cloud/query/sparql',
                 params={'query': query, 'format': 'json'},
-                headers={'User-Agent': 'CapX-Portal/1.0'}
+                headers={'User-Agent': get_user_agent('Portal')}
             )
             data = resp.json()
             mapping = {}
