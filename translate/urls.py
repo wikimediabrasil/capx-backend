@@ -10,9 +10,7 @@ urlpatterns = [
     path('logout/', views.logout_view, name='logout'),
     path('oauth/begin/', views.oauth_begin, name='oauth_begin'),
     path('oauth/', views.oauth_callback, name='oauth_callback'),
-    # Metabase per-user OAuth
     path('metabase/connect/', views.metabase_oauth_begin, name='metabase_oauth_begin'),
-    # Callback is multiplexed on /translate/oauth now; dedicated path left unused.
     path('metabase/disconnect/', views.metabase_oauth_disconnect, name='metabase_oauth_disconnect'),
+    path('metabase/authorize/<str:state>/', views.metabase_oauth_authorize_state, name='metabase_oauth_authorize_state'),
 ]
-                                                                                                                                                                                                                                        

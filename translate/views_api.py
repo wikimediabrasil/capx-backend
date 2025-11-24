@@ -1,4 +1,5 @@
 from typing import List
+import os
 
 from rest_framework import status, viewsets
 from rest_framework.permissions import IsAuthenticated
@@ -7,10 +8,13 @@ from rest_framework.decorators import action
 
 from skills.models import Skill
 from .services import MetabaseClient, build_capacity_list
-from .models import MetabaseOAuthToken
+from .models import MetabaseOAuthToken, MetabaseOAuthRequest
 from .serializers import CapacityItemSerializer, TranslationSubmitSerializer
 
 from drf_spectacular.utils import extend_schema, OpenApiParameter
+from requests_oauthlib import OAuth1Session
+from django.urls import reverse
+from django.utils import timezone
 
 
 class CapacityTranslationViewSet(viewsets.ViewSet):
@@ -96,3 +100,57 @@ class CapacityTranslationViewSet(viewsets.ViewSet):
             changed.append('description')
 
         return Response({'status': 'ok', 'changed': changed, 'metabase_id': metabase_id})
+
+
+class MetabaseOAuthViewSet(viewsets.ViewSet):
+    permission_classes = [IsAuthenticated]
+
+    REQUEST_TOKEN_URL = 'https://metabase.wikibase.cloud/w/index.php?title=Special:OAuth/initiate'
+    AUTHORIZE_URL = 'https://metabase.wikibase.cloud/w/index.php?title=Special:OAuth/authorize'
+
+    @extend_schema(
+        summary='Begin Metabase OAuth (popup-friendly)',
+        description='Stores temporary request credentials in session and returns a local URL to redirect the user. That local URL will redirect to Metabase authorize.',
+        responses={'200': {'type': 'object', 'properties': {'authorization_url': {'type': 'string'}}}},
+    )
+    @action(detail=False, methods=['post'], url_path='begin')
+    def begin(self, request):
+        consumer_key = os.environ.get('METABASE_OAUTH_CONSUMER_KEY')
+        consumer_secret = os.environ.get('METABASE_OAUTH_CONSUMER_SECRET')
+        if not consumer_key or not consumer_secret:
+            return Response({'detail': 'Metabase OAuth is not configured.'}, status=status.HTTP_503_SERVICE_UNAVAILABLE)
+        callback_uri = "oob"
+        oauth = OAuth1Session(client_key=consumer_key, client_secret=consumer_secret, callback_uri=callback_uri)
+        try:
+            fetch_response = oauth.fetch_request_token(self.REQUEST_TOKEN_URL)
+        except Exception as e:
+            return Response({'detail': f'Failed to initiate OAuth: {e}'}, status=status.HTTP_502_BAD_GATEWAY)
+        request_token = fetch_response.get('oauth_token')
+        request_secret = fetch_response.get('oauth_token_secret')
+        if not request_token or not request_secret:
+            return Response({'detail': 'Provider did not supply request token/secret.'}, status=status.HTTP_502_BAD_GATEWAY)
+        # Opportunistic cleanup of stale requests
+        MetabaseOAuthRequest.objects.filter(consumed=False).exclude(created_at__gte=timezone.now()-timezone.timedelta(minutes=15)).delete()
+        oreq = MetabaseOAuthRequest.objects.create(user=request.user, request_token=request_token, request_secret=request_secret)
+        local_url = request.build_absolute_uri(reverse('translate:metabase_oauth_authorize_state', args=[oreq.state]))
+        return Response({'authorization_url': local_url, 'state': oreq.state})
+
+    @extend_schema(
+        summary='Metabase OAuth status for current user',
+        description='Returns whether the current user has a connected Metabase account.',
+        responses={'200': {'type': 'object', 'properties': {'connected': {'type': 'boolean'}, 'username': {'type': 'string'}}}},
+    )
+    @action(detail=False, methods=['get'], url_path='status')
+    def status(self, request):
+        tok = MetabaseOAuthToken.objects.filter(user=request.user).first()
+        return Response({'connected': bool(tok), 'username': getattr(tok, 'mb_username', None) or ''})
+
+    @extend_schema(
+        summary='Disconnect Metabase OAuth',
+        description='Revokes local stored tokens (does not revoke at provider).',
+        responses={'200': {'type': 'object', 'properties': {'status': {'type': 'string'}}}},
+    )
+    @action(detail=False, methods=['delete'], url_path='disconnect')
+    def disconnect(self, request):
+        MetabaseOAuthToken.objects.filter(user=request.user).delete()
+        return Response({'status': 'ok'})

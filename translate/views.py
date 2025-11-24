@@ -7,7 +7,7 @@ from django.contrib import messages
 from django.urls import reverse
 from django.views.decorators.http import require_GET
 from requests_oauthlib import OAuth1Session
-from .models import MetabaseOAuthToken
+from .models import MetabaseOAuthToken, MetabaseOAuthRequest
 from social_django.utils import load_strategy, load_backend
 from users.models import AuthExtraInfo
 
@@ -116,7 +116,30 @@ def metabase_oauth_begin(request):
     return redirect(authorization_url)
 
 
-@translate_login_required
+def metabase_oauth_authorize_state(request, state):
+    consumer_key = os.environ.get('METABASE_OAUTH_CONSUMER_KEY')
+    consumer_secret = os.environ.get('METABASE_OAUTH_CONSUMER_SECRET')
+    if not consumer_key or not consumer_secret:
+        messages.error(request, 'Metabase OAuth is not configured. Missing consumer credentials.')
+        return redirect(INDEX_URL_NAME)
+    try:
+        oreq = MetabaseOAuthRequest.objects.get(state=state, consumed=False)
+    except MetabaseOAuthRequest.DoesNotExist:
+        messages.error(request, 'Invalid or expired OAuth request state.')
+        return redirect(INDEX_URL_NAME)
+    callback_uri = request.build_absolute_uri(reverse('translate:oauth_callback'))
+    oauth = OAuth1Session(
+        client_key=consumer_key,
+        client_secret=consumer_secret,
+        resource_owner_key=oreq.request_token,
+        resource_owner_secret=oreq.request_secret,
+        callback_uri=callback_uri,
+    )
+    authorization_url = oauth.authorization_url(AUTHORIZE_URL)
+    request.session['mb_oauth_popup'] = True
+    return redirect(authorization_url)
+
+
 def metabase_oauth_callback(request):
     consumer_key = os.environ.get('METABASE_OAUTH_CONSUMER_KEY')
     consumer_secret = os.environ.get('METABASE_OAUTH_CONSUMER_SECRET')
@@ -126,16 +149,19 @@ def metabase_oauth_callback(request):
         return redirect(INDEX_URL_NAME)
     oauth_token = request.GET.get('oauth_token')
     oauth_verifier = request.GET.get('oauth_verifier')
-    req_secret = request.session.pop('mb_oauth_req_secret', None)
-    if not oauth_token or not oauth_verifier or not req_secret:
+    if not oauth_token or not oauth_verifier:
         messages.error(request, 'Invalid Metabase OAuth callback parameters.')
-        request.session.pop('mb_oauth_req_secret', None)
+        return redirect(INDEX_URL_NAME)
+    try:
+        oreq = MetabaseOAuthRequest.objects.get(request_token=oauth_token, consumed=False)
+    except MetabaseOAuthRequest.DoesNotExist:
+        messages.error(request, 'Unknown or consumed OAuth request token.')
         return redirect(INDEX_URL_NAME)
     oauth = OAuth1Session(
         client_key=consumer_key,
         client_secret=consumer_secret,
         resource_owner_key=oauth_token,
-        resource_owner_secret=req_secret,
+        resource_owner_secret=oreq.request_secret,
         verifier=oauth_verifier,
     )
     try:
@@ -151,15 +177,25 @@ def metabase_oauth_callback(request):
         except Exception:
             pass
         MetabaseOAuthToken.objects.update_or_create(
-            user=request.user,
+            user=oreq.user,
             defaults={'access_token': access_token, 'access_secret': access_secret, 'mb_username': mb_username or ''}
         )
+        oreq.consumed = True
+        oreq.save(update_fields=['consumed'])
+        # If popup flow, render close-window page; otherwise show message.
+        if request.session.get('mb_oauth_popup'):
+            request.session.pop('mb_oauth_popup', None)
+            return render(request, 'translate/oauth_done.html', {'mb_username': mb_username})
         messages.success(request, f'Metabase connected as {mb_username or "your account"}.')
     except Exception as e:
+        if request.session.get('mb_oauth_popup'):
+            request.session.pop('mb_oauth_popup', None)
+            return render(request, 'translate/oauth_done.html', {'error': str(e)})
         messages.error(request, f'Failed to complete Metabase OAuth: {e}')
     finally:
-        # Ensure the temporary secret is cleared whether success or failure.
-        request.session.pop('mb_oauth_req_secret', None)
+        # Database-backed flow does not require session cleanup.
+        # Old request rows are cleaned opportunistically in begin endpoint.
+        pass  # intentional no-op
     return redirect(INDEX_URL_NAME)
 
 
