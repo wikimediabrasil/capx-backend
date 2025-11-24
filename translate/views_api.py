@@ -7,6 +7,7 @@ from rest_framework.decorators import action
 
 from skills.models import Skill
 from .services import MetabaseClient, build_capacity_list
+from .models import MetabaseOAuthToken
 from .serializers import CapacityItemSerializer, TranslationSubmitSerializer
 
 from drf_spectacular.utils import extend_schema, OpenApiParameter
@@ -80,7 +81,12 @@ class CapacityTranslationViewSet(viewsets.ViewSet):
         if not metabase_id:
             return Response({'detail': 'Metabase item not found for qid'}, status=status.HTTP_400_BAD_REQUEST)
 
-        client.login_bot()
+        # Prefer per-user OAuth if connected; fallback to bot
+        token_obj = MetabaseOAuthToken.objects.filter(user=request.user).first()
+        if token_obj:
+            client.login_user_oauth(token_obj.access_token, token_obj.access_secret)
+        else:
+            client.login_bot()
         changed = []
         if label is not None:
             client.set_term(metabase_id, lang, 'label', label, request.user.username)

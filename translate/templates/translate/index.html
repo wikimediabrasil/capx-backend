@@ -45,7 +45,19 @@
     <h1>Capacities Translation Workspace</h1>
   </header>
   <main>
-    <p style="margin-top:0; font-size:.85rem; line-height:1.4">Translate capacity labels and descriptions across languages. Missing entries are highlighted. Changes are saved using the CapacityExchange bot. Fallback shows English for context.</p>
+    <p style="margin-top:0; font-size:.85rem; line-height:1.4">Translate capacity labels and descriptions across languages. Missing entries are highlighted. Edits are saved to Metabase. Fallback shows English for context.</p>
+
+    {% if not metabase_connected %}
+    <div style="background:#fff3cd; border:1px solid #ffeeba; color:#856404; padding:.6rem .75rem; border-radius:4px; margin-bottom:.8rem;">
+      You can edit as yourself by connecting your Metabase account.
+      <a href="{% url 'translate:metabase_oauth_begin' %}" style="margin-left:.6rem; background:#1d70b8; color:#fff; padding:.35rem .6rem; border-radius:3px; text-decoration:none;">Connect Metabase</a>
+    </div>
+    {% else %}
+    <div style="background:#e6f4ea; border:1px solid #c7ebd0; color:#1e4620; padding:.5rem .65rem; border-radius:4px; margin-bottom:.8rem; font-size:.85rem;">
+      Connected to Metabase as <strong>{{ metabase_username|default:'your account' }}</strong>.
+      <a href="{% url 'translate:metabase_oauth_disconnect' %}" style="margin-left:.6rem; color:#1d70b8;">Disconnect</a>
+    </div>
+    {% endif %}
 
     <div class="controls">
       <div>
