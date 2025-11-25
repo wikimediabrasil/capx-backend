@@ -115,22 +115,29 @@ class MetabaseOAuthViewSet(viewsets.ViewSet):
     )
     @action(detail=False, methods=['post'], url_path='begin')
     def begin(self, request):
+        # Verify consumer credentials
         consumer_key = os.environ.get('METABASE_OAUTH_CONSUMER_KEY')
         consumer_secret = os.environ.get('METABASE_OAUTH_CONSUMER_SECRET')
         if not consumer_key or not consumer_secret:
             return Response({'detail': 'Metabase OAuth is not configured.'}, status=status.HTTP_503_SERVICE_UNAVAILABLE)
-        callback_uri = "oob"
-        oauth = OAuth1Session(client_key=consumer_key, client_secret=consumer_secret, callback_uri=callback_uri)
+
+        # Initiate OAuth request
+        oauth = OAuth1Session(client_key=consumer_key, client_secret=consumer_secret, callback_uri="oob")
         try:
             fetch_response = oauth.fetch_request_token(self.REQUEST_TOKEN_URL)
         except Exception as e:
             return Response({'detail': f'Failed to initiate OAuth: {e}'}, status=status.HTTP_502_BAD_GATEWAY)
+
+        # Extract tokens
         request_token = fetch_response.get('oauth_token')
         request_secret = fetch_response.get('oauth_token_secret')
         if not request_token or not request_secret:
             return Response({'detail': 'Provider did not supply request token/secret.'}, status=status.HTTP_502_BAD_GATEWAY)
+
         # Opportunistic cleanup of stale requests
         MetabaseOAuthRequest.objects.filter(consumed=False).exclude(created_at__gte=timezone.now()-timezone.timedelta(minutes=15)).delete()
+
+        # Store request info and build local authorization URL
         oreq = MetabaseOAuthRequest.objects.create(user=request.user, request_token=request_token, request_secret=request_secret)
         local_url = request.build_absolute_uri(reverse('translate:metabase_oauth_authorize_state', args=[oreq.state]))
         return Response({'authorization_url': local_url, 'state': oreq.state})

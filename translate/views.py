@@ -65,23 +65,25 @@ def oauth_begin(request):
     response = backend.start()
 
     oauth_url = getattr(response, 'url', None)
-    oauth_token = oauth_url.split('oauth_token=')[1].split('&')[0]  # Extract token from URL
+    oauth_token = oauth_url.split('oauth_token=')[1].split('&')[0] if oauth_url and 'oauth_token=' in oauth_url else None
     if oauth_token:
-        index_url = request.build_absolute_uri(translate_return_path).split("://", 1)[-1].rstrip('/')
+        callback_path = request.build_absolute_uri(reverse('translate:mw_oauth_callback')).split("://", 1)[-1].rstrip('/')
         AuthExtraInfo.objects.update_or_create(
             token=oauth_token,
-            defaults={'extra': index_url}
+            defaults={'extra': callback_path}
         )
     return response
 
 
 @require_GET
 def oauth_callback(request):
-    # This callback is shared between MediaWiki (social_django) and Metabase per-user OAuth.
-    # If a Metabase request token secret is present in the session, we treat it as Metabase.
-    if request.session.get('mb_oauth_req_secret'):
-        return metabase_oauth_callback(request)
-    # Otherwise defer to social_django MediaWiki backend completion.
+    # Dedicated Metabase callback only now.
+    return metabase_oauth_callback(request)
+
+
+@require_GET
+def mw_oauth_callback(request):
+    """MediaWiki (social_django) OAuth callback separated to avoid collision with Metabase."""
     complete_url = reverse('social:complete', kwargs={'backend': 'mediawiki'})
     qs = request.META.get('QUERY_STRING')
     if qs:
@@ -141,62 +143,74 @@ def metabase_oauth_authorize_state(request, state):
 
 
 def metabase_oauth_callback(request):
+    # Verify consumer credentials
     consumer_key = os.environ.get('METABASE_OAUTH_CONSUMER_KEY')
     consumer_secret = os.environ.get('METABASE_OAUTH_CONSUMER_SECRET')
     if not consumer_key or not consumer_secret:
         messages.error(request, 'Metabase OAuth is not configured. Missing consumer credentials.')
         request.session.pop('mb_oauth_req_secret', None)
         return redirect(INDEX_URL_NAME)
+
+    # Extract OAuth parameters
     oauth_token = request.GET.get('oauth_token')
     oauth_verifier = request.GET.get('oauth_verifier')
     if not oauth_token or not oauth_verifier:
         messages.error(request, 'Invalid Metabase OAuth callback parameters.')
         return redirect(INDEX_URL_NAME)
+
+    # Retrieve request secret from DB
     try:
         oreq = MetabaseOAuthRequest.objects.get(request_token=oauth_token, consumed=False)
+        request_secret = oreq.request_secret
     except MetabaseOAuthRequest.DoesNotExist:
-        messages.error(request, 'Unknown or consumed OAuth request token.')
-        return redirect(INDEX_URL_NAME)
+        # Fall back to session-stored secret for non-DB flow
+        if request.session.get('mb_oauth_req_secret'):
+            request_secret = request.session.get('mb_oauth_req_secret')
+            oreq = None
+        else:
+            # Unknown request token
+            messages.error(request, 'Unknown or consumed OAuth request token.')
+            return redirect(INDEX_URL_NAME)
+
+    # Exchange request token for access token
     oauth = OAuth1Session(
         client_key=consumer_key,
         client_secret=consumer_secret,
         resource_owner_key=oauth_token,
-        resource_owner_secret=oreq.request_secret,
+        resource_owner_secret=request_secret,
         verifier=oauth_verifier,
     )
+
     try:
+        # Fetch access token
         tokens = oauth.fetch_access_token(ACCESS_TOKEN_URL)
         access_token = tokens.get('oauth_token')
         access_secret = tokens.get('oauth_token_secret')
+
         # Retrieve Metabase username
-        mb_username = None
-        try:
-            r = oauth.get(METABASE_API_ENDPOINT, params={'action': 'query', 'meta': 'userinfo', 'format': 'json'}, timeout=30)
-            r.raise_for_status()
-            mb_username = (r.json().get('query', {}).get('userinfo', {}) or {}).get('name')
-        except Exception:
-            pass
+        r = oauth.get(METABASE_API_ENDPOINT, params={'action': 'query', 'meta': 'userinfo', 'format': 'json'}, timeout=30)
+        r.raise_for_status()
+        mb_username = (r.json().get('query', {}).get('userinfo', {}) or {}).get('name')
+        
+        # Store tokens
         MetabaseOAuthToken.objects.update_or_create(
-            user=oreq.user,
+            user=oreq.user if oreq else request.user,
             defaults={'access_token': access_token, 'access_secret': access_secret, 'mb_username': mb_username or ''}
         )
-        oreq.consumed = True
-        oreq.save(update_fields=['consumed'])
-        # If popup flow, render close-window page; otherwise show message.
-        if request.session.get('mb_oauth_popup'):
-            request.session.pop('mb_oauth_popup', None)
+
+        # Mark request as consumed
+        if oreq:
+            oreq.consumed = True
+            oreq.save(update_fields=['consumed'])
             return render(request, 'translate/oauth_done.html', {'mb_username': mb_username})
-        messages.success(request, f'Metabase connected as {mb_username or "your account"}.')
-    except Exception as e:
-        if request.session.get('mb_oauth_popup'):
-            request.session.pop('mb_oauth_popup', None)
-            return render(request, 'translate/oauth_done.html', {'error': str(e)})
-        messages.error(request, f'Failed to complete Metabase OAuth: {e}')
+        else: 
+            if request.session.get('mb_oauth_popup'):
+                request.session.pop('mb_oauth_popup', None)
+            return redirect(INDEX_URL_NAME)
     finally:
         # Database-backed flow does not require session cleanup.
         # Old request rows are cleaned opportunistically in begin endpoint.
         pass  # intentional no-op
-    return redirect(INDEX_URL_NAME)
 
 
 @translate_login_required
