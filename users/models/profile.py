@@ -3,6 +3,8 @@ from django.db.models import Manager
 from django.dispatch import receiver
 from django.db.models.signals import post_save
 from django.core.validators import RegexValidator
+from django.core.exceptions import ValidationError
+import requests
 
 from orgs.models import Organization
 from skills.models import Skill
@@ -16,6 +18,39 @@ class ActiveProfileManager(Manager):
     """
     def get_queryset(self):
         return super().get_queryset().filter(user__is_active=True)
+
+
+def validate_wiki_alt(value):
+    """Validate that the provided Wikimedia alternative account exists and is not a CapX username.
+
+    Checks:
+    1. Username exists on Wikimedia (Meta-Wiki) via MediaWiki API.
+    2. Username is not already a primary CapX user account (CustomUser.username).
+    """
+    if not value:
+        return
+    try:
+        resp = requests.get(
+            "https://meta.wikimedia.org/w/api.php",
+            params={
+                "action": "query",
+                "format": "json",
+                "list": "users",
+                "ususers": value,
+            },
+            timeout=5,
+            headers={"User-Agent": "CapX/1.0"},
+        )
+        resp.raise_for_status()
+        data = resp.json()
+        users = data.get("query", {}).get("users", [])
+        if not users or users[0].get("missing") is not None:
+            raise ValidationError("Wikimedia username does not exist.")
+    except requests.RequestException:
+        raise ValidationError("Unable to reach Wikimedia API to validate username.")
+
+    if CustomUser.objects.filter(username=value).exists():
+        raise ValidationError("This username already belongs to a CapX user; cannot set as alternative account.")
 
 
 class Profile(models.Model):
@@ -88,7 +123,8 @@ class Profile(models.Model):
         verbose_name="Wikimedia alternative account",
         max_length=128,
         help_text="Wikimedia alternative account of the user.",
-        blank=True
+        blank=True,
+        validators=[validate_wiki_alt]
     )
 
     # COMMUNITY
@@ -214,3 +250,5 @@ class LanguageProficiency(models.Model):
 def create_user_profile(sender, instance, created, **kwargs):
     if created:
         Profile.objects.create(user=instance)
+        # Blank any existing wiki_alt matching this new username to avoid duplicity
+        Profile.all_objects.filter(wiki_alt=instance.username).exclude(user=instance).update(wiki_alt="")

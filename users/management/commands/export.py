@@ -2,8 +2,9 @@ from django.core.management.base import BaseCommand
 from users.serializers import ProfileSerializer
 from users.models import Profile, DataHash
 from skills.models import Skill
-from django.conf import settings
 from users.models import CustomUser, UserBadge
+from CapX.useragent import get_user_agent
+from django.conf import settings
 import json
 import requests
 import hashlib
@@ -24,9 +25,6 @@ class Command(BaseCommand):
             return item.replace(',', '&#44;') if isinstance(item, str) else item
         return '[' + ', '.join(str(escape_commas(item)) for item in data_list) + ']'
 
-    def get_user_agent(self):
-        version = getattr(settings, "SPECTACULAR_SETTINGS", {}).get("VERSION", "dev")
-        return f"CapacityExchangeBot/{version}"
 
     def get_meta_wiki_users(self):
         query_params = {
@@ -42,7 +40,7 @@ class Command(BaseCommand):
         response = requests.get(
             'https://meta.wikimedia.org/w/api.php',
             params=query_params,
-            headers={'User-Agent': self.get_user_agent()}
+            headers={'User-Agent': get_user_agent('Export')}
         )
         if self.verbosity >= 2:
             self.stdout.write(f"Meta wiki users response: {response.json()}")
@@ -202,7 +200,7 @@ class Command(BaseCommand):
             GROUP BY ?item ?value ?language
             ORDER BY ?language
             """
-        headers = {'User-Agent': self.get_user_agent(), 'Accept': 'application/sparql-results+json'}
+        headers = {'User-Agent': get_user_agent('Export'), 'Accept': 'application/sparql-results+json'}
         response = requests.get(
             'https://metabase.wikibase.cloud/query/sparql',
             params={'query': query},
@@ -322,7 +320,7 @@ class Command(BaseCommand):
             "type": "login",
             "format": "json"
         }
-        response = session.get(url=url, params=params, headers={'User-Agent': self.get_user_agent()})
+        response = session.get(url=url, params=params, headers={'User-Agent': get_user_agent('Export')})
         data = response.json()
         if self.verbosity >= 2:
             self.stdout.write(f"Login token response: {data}")
@@ -336,7 +334,7 @@ class Command(BaseCommand):
             "lgtoken": login_token,
             "format": "json"
         }
-        response = session.post(url, data=params, headers={'User-Agent': self.get_user_agent()}).json()
+        response = session.post(url, data=params, headers={'User-Agent': get_user_agent('Export')}).json()
         if response['login']['result'] != 'Success':
             raise requests.exceptions.RequestException("Login failed")
         if self.verbosity >= 2:
@@ -349,7 +347,7 @@ class Command(BaseCommand):
             "meta": "tokens",
             "format": "json"
         }
-        response = session.get(url=url, params=params, headers={'User-Agent': self.get_user_agent()})
+        response = session.get(url=url, params=params, headers={'User-Agent': get_user_agent('Export')})
         data = response.json()
         if self.verbosity >= 2:
             self.stdout.write(f"CSRF token response: {data}")
@@ -368,7 +366,7 @@ class Command(BaseCommand):
         if self.verbosity >= 2:
             self.stdout.write(f"Editing page {title} with text: {text}")
         
-        response = session.post(url, data=params, headers={'User-Agent': self.get_user_agent()})
+        response = session.post(url, data=params, headers={'User-Agent': get_user_agent('Export')})
         return response.json()
 
     def hash_data(self, data):

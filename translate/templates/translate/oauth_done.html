@@ -1,0 +1,30 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <title>Metabase Authorization</title>
+  <style>
+    body { font-family: system-ui, Arial, sans-serif; margin: 0; background:#f6f7f8; }
+    main { max-width: 520px; margin: 15vh auto; background:#fff; padding:1rem 1.25rem; border-radius:6px; box-shadow:0 2px 10px rgba(0,0,0,.08); }
+    h1 { font-size:1.1rem; margin:0 0 .5rem; }
+    p { margin:.5rem 0; color:#333; }
+    .ok { color:#1e4620; }
+    .err { color:#7d0808; }
+    button { cursor:pointer; background:#1d70b8; color:#fff; border:none; padding:.5rem .9rem; border-radius:4px; font-size:.9rem; }
+  </style>
+</head>
+<body>
+  <main>
+    {% if error %}
+      <h1 class="err">Authorization failed</h1>
+      <p>{{ error }}</p>
+    {% else %}
+      <h1 class="ok">Authorization complete</h1>
+      <p>Connected{% if mb_username %} as <strong>{{ mb_username }}</strong>{% endif %}. You can close this window.</p>
+    {% endif %}
+    <p>
+      <button onclick="window.close()">Close window</button>
+    </p>
+  </main>
+</body>
+</html>

@@ -5,10 +5,12 @@ from typing import Dict, Optional
 
 import requests
 from django.conf import settings
+from CapX.useragent import get_user_agent
+from requests_oauthlib import OAuth1Session
 
 METABASE_API_ENDPOINT = "https://metabase.wikibase.cloud/w/api.php"
 METABASE_SPARQL_ENDPOINT = "https://metabase.wikibase.cloud/query/sparql"
-USER_AGENT = "CapX/Translate/1.0"
+USER_AGENT = get_user_agent("Translate")
 
 
 class MetabaseClient:
@@ -27,6 +29,33 @@ class MetabaseClient:
         if not username or not password:
             raise RuntimeError("Missing CAPX_BOT_USERNAME/CAPX_BOT_PASSWORD in settings_local.py or env")
         self._session, self._token = self._mw_login(METABASE_API_ENDPOINT, username, password)
+        return self
+
+    def login_user_oauth(self, access_token: str, access_secret: str):
+        """Use a user's Metabase OAuth credentials to authenticate requests.
+        Requires environment variables METABASE_OAUTH_CONSUMER_KEY and METABASE_OAUTH_CONSUMER_SECRET.
+        """
+        consumer_key = os.environ.get("METABASE_OAUTH_CONSUMER_KEY")
+        consumer_secret = os.environ.get("METABASE_OAUTH_CONSUMER_SECRET")
+        if not consumer_key or not consumer_secret:
+            raise RuntimeError("Missing METABASE_OAUTH_CONSUMER_KEY/SECRET env vars")
+        sess = OAuth1Session(
+            client_key=consumer_key,
+            client_secret=consumer_secret,
+            resource_owner_key=access_token,
+            resource_owner_secret=access_secret,
+        )
+        # Fetch CSRF token with the OAuth session
+        r = sess.get(METABASE_API_ENDPOINT, params={
+            "action": "query",
+            "meta": "tokens",
+            "format": "json",
+        }, timeout=30)
+        r.raise_for_status()
+        csrf = r.json().get("query", {}).get("tokens", {}).get("csrftoken")
+        if not csrf:
+            raise RuntimeError("Failed to obtain CSRF token via OAuth session.")
+        self._session, self._token = sess, csrf
         return self
 
     def _mw_login(self, api_endpoint, username, password):
