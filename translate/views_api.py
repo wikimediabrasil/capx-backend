@@ -102,7 +102,7 @@ class CapacityTranslationViewSet(viewsets.ViewSet):
         return Response({'status': 'ok', 'changed': changed, 'metabase_id': metabase_id})
 
 
-class MetabaseOAuthViewSet(viewsets.ViewSet):
+class CapacityTranslationOauthViewSet(viewsets.ViewSet):
     permission_classes = [IsAuthenticated]
 
     REQUEST_TOKEN_URL = 'https://metabase.wikibase.cloud/w/index.php?title=Special:OAuth/initiate'
