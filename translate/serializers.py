@@ -31,3 +31,14 @@ class TranslationSubmitSerializer(serializers.Serializer):
         attrs['qid'] = qid
         attrs['lang'] = lang
         return attrs
+
+class OauthBeginSerializer(serializers.Serializer):
+    authorization_url = serializers.URLField()
+    state = serializers.CharField()
+
+class OauthStatusSerializer(serializers.Serializer):
+    connected = serializers.BooleanField()
+    username = serializers.CharField(allow_null=True, required=False)
+
+class OauthDisconnectSerializer(serializers.Serializer):
+    status = serializers.CharField()

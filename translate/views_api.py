@@ -9,7 +9,7 @@ from rest_framework.decorators import action
 from skills.models import Skill
 from .services import MetabaseClient, build_capacity_list
 from .models import MetabaseOAuthToken, MetabaseOAuthRequest
-from .serializers import CapacityItemSerializer, TranslationSubmitSerializer
+from .serializers import CapacityItemSerializer, TranslationSubmitSerializer, OauthBeginSerializer, OauthStatusSerializer, OauthDisconnectSerializer
 
 from drf_spectacular.utils import extend_schema, OpenApiParameter
 from requests_oauthlib import OAuth1Session
@@ -107,11 +107,12 @@ class CapacityTranslationOauthViewSet(viewsets.ViewSet):
 
     REQUEST_TOKEN_URL = 'https://metabase.wikibase.cloud/w/index.php?title=Special:OAuth/initiate'
     AUTHORIZE_URL = 'https://metabase.wikibase.cloud/w/index.php?title=Special:OAuth/authorize'
-
+    
     @extend_schema(
         summary='Begin Metabase OAuth (popup-friendly)',
         description='Stores temporary request credentials in session and returns a local URL to redirect the user. That local URL will redirect to Metabase authorize.',
-        responses={'200': {'type': 'object', 'properties': {'authorization_url': {'type': 'string'}}}},
+        request=None,
+        responses=OauthBeginSerializer,
     )
     @action(detail=False, methods=['post'], url_path='begin')
     def begin(self, request):
@@ -145,7 +146,8 @@ class CapacityTranslationOauthViewSet(viewsets.ViewSet):
     @extend_schema(
         summary='Metabase OAuth status for current user',
         description='Returns whether the current user has a connected Metabase account.',
-        responses={'200': {'type': 'object', 'properties': {'connected': {'type': 'boolean'}, 'username': {'type': 'string'}}}},
+        request=None,
+        responses=OauthStatusSerializer,
     )
     @action(detail=False, methods=['get'], url_path='status')
     def status(self, request):
@@ -155,7 +157,8 @@ class CapacityTranslationOauthViewSet(viewsets.ViewSet):
     @extend_schema(
         summary='Disconnect Metabase OAuth',
         description='Revokes local stored tokens (does not revoke at provider).',
-        responses={'200': {'type': 'object', 'properties': {'status': {'type': 'string'}}}},
+        request=None,
+        responses=OauthDisconnectSerializer,
     )
     @action(detail=False, methods=['delete'], url_path='disconnect')
     def disconnect(self, request):
