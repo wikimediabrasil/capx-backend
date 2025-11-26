@@ -19,12 +19,17 @@ class OrganizationNameInlineFormSet(BaseInlineFormSet):
 		for form in self.forms:
 			if not hasattr(form, 'cleaned_data'):
 				continue
+			# Determine language code from cleaned data or fall back to the instance.
+			lang_code = form.cleaned_data.get('language_code')
+			if not lang_code and hasattr(form, 'instance'):
+				lang_code = getattr(form.instance, 'language_code', None)
+
 			if form.cleaned_data.get('DELETE'):
 				# Skip deleted forms (except we check 'en' below)
-				if form.cleaned_data.get('language_code') == 'en':
+				if lang_code == 'en':
 					raise ValidationError("The English (en) translation cannot be deleted. Delete the organization instead.")
 				continue
-			if form.cleaned_data.get('language_code') == 'en':
+			if lang_code == 'en':
 				english_present = True
 		if not english_present:
 			raise ValidationError("An English (en) translation is required.")
