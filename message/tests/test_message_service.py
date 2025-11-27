@@ -19,10 +19,10 @@ class MessageServiceTest(TestCase):
         self.message = Message.objects.create(
             sender=self.sender,
             receiver=self.receiver,
-            message='Test message',
-            subject='Test subject',
             method='email'
         )
+        self.content = 'Test message content'
+        self.subject = 'Test subject'
         self.user_social_auth = UserSocialAuth.objects.create(
             user=self.sender,
             provider='mediawiki',
@@ -50,7 +50,7 @@ class MessageServiceTest(TestCase):
             }))
         ]
 
-        MessageService.send_message(self.message)
+        MessageService.send_message(self.message, self.content, self.subject)
         self.message.refresh_from_db()
         self.assertEqual(self.message.status, 'failed')
         self.assertEqual(self.message.error_message, 'Receiver account is invalid or does not exist.')
@@ -70,7 +70,7 @@ class MessageServiceTest(TestCase):
             }))
         ]
 
-        MessageService.send_message(self.message)
+        MessageService.send_message(self.message, self.content, self.subject)
         self.message.refresh_from_db()
         self.assertEqual(self.message.status, 'failed')
         self.assertEqual(self.message.error_message, 'An exception occurred: Sender account is invalid or does not exist.')
@@ -79,7 +79,7 @@ class MessageServiceTest(TestCase):
     def test_send_message_user_social_auth_does_not_exist(self, mock_oauth):
         self.user_social_auth.delete()
 
-        MessageService.send_message(self.message)
+        MessageService.send_message(self.message, self.content, self.subject)
         self.message.refresh_from_db()
         self.assertEqual(self.message.status, 'failed')
 
@@ -87,7 +87,7 @@ class MessageServiceTest(TestCase):
     def test_send_message_exception(self, mock_oauth):
         mock_oauth.side_effect = Exception('Test exception')
 
-        MessageService.send_message(self.message)
+        MessageService.send_message(self.message, self.content, self.subject)
         self.message.refresh_from_db()
         self.assertEqual(self.message.status, 'failed')
 
@@ -107,7 +107,7 @@ class MessageServiceTest(TestCase):
             MagicMock(json=MagicMock(return_value={'query': {'tokens': {'csrftoken': None}}}))
         ]
 
-        MessageService.send_message(self.message)
+        MessageService.send_message(self.message, self.content, self.subject)
         self.message.refresh_from_db()
         self.assertEqual(self.message.status, 'failed')
 
@@ -128,7 +128,7 @@ class MessageServiceTest(TestCase):
         ]
         mock_oauth_instance.post.return_value = MagicMock(json=MagicMock(return_value={'emailuser': {'result': 'Success'}}))
 
-        MessageService.send_message(self.message)
+        MessageService.send_message(self.message, self.content, self.subject)
         self.message.refresh_from_db()
         self.assertEqual(self.message.status, 'sent')
         self.assertEqual(self.message.error_message, '')
@@ -153,7 +153,7 @@ class MessageServiceTest(TestCase):
         ]
         mock_oauth_instance.post.return_value = MagicMock(json=MagicMock(return_value={'edit': {'result': 'Success'}}))
 
-        MessageService.send_message(self.message)
+        MessageService.send_message(self.message, self.content, self.subject)
         self.message.refresh_from_db()
         self.assertEqual(self.message.status, 'sent')
         self.assertEqual(self.message.error_message, '')
@@ -175,7 +175,7 @@ class MessageServiceTest(TestCase):
         ]
         mock_oauth_instance.post.return_value = MagicMock(json=MagicMock(return_value={'edit': {'result': 'Success'}}))
 
-        MessageService.send_message(self.message)
+        MessageService.send_message(self.message, self.content, self.subject)
         self.message.refresh_from_db()
         self.assertEqual(self.message.status, 'sent')
         self.assertEqual(self.message.error_message, 'Receiver is not emailable. Using talk page instead.')
@@ -197,7 +197,7 @@ class MessageServiceTest(TestCase):
         ]
         mock_oauth_instance.post.return_value = MagicMock(json=MagicMock(return_value={'edit': {'result': 'Success'}}))
 
-        MessageService.send_message(self.message)
+        MessageService.send_message(self.message, self.content, self.subject)
         self.message.refresh_from_db()
         self.assertEqual(self.message.status, 'sent')
         self.assertEqual(self.message.error_message, 'Sender is not emailable. Using talk page instead.')
