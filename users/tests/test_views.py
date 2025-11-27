@@ -957,13 +957,12 @@ class StatisticsViewTestCase(TestCase):
             self.assertIn(key, response.data)
             self.assertIsInstance(response.data[key], int)
 
-    @patch('message.models.MessageService.send_message', return_value=None)
-    def test_statistics_view_counts(self, mock_send_message):
+    def test_statistics_view_counts(self):
         # Create a skill with creation date this month
         Skill.objects.create(skill_wikidata_item="Q1")
 
         # Create a message with date this month
-        Message.objects.create(sender=self.user, receiver=self.user, message="test", subject="test", method="email")
+        Message.objects.create(sender=self.user, receiver=self.user, method="email")
 
         # Create an organization with managers and management joined this month
         org_type = OrganizationType.objects.create(type_name='Type', type_code='T')
