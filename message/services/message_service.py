@@ -15,6 +15,23 @@ class MessageService:
             # Step 1: Get the OAuth credentials
             oauth = MessageService._get_oauth_session(instance.sender)
 
+            # Step 1.5: Batch fetch sender/receiver info and validate receiver
+            sender_username = MessageService._cap(instance.sender.username)
+            receiver_username = MessageService._cap(instance.receiver)
+
+            users_info = MessageService._fetch_users_info(oauth, url, [receiver_username, sender_username])
+
+            receiver = users_info.get(receiver_username, {})
+            sender = users_info.get(sender_username, {})
+
+            if not receiver or receiver.get('missing') or receiver.get('invalid'):
+                MessageService._update_instance_status(
+                    instance,
+                    'failed',
+                    'Receiver account is invalid or does not exist.'
+                )
+                return
+
             # Step 2: Fetch CSRF token
             token = MessageService._fetch_csrf_token(oauth, url)
             if not token:
@@ -25,10 +42,14 @@ class MessageService:
             if instance.method == 'talkpage':
                 success = MessageService._send_talk_page(oauth, url, instance, token)
             elif instance.method == 'email':
-                if not MessageService._is_user_emailable(oauth, url, instance.receiver):
+                # Use batch-fetched info for emailable checks
+                receiver_emailable = receiver.get('emailable', False)
+                sender_emailable = sender.get('emailable', False)
+
+                if not receiver_emailable:
                     error_message = 'Receiver is not emailable. Using talk page instead.'
                     success = MessageService._send_talk_page(oauth, url, instance, token)
-                elif not MessageService._is_user_emailable(oauth, url, instance.sender):
+                elif not sender_emailable:
                     error_message = 'Sender is not emailable. Using talk page instead.'
                     success = MessageService._send_talk_page(oauth, url, instance, token)
                 else:
@@ -43,6 +64,10 @@ class MessageService:
 
         except Exception as e:
             MessageService._update_instance_status(instance, 'failed', f'An exception occurred: {str(e)}')
+
+    @staticmethod
+    def _cap(username):
+        return username[0].upper() + username[1:]
 
     @staticmethod
     def _get_oauth_session(sender):
@@ -74,17 +99,29 @@ class MessageService:
         return response.json().get('query', {}).get('tokens', {}).get('csrftoken', '')
 
     @staticmethod
-    def _is_user_emailable(oauth, url, receiver):
+    def _fetch_users_info(oauth, url, usernames):
+        # Accept list of usernames and perform a single batch query
+        # API expects pipe-separated usernames
+        joined = '|'.join([str(u) for u in usernames])
         params = {
             'action': 'query',
             'format': 'json',
             'list': 'users',
             'formatversion': '2',
             'usprop': 'emailable',
-            'ususers': receiver,
+            'ususers': joined,
         }
         response = oauth.get(url, params=params, timeout=60)
-        return response.json().get('query', {}).get('users', [{}])[0].get('emailable', False)
+        users = response.json().get('query', {}).get('users', [])
+
+        # Map results
+        users_info = {}
+        for user in users:
+            key = user.get('name')
+            if not key:
+                raise ValueError("User entry missing 'name' field; this indicates an unexpected API response: %r" % (user,))
+            users_info[key] = user
+        return users_info
 
     @staticmethod
     def _send_email(oauth, url, instance, token):
