@@ -1,5 +1,6 @@
 from .models import Message
 from .serializers import MessageSerializer
+from .services.message_service import MessageService
 from rest_framework import status, viewsets, filters
 from rest_framework.response import Response
 from rest_framework.permissions import IsAuthenticated
@@ -34,8 +35,33 @@ class MessageViewSet(viewsets.ModelViewSet):
         else:
             return Message.objects.filter(sender=user)
 
-    def perform_create(self, serializer):
-        serializer.save(sender=self.request.user)
+
+    @extend_schema(
+        summary="Create a new message.",
+        description="Create and send a message via Wikimedia API. The 'message' and 'subject' fields are write-only.",
+    )
+    def create(self, request, *args, **kwargs):
+        serializer = self.get_serializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+
+        data = serializer.validated_data
+        content = data.pop('message')
+        subject = data.pop('subject')
+
+        # Persist a minimal Message record without content
+        instance = Message(
+            sender=request.user,
+            receiver=data['receiver'],
+            method=data['method'],
+        )
+        instance.save()
+
+        # Attach ephemeral content for the service call
+        # Delegate sending and persistence to the service
+        MessageService.send_message(instance, content, subject)
+
+        response_serializer = self.get_serializer(instance)
+        return Response(response_serializer.data, status=status.HTTP_201_CREATED)
 
     def get_serializer_class(self):
         serializer_class = super().get_serializer_class()

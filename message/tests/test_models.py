@@ -1,7 +1,6 @@
 from django.test import TestCase
 from ..models import Message
 from users.models import CustomUser
-from unittest.mock import patch
 import secrets
 
 
@@ -9,11 +8,8 @@ class TestMessageModel(TestCase):
     def setUp(self):
         self.user = CustomUser.objects.create_user(username='testuser', password=str(secrets.randbits(16)))
 
-    @patch('message.models.MessageService.send_message', return_value=None)
-    def test_message_creation(self, mock_send_message):
+    def test_message_creation(self):
         message = Message.objects.create(
-            message='Sample message',
-            subject='Sample subject',
             sender=self.user,
             receiver='receiver',
             method='email'
@@ -26,13 +22,10 @@ class TestMessageModel(TestCase):
         self.assertEqual(expected_sender, 'testuser')
         self.assertEqual(expected_receiver, 'receiver')
         self.assertEqual(expected_method, 'email')
-        self.assertEqual(expected_status, 'sending')
+        self.assertEqual(expected_status, 'pending')
 
-    @patch('message.models.MessageService.send_message', return_value=None)
-    def test_message_str(self, mock_send_message):
+    def test_message_str(self):
         message = Message.objects.create(
-            message='Sample message',
-            subject='Sample subject',
             sender=self.user,
             receiver='receiver',
             method='email'

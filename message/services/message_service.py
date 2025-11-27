@@ -4,7 +4,7 @@ from social_django.models import UserSocialAuth
 
 class MessageService:
     @staticmethod
-    def send_message(instance):
+    def send_message(instance, content, subject):
         """
         Sends a message via Wikimedia API. Supports email or user talk page messages.
         Updates the message's status accordingly.
@@ -43,7 +43,7 @@ class MessageService:
 
             # Step 3: Decide method and send message
             if instance.method == 'talkpage':
-                success = MessageService._send_talk_page(oauth, url, instance, token)
+                success = MessageService._send_talk_page(oauth, url, instance, token, content, subject)
             elif instance.method == 'email':
                 # Use batch-fetched info for emailable checks
                 receiver_emailable = receiver.get('emailable', False)
@@ -51,12 +51,12 @@ class MessageService:
 
                 if not receiver_emailable:
                     error_message = 'Receiver is not emailable. Using talk page instead.'
-                    success = MessageService._send_talk_page(oauth, url, instance, token)
+                    success = MessageService._send_talk_page(oauth, url, instance, token, content, subject)
                 elif not sender_emailable:
                     error_message = 'Sender is not emailable. Using talk page instead.'
-                    success = MessageService._send_talk_page(oauth, url, instance, token)
+                    success = MessageService._send_talk_page(oauth, url, instance, token, content, subject)
                 else:
-                    success = MessageService._send_email(oauth, url, instance, token)
+                    success = MessageService._send_email(oauth, url, instance, token, content, subject)
 
             # Step 4: Update the instance status
             MessageService._update_instance_status(
@@ -74,7 +74,7 @@ class MessageService:
 
     @staticmethod
     def _get_oauth_session(sender):
-        user_social_auth = UserSocialAuth.objects.get(user=sender)
+        user_social_auth = UserSocialAuth.objects.filter(user=sender).last()
         return OAuth1Session(
             settings.SOCIAL_AUTH_MEDIAWIKI_KEY,
             client_secret=settings.SOCIAL_AUTH_MEDIAWIKI_SECRET,
@@ -127,12 +127,12 @@ class MessageService:
         return users_info
 
     @staticmethod
-    def _send_email(oauth, url, instance, token):
+    def _send_email(oauth, url, instance, token, content, subject):
         params = {
             'action': 'emailuser',
             'target': instance.receiver,
-            'subject': '[Capacity Exchange] ' + instance.subject,
-            'text': instance.message,
+            'subject': '[Capacity Exchange] ' + subject,
+            'text': content,
             'ccme': '1',
             'format': 'json',
             'token': token,
@@ -141,13 +141,13 @@ class MessageService:
         return response.json().get('emailuser', {}).get('result') == 'Success'
 
     @staticmethod
-    def _send_talk_page(oauth, url, instance, token):
+    def _send_talk_page(oauth, url, instance, token, content, subject):
         params = {
             'action': 'edit',
             'title': f'User talk:{instance.receiver}',
             'section': 'new',
-            'sectiontitle': '[Capacity Exchange] ' + instance.subject,
-            'text': instance.message + '\n\n--~~~~',
+            'sectiontitle': '[Capacity Exchange] ' + subject,
+            'text': content + '\n\n--~~~~',
             'format': 'json',
             'token': token,
         }
