@@ -1,4 +1,4 @@
-from django.test import TestCase
+from django.test import TestCase, override_settings
 from django.conf import settings
 from unittest.mock import patch, MagicMock
 from message.services.message_service import MessageService
@@ -7,12 +7,13 @@ from message.models import Message
 from users.models import CustomUser
 import secrets
 
+@override_settings(
+    SOCIAL_AUTH_MEDIAWIKI_KEY='test_key',
+    SOCIAL_AUTH_MEDIAWIKI_SECRET='test_secret'
+)
+
 class MessageServiceTest(TestCase):
     def setUp(self):
-        # Ensure required settings exist for OAuth session creation
-        settings.SOCIAL_AUTH_MEDIAWIKI_KEY = getattr(settings, 'SOCIAL_AUTH_MEDIAWIKI_KEY', 'test_key')
-        settings.SOCIAL_AUTH_MEDIAWIKI_SECRET = getattr(settings, 'SOCIAL_AUTH_MEDIAWIKI_SECRET', 'test_secret')
-
         self.sender = CustomUser.objects.create_user(username='sender', password=str(secrets.randbits(16)))
         self.receiver = 'receiver'
         self.message = Message.objects.create(
@@ -53,6 +54,26 @@ class MessageServiceTest(TestCase):
         self.message.refresh_from_db()
         self.assertEqual(self.message.status, 'failed')
         self.assertEqual(self.message.error_message, 'Receiver account is invalid or does not exist.')
+
+    @patch('message.services.message_service.OAuth1Session')
+    def test_send_message_invalid_sender(self, mock_oauth):
+        # First GET: users info (batch) — sender invalid/missing
+        mock_oauth_instance = mock_oauth.return_value
+        mock_oauth_instance.get.side_effect = [
+            MagicMock(json=MagicMock(return_value={
+                'query': {
+                    'users': [
+                        {'name': 'Receiver', 'emailable': True},
+                        {'name': 'Sender', 'missing': True}
+                    ]
+                }
+            }))
+        ]
+
+        MessageService.send_message(self.message)
+        self.message.refresh_from_db()
+        self.assertEqual(self.message.status, 'failed')
+        self.assertEqual(self.message.error_message, 'An exception occurred: Sender account is invalid or does not exist.')
 
     @patch('message.services.message_service.OAuth1Session')
     def test_send_message_user_social_auth_does_not_exist(self, mock_oauth):

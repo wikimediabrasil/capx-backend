@@ -32,6 +32,9 @@ class MessageService:
                 )
                 return
 
+            if not sender or sender.get('missing') or sender.get('invalid'):
+                raise ValueError('Sender account is invalid or does not exist.')
+
             # Step 2: Fetch CSRF token
             token = MessageService._fetch_csrf_token(oauth, url)
             if not token:
@@ -67,7 +70,7 @@ class MessageService:
 
     @staticmethod
     def _cap(username):
-        return username[0].upper() + username[1:]
+        return username[0].upper() + username[1:] if username else username
 
     @staticmethod
     def _get_oauth_session(sender):
@@ -102,7 +105,7 @@ class MessageService:
     def _fetch_users_info(oauth, url, usernames):
         # Accept list of usernames and perform a single batch query
         # API expects pipe-separated usernames
-        joined = '|'.join([str(u) for u in usernames])
+        joined = '|'.join(usernames)
         params = {
             'action': 'query',
             'format': 'json',
@@ -119,7 +122,7 @@ class MessageService:
         for user in users:
             key = user.get('name')
             if not key:
-                raise ValueError("User entry missing 'name' field; this indicates an unexpected API response: %r" % (user,))
+                raise ValueError(f"User entry missing 'name' field; this indicates an unexpected API response: {user}")
             users_info[key] = user
         return users_info
 
