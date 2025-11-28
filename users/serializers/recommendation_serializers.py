@@ -9,7 +9,7 @@ class RecommendationUserSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = Profile
-        fields = ['id', 'display_name', 'username', 'profile_image', 'matches']
+        fields = ['id', 'display_name', 'username', 'avatar', 'matches']
 
 
 class RecommendationOrganizationSerializer(serializers.ModelSerializer):
