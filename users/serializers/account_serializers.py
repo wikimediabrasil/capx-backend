@@ -26,7 +26,6 @@ class LanguageProficiencySerializer(serializers.ModelSerializer):
         fields = ['id', 'proficiency']
 
 
-@extend_schema_serializer(deprecate_fields=['profile_image'])
 class ProfileSerializer(serializers.ModelSerializer):
     user = UserSerializer()
     is_manager = serializers.SerializerMethodField()
@@ -37,10 +36,9 @@ class ProfileSerializer(serializers.ModelSerializer):
     class Meta:
         model = Profile
         fields = [
-            'user', 'last_update', 'last_login', 'profile_image', 'avatar', 'display_name', 'pronoun', 'about',
-            'wikidata_qid', 'wiki_alt', 'territory', 'language', 'affiliation', 'wikimedia_project', 'team',
-            'skills_known', 'skills_available', 'skills_wanted', 'contact', 'social', 'is_manager', 'badges',
-            'automated_lets_connect',
+            'user', 'last_update', 'last_login', 'avatar', 'display_name', 'pronoun', 'about', 'wikidata_qid', 
+            'wiki_alt', 'territory', 'language', 'affiliation', 'wikimedia_project', 'team', 'skills_known', 
+            'skills_available', 'skills_wanted', 'contact', 'social', 'is_manager', 'badges', 'automated_lets_connect',
         ]
         read_only_fields = ['is_manager', 'badges']
 

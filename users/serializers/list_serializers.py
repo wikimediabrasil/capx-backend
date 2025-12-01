@@ -20,5 +20,5 @@ class UsersByTagSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = Profile
-        fields = ['id', 'display_name', 'username', 'profile_image']
+        fields = ['id', 'display_name', 'username', 'avatar']
 

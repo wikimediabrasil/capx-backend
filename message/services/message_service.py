@@ -4,7 +4,7 @@ from social_django.models import UserSocialAuth
 
 class MessageService:
     @staticmethod
-    def send_message(instance):
+    def send_message(instance, content, subject):
         """
         Sends a message via Wikimedia API. Supports email or user talk page messages.
         Updates the message's status accordingly.
@@ -15,6 +15,26 @@ class MessageService:
             # Step 1: Get the OAuth credentials
             oauth = MessageService._get_oauth_session(instance.sender)
 
+            # Step 1.5: Batch fetch sender/receiver info and validate receiver
+            sender_username = MessageService._cap(instance.sender.username)
+            receiver_username = MessageService._cap(instance.receiver)
+
+            users_info = MessageService._fetch_users_info(oauth, url, [receiver_username, sender_username])
+
+            receiver = users_info.get(receiver_username, {})
+            sender = users_info.get(sender_username, {})
+
+            if not receiver or receiver.get('missing') or receiver.get('invalid'):
+                MessageService._update_instance_status(
+                    instance,
+                    'failed',
+                    'Receiver account is invalid or does not exist.'
+                )
+                return
+
+            if not sender or sender.get('missing') or sender.get('invalid'):
+                raise ValueError('Sender account is invalid or does not exist.')
+
             # Step 2: Fetch CSRF token
             token = MessageService._fetch_csrf_token(oauth, url)
             if not token:
@@ -23,16 +43,20 @@ class MessageService:
 
             # Step 3: Decide method and send message
             if instance.method == 'talkpage':
-                success = MessageService._send_talk_page(oauth, url, instance, token)
+                success = MessageService._send_talk_page(oauth, url, instance, token, content, subject)
             elif instance.method == 'email':
-                if not MessageService._is_user_emailable(oauth, url, instance.receiver):
+                # Use batch-fetched info for emailable checks
+                receiver_emailable = receiver.get('emailable', False)
+                sender_emailable = sender.get('emailable', False)
+
+                if not receiver_emailable:
                     error_message = 'Receiver is not emailable. Using talk page instead.'
-                    success = MessageService._send_talk_page(oauth, url, instance, token)
-                elif not MessageService._is_user_emailable(oauth, url, instance.sender):
+                    success = MessageService._send_talk_page(oauth, url, instance, token, content, subject)
+                elif not sender_emailable:
                     error_message = 'Sender is not emailable. Using talk page instead.'
-                    success = MessageService._send_talk_page(oauth, url, instance, token)
+                    success = MessageService._send_talk_page(oauth, url, instance, token, content, subject)
                 else:
-                    success = MessageService._send_email(oauth, url, instance, token)
+                    success = MessageService._send_email(oauth, url, instance, token, content, subject)
 
             # Step 4: Update the instance status
             MessageService._update_instance_status(
@@ -45,8 +69,12 @@ class MessageService:
             MessageService._update_instance_status(instance, 'failed', f'An exception occurred: {str(e)}')
 
     @staticmethod
+    def _cap(username):
+        return username[0].upper() + username[1:] if username else username
+
+    @staticmethod
     def _get_oauth_session(sender):
-        user_social_auth = UserSocialAuth.objects.get(user=sender)
+        user_social_auth = UserSocialAuth.objects.filter(user=sender).last()
         return OAuth1Session(
             settings.SOCIAL_AUTH_MEDIAWIKI_KEY,
             client_secret=settings.SOCIAL_AUTH_MEDIAWIKI_SECRET,
@@ -74,25 +102,37 @@ class MessageService:
         return response.json().get('query', {}).get('tokens', {}).get('csrftoken', '')
 
     @staticmethod
-    def _is_user_emailable(oauth, url, receiver):
+    def _fetch_users_info(oauth, url, usernames):
+        # Accept list of usernames and perform a single batch query
+        # API expects pipe-separated usernames
+        joined = '|'.join(usernames)
         params = {
             'action': 'query',
             'format': 'json',
             'list': 'users',
             'formatversion': '2',
             'usprop': 'emailable',
-            'ususers': receiver,
+            'ususers': joined,
         }
         response = oauth.get(url, params=params, timeout=60)
-        return response.json().get('query', {}).get('users', [{}])[0].get('emailable', False)
+        users = response.json().get('query', {}).get('users', [])
+
+        # Map results
+        users_info = {}
+        for user in users:
+            key = user.get('name')
+            if not key:
+                raise ValueError(f"User entry missing 'name' field; this indicates an unexpected API response: {user}")
+            users_info[key] = user
+        return users_info
 
     @staticmethod
-    def _send_email(oauth, url, instance, token):
+    def _send_email(oauth, url, instance, token, content, subject):
         params = {
             'action': 'emailuser',
             'target': instance.receiver,
-            'subject': '[Capacity Exchange] ' + instance.subject,
-            'text': instance.message,
+            'subject': '[Capacity Exchange] ' + subject,
+            'text': content,
             'ccme': '1',
             'format': 'json',
             'token': token,
@@ -101,13 +141,13 @@ class MessageService:
         return response.json().get('emailuser', {}).get('result') == 'Success'
 
     @staticmethod
-    def _send_talk_page(oauth, url, instance, token):
+    def _send_talk_page(oauth, url, instance, token, content, subject):
         params = {
             'action': 'edit',
             'title': f'User talk:{instance.receiver}',
             'section': 'new',
-            'sectiontitle': '[Capacity Exchange] ' + instance.subject,
-            'text': instance.message + '\n\n--~~~~',
+            'sectiontitle': '[Capacity Exchange] ' + subject,
+            'text': content + '\n\n--~~~~',
             'format': 'json',
             'token': token,
         }
