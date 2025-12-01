@@ -352,7 +352,7 @@ class UsersBySkillTestCase(TestCase):
                 'id': profile['user']['id'],
                 'display_name': profile['display_name'],
                 'username': profile['user']['username'],
-                'profile_image': profile['profile_image']
+                'avatar': profile['avatar']
             } for profile in serializer_data
         ]
         self.assertEqual(response_data, simplified_serializer_data)
@@ -410,7 +410,7 @@ class UsersByTagTestCase(TestCase):
                     'id': profile['user']['id'],
                     'display_name': profile['display_name'],
                     'username': profile['user']['username'],
-                    'profile_image': profile['profile_image']
+                    'avatar': profile['avatar']
                 } for profile in serializer_data
             ]
             self.assertEqual(response_data, simplified_serializer_data)
@@ -451,7 +451,7 @@ class UsersByTagTestCase(TestCase):
                 'id': profile['user']['id'],
                 'display_name': profile['display_name'],
                 'username': profile['user']['username'],
-                'profile_image': profile['profile_image']
+                'avatar': profile['avatar']
             } for profile in serializer_data
         ]
         self.assertEqual(response_data, simplified_serializer_data)
@@ -492,7 +492,7 @@ class UsersByTagTestCase(TestCase):
                 'id': profile['user']['id'],
                 'display_name': profile['display_name'],
                 'username': profile['user']['username'],
-                'profile_image': profile['profile_image']
+                'avatar': profile['avatar']
             } for profile in serializer_data
         ]
         self.assertEqual(response_data, simplified_serializer_data)
@@ -533,7 +533,7 @@ class UsersByTagTestCase(TestCase):
                 'id': profile['user']['id'],
                 'display_name': profile['display_name'],
                 'username': profile['user']['username'],
-                'profile_image': profile['profile_image']
+                'avatar': profile['avatar']
             } for profile in serializer_data
         ]
         self.assertEqual(response_data, simplified_serializer_data)
@@ -583,7 +583,7 @@ class UsersByTagTestCase(TestCase):
                 'id': profile['user']['id'],
                 'display_name': profile['display_name'],
                 'username': profile['user']['username'],
-                'profile_image': profile['profile_image']
+                'avatar': profile['avatar']
             } for profile in serializer_data
         ]
         self.assertEqual(response_data, simplified_serializer_data)

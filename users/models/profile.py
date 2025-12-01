@@ -74,13 +74,6 @@ class Profile(models.Model):
         on_delete=models.CASCADE,
         editable=False
     )
-    profile_image = models.URLField(
-        verbose_name="Profile image",
-        max_length=512,
-        null=True,
-        help_text="URL of the profile image from Commons.",
-        blank=True
-    )
     avatar = models.ForeignKey(
         Avatar,
         on_delete=models.RESTRICT,
