@@ -60,6 +60,79 @@ class CapacityTranslationViewSet(viewsets.ViewSet):
         return Response({'results': serializer.data})
 
     @extend_schema(
+        summary='Suggest languages by completion',
+        description='Returns language codes with >= min_completion ratio of items having both label and description.',
+        parameters=[
+            OpenApiParameter(
+                name='min_completion',
+                type=float,
+                description='Minimum completion ratio (0-1). Default: 0.8',
+                required=False,
+            ),
+        ],
+        responses={
+            '200': {
+                'type': 'object', 
+                'properties': {
+                    'languages': {
+                        'type': 'array', 
+                        'items': {
+                            'type': 'string'
+                        }
+                    }, 
+                    'stats': {
+                        'type': 'object', 
+                        'properties': {
+                            'complete': {'type': 'number'}, 
+                            'total': {'type': 'number'}, 
+                            'completion': {'type': 'number'}
+                        }
+                    }, 
+                    'min_completion': {
+                        'type': 'number'
+                    }
+                }
+            }
+        },
+    )
+    @action(detail=False, methods=['get'], url_path='suggestions')
+    def suggestions(self, request):
+        # Compute per-language completeness across all capacity items
+        try:
+            min_completion = float(request.query_params.get('min_completion', '0.8'))
+        except ValueError:
+            min_completion = 0.8
+        min_completion = max(0.0, min(1.0, min_completion))
+
+        qids: List[str] = list(
+            Skill.objects.order_by('pk').values_list('skill_wikidata_item', flat=True)
+        )
+        client = MetabaseClient()
+        terms = client.fetch_map_and_terms(qids)
+
+        total = len(qids) if qids else 0
+        if total == 0:
+            return Response({'languages': [], 'stats': {}}, status=status.HTTP_200_OK)
+
+        # Aggregate completeness: label AND description present for the language
+        counts = {}
+        for qid, lang_map in terms.items():
+            for lg, entry in lang_map.items():
+                has_label = bool(entry.get('label'))
+                has_desc = bool(entry.get('description'))
+                if has_label and has_desc:
+                    counts[lg] = counts.get(lg, 0) + 1
+
+        stats = {}
+        for lg, cnt in counts.items():
+            completion = cnt / total
+            stats[lg] = {'complete': cnt, 'total': total, 'completion': completion}
+
+        languages = [lg for lg, s in stats.items() if s['completion'] >= min_completion and lg != 'en']
+        languages.sort()
+        return Response({'languages': languages, 'stats': stats, 'min_completion': min_completion}, status=status.HTTP_200_OK)
+
+    @extend_schema(
         summary='Submit a translation for a capacity item.',
         description='This endpoint allows submitting translations for capacity items to Metabase.',
         request=TranslationSubmitSerializer,
