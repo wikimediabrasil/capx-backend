@@ -205,19 +205,29 @@ def build_capacity_list(terms_by_qid: Dict[str, Dict[str, Dict[str, str]]], lang
     """
     Build a flattened list suitable for UI/API consumption.
     Each item: { qid, metabase_id, lang, label, description, fallback_label, fallback_description }
+
+    If the chosen fallback is missing a label/description for a given item,
+    English (en) is used as a secondary fallback for that specific field.
     """
     items = []
     for qid, lang_map in terms_by_qid.items():
         current = lang_map.get(lang, {})
         fb = lang_map.get(fallback, {})
-        metabase_id = (current or fb or {}).get('metabase_id')
+        fb_en = lang_map.get('en', {}) if fallback != 'en' else {}
+        metabase_id = (current or fb or fb_en or {}).get('metabase_id')
+        fallback_label = (fb or {}).get('label')
+        fallback_description = (fb or {}).get('description')
+        if not fallback_label:
+            fallback_label = (fb_en or {}).get('label')
+        if not fallback_description:
+            fallback_description = (fb_en or {}).get('description')
         items.append({
             'qid': qid,
             'metabase_id': metabase_id,
             'lang': lang,
             'label': (current or {}).get('label'),
             'description': (current or {}).get('description'),
-            'fallback_label': (fb or {}).get('label'),
-            'fallback_description': (fb or {}).get('description'),
+            'fallback_label': fallback_label,
+            'fallback_description': fallback_description,
         })
     return items

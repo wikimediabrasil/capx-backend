@@ -63,20 +63,14 @@
       <div>
         <label for="lang">Language code</label><br>
         <input id="lang" value="pt-br" list="lang-suggestions" />
-        <datalist id="lang-suggestions">
-          <option>pt-br</option>
-          <option>fr</option>
-          <option>es</option>
-          <option>de</option>
-        </datalist>
+        <datalist id="lang-suggestions"></datalist>
       </div>
       <div>
         <label for="fallback">Fallback</label><br>
         <select id="fallback">
           <option value="en" selected>English (en)</option>
-          <option value="pt-br">Portuguese (pt-br)</option>
-          <option value="es">Spanish (es)</option>
         </select>
+        <span id="fallback-loading" class="loading-indicator" title="Loading language suggestions"><span class="spinner" aria-label="Loading"></span></span>
       </div>
       <div class="search-box">
         <label for="search">Search</label><br>
@@ -131,11 +125,54 @@
     const saveAllBtn = document.getElementById('save-all');
     const searchEl = document.getElementById('search');
     const loadingEl = document.getElementById('loading');
+    const langSuggestionsEl = document.getElementById('lang-suggestions');
+    const fallbackEl = document.getElementById('fallback');
+    const fallbackLoadingEl = document.getElementById('fallback-loading');
 
     let currentItems = [];
     let changedQIDs = new Set();
-    let pendingQIDs = new Map(); // qid -> timestamp saved
-    const PENDING_REFRESH_MS = 30000; // 30 seconds default propagation window
+    let pendingQIDs = new Map(); // qid -> { ts, label, description, firstTs }
+    const PENDING_REFRESH_MS = 10000; // 10s between checks
+    const MAX_PENDING_MS = 120000; // give up after 2 minutes
+
+    // Populate dynamic language suggestions (>=80% completion), and fallback options
+    async function populateSuggestions() {
+      try {
+        if (fallbackLoadingEl) fallbackLoadingEl.classList.add('active');
+        const resp = await fetch('/translating/suggestions/?min_completion=0.8');
+        if (!resp.ok) throw new Error(await resp.text());
+        const data = await resp.json();
+        const langs = Array.isArray(data.languages) ? data.languages : [];
+        // Fill datalist
+        langSuggestionsEl.innerHTML = '';
+        for (const lg of langs) {
+          const opt = document.createElement('option');
+          opt.value = lg;
+          langSuggestionsEl.appendChild(opt);
+        }
+        // Fill fallback select: keep English first, then suggested langs
+        const currentFallback = fallbackEl.value;
+        fallbackEl.innerHTML = '';
+        const enOpt = document.createElement('option');
+        enOpt.value = 'en';
+        enOpt.textContent = 'English (en)';
+        fallbackEl.appendChild(enOpt);
+        for (const lg of langs) {
+          const opt = document.createElement('option');
+          opt.value = lg;
+          opt.textContent = lg;
+          fallbackEl.appendChild(opt);
+        }
+        // Restore previously selected fallback if present, else keep English
+        const hasPrev = Array.from(fallbackEl.options).some(o => o.value === currentFallback);
+        fallbackEl.value = hasPrev ? currentFallback : 'en';
+      } catch (e) {
+        // Non-fatal; leave static defaults
+        console.warn('Failed to populate suggestions:', e);
+      } finally {
+        if (fallbackLoadingEl) fallbackLoadingEl.classList.remove('active');
+      }
+    }
 
     function updateStatsOnly() {
       const statsEl = document.getElementById('stats');
@@ -225,7 +262,33 @@
       try {
         const resp = await fetch(`/translating/?lang=${encodeURIComponent(lang)}&fallback=${encodeURIComponent(fallback)}`);
         const data = await resp.json();
-        currentItems = data.results || [];
+        const serverItems = data.results || [];
+        // Reconcile server data with any pending items (propagation delay handling)
+        const now = Date.now();
+        const reconciled = serverItems.map(it => {
+          const pend = pendingQIDs.get(it.qid);
+          if (!pend) return it;
+          const serverLabel = (it.label || '').trim();
+          const serverDesc = (it.description || '').trim();
+          const expectedLabel = pend.label === undefined ? undefined : (pend.label || '').trim();
+          const expectedDesc = pend.description === undefined ? undefined : (pend.description || '').trim();
+          const labelOk = expectedLabel === undefined || expectedLabel === serverLabel;
+          const descOk = expectedDesc === undefined || expectedDesc === serverDesc;
+          if (labelOk && descOk) {
+            // Server has the expected values; clear pending state
+            pendingQIDs.delete(it.qid);
+            // Also clear changed marker once server reflects the edits
+            changedQIDs.delete(it.qid);
+            return it;
+          }
+          // Keep showing the expected values while still pending
+          return {
+            ...it,
+            label: expectedLabel !== undefined ? pend.label : it.label,
+            description: expectedDesc !== undefined ? pend.description : it.description,
+          };
+        });
+        currentItems = reconciled;
         changedQIDs.clear();
         renderRows();
       } catch (e) {
@@ -315,9 +378,10 @@
             body: JSON.stringify(payload)
         });
         if (!resp.ok) throw new Error(await resp.text());
-        changedQIDs.delete(qid);
+        // Keep changed marker while pending until server reflects values
         // Optimistically mark as pending without full reload
-        pendingQIDs.set(qid, Date.now());
+        const now = Date.now();
+        pendingQIDs.set(qid, { ts: now, firstTs: now, label: payload.label, description: payload.description });
         // Update currentItems local copy for qid
         const item = currentItems.find(i => i.qid === qid);
         if (item) {
@@ -370,11 +434,20 @@
       schedulePendingAutoRefresh._scheduled = true;
       setTimeout(() => {
         schedulePendingAutoRefresh._scheduled = false;
-        // Remove any pending older than threshold and trigger a reload to fetch updated values
+        // Trigger a reload to check for propagation while within max window
         if (pendingQIDs.size) {
-          load(); // this will clear pending map after reload
-          pendingQIDs.clear();
-          updateStatsOnly();
+          const now = Date.now();
+          // If any pending is still within MAX_PENDING_MS, keep checking
+          const hasWithinWindow = Array.from(pendingQIDs.values()).some(p => (now - (p.firstTs || p.ts)) < MAX_PENDING_MS);
+          if (hasWithinWindow) {
+            load(); // reconcile will keep pending until server reflects changes
+            updateStatsOnly();
+            // Schedule another check
+            schedulePendingAutoRefresh();
+          } else {
+            // Give up: stop rescheduling; keep current overlay values and markers
+            updateStatsOnly();
+          }
         }
       }, PENDING_REFRESH_MS);
     }
@@ -413,8 +486,9 @@
     filterChangedEl.addEventListener('change', renderRows);
     searchEl.addEventListener('input', renderRows);
     loadBtn.addEventListener('click', load);
-    // Initial load
+    // Initial load first (with English fallback), then populate suggestions async
     load();
+    populateSuggestions();
   </script>
 </body>
 </html>
