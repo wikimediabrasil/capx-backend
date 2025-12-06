@@ -169,7 +169,7 @@ REST_KNOX = {'TOKEN_TTL': timedelta(days=30)}
 SPECTACULAR_SETTINGS = {
     'TITLE': 'Capacity Exchange (CapX) API',
     'DESCRIPTION': 'The Capacity Exchange (CapX) is a platform for finding and connecting with fellow Wikimedians to exchange knowledge, skills, and services on a global level.',
-    'VERSION': '2.2.5',
+    'VERSION': '2.2.6',
     'SERVE_INCLUDE_SCHEMA': True,
     'SWAGGER_UI_DIST': 'SIDECAR',
     'SWAGGER_UI_FAVICON_HREF': 'SIDECAR',
