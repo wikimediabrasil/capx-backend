@@ -15,6 +15,7 @@ from drf_spectacular.utils import extend_schema, OpenApiParameter
 from requests_oauthlib import OAuth1Session
 from django.urls import reverse
 from django.utils import timezone
+import requests
 
 
 class CapacityTranslationViewSet(viewsets.ViewSet):
@@ -58,6 +59,70 @@ class CapacityTranslationViewSet(viewsets.ViewSet):
         items.sort(key=lambda it: (not is_missing(it), (it.get('fallback_label') or '').lower()))
         serializer = CapacityItemSerializer(items, many=True)
         return Response({'results': serializer.data})
+
+    @extend_schema(
+        summary='List allowed languages (Wikibase)',
+        description='Returns allowed language codes for wbsetlabel, enriched with name and autonym.',
+        responses={
+            200: {
+                'type': 'object',
+                'properties': {
+                    'languages': {
+                        'type': 'array',
+                        'items': {
+                            'type': 'object',
+                            'properties': {
+                                'code': {'type': 'string'},
+                                'name': {'type': 'string'},
+                                'autonym': {'type': 'string'},
+                                'label': {'type': 'string'}
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    )
+    @action(detail=False, methods=['get'], url_path='languages')
+    def languages(self, request):
+        try:
+            pi = requests.get(
+                'https://metabase.wikibase.cloud/w/api.php',
+                params={'action': 'paraminfo', 'format': 'json', 'modules': 'wbsetlabel'},
+                timeout=30
+            )
+            pi.raise_for_status()
+            pi_data = pi.json()
+            modules = (pi_data.get('paraminfo', {}) or {}).get('modules', [])
+            mod = next((m for m in modules if m.get('name') == 'wbsetlabel'), None)
+            params_list = mod.get('parameters', []) if mod else []
+            lang_param = next((p for p in params_list if p.get('name') == 'language'), None)
+            codes = lang_param.get('type', []) if lang_param else []
+
+            li = requests.get(
+                'https://metabase.wikibase.cloud/w/api.php',
+                params={'action': 'query', 'format': 'json', 'meta': 'languageinfo', 'liprop': 'autonym|name', 'uselang': 'en'},
+                timeout=30
+            )
+            li.raise_for_status()
+            li_data = li.json()
+            info = (li_data.get('query', {}) or {}).get('languageinfo', {})
+
+            def build_entry(code: str):
+                meta = info.get(code, {}) or {}
+                name = meta.get('name') or code
+                autonym = meta.get('autonym') or ''
+                # label: English name + code, and autonym when different
+                label = f"{code} — {name}"
+                if autonym and autonym != name:
+                    label = f"{code} — {name} — {autonym}"
+                return {'code': code, 'name': name, 'autonym': autonym, 'label': label}
+
+            entries = [build_entry(c) for c in codes]
+            entries.sort(key=lambda x: (x['code']))
+            return Response({'languages': entries})
+        except Exception as e:
+            return Response({'detail': f'Failed to fetch languages: {e}'}, status=status.HTTP_502_BAD_GATEWAY)
 
     @extend_schema(
         summary='Suggest languages by completion',
@@ -165,12 +230,48 @@ class CapacityTranslationViewSet(viewsets.ViewSet):
         else:
             client.login_bot()
         changed = []
-        if label is not None:
-            client.set_term(metabase_id, lang, 'label', label, request.user.username)
-            changed.append('label')
-        if description is not None:
-            client.set_term(metabase_id, lang, 'description', description, request.user.username)
-            changed.append('description')
+        try:
+            if label is not None:
+                client.set_term(metabase_id, lang, 'label', label, request.user.username)
+                changed.append('label')
+            if description is not None:
+                client.set_term(metabase_id, lang, 'description', description, request.user.username)
+                changed.append('description')
+        except Exception as e:
+            # Provide a friendly message when Metabase/Wikibase denies edits due to unconfirmed email
+            msg = str(e)
+            needs_confirmation = ('confirmedittext' in msg) or ('You must confirm your email address' in msg)
+            permission_denied = ('permissiondenied' in msg) or ('You do not have the permissions needed' in msg)
+            too_long = ('wikibase-validator-description-too-long' in msg) or ('Description must be no more than' in msg)
+            if needs_confirmation or permission_denied:
+                return Response(
+                    {
+                        'detail': (
+                            'Your Metabase account must confirm its email before editing. '
+                            'Please open Metabase Preferences and validate your email: '
+                            'https://metabase.wikibase.cloud/wiki/Special:Preferences'
+                        )
+                    },
+                    status=status.HTTP_403_FORBIDDEN,
+                )
+            if too_long:
+                # Try to extract the limit number from the message
+                limit = None
+                for part in msg.split():
+                    if part.isdigit():
+                        limit = part
+                        break
+                limit_text = limit or '250'
+                return Response(
+                    {
+                        'detail': f'Description is too long. Maximum length is {limit_text} characters.',
+                        'field': 'description',
+                        'max_length': int(limit_text) if limit_text.isdigit() else 250,
+                    },
+                    status=status.HTTP_400_BAD_REQUEST,
+                )
+            # Fallback: bubble up as a generic bad gateway from provider
+            return Response({'detail': f'Failed to submit to Metabase: {msg}'}, status=status.HTTP_502_BAD_GATEWAY)
 
         return Response({'status': 'ok', 'changed': changed, 'metabase_id': metabase_id})
 

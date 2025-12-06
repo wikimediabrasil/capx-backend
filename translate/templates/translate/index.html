@@ -61,9 +61,9 @@
 
     <div class="controls">
       <div>
-        <label for="lang">Language code</label><br>
-        <input id="lang" value="pt-br" list="lang-suggestions" />
-        <datalist id="lang-suggestions"></datalist>
+        <label for="lang">Language</label><br>
+        <select id="lang"></select>
+        <span id="lang-loading" class="loading-indicator" title="Loading language list"><span class="spinner" aria-label="Loading"></span></span>
       </div>
       <div>
         <label for="fallback">Fallback</label><br>
@@ -106,6 +106,7 @@
       </thead>
       <tbody></tbody>
     </table>
+    <div id="toast" style="display:none; position:fixed; right:16px; bottom:16px; max-width:420px; background:#333; color:#fff; padding:.6rem .8rem; border-radius:6px; box-shadow:0 6px 18px rgba(0,0,0,.25); font-size:.85rem; line-height:1.35; z-index:1000"></div>
   </main>
   <script>
     // --- CSRF helper (Django session auth)
@@ -125,9 +126,10 @@
     const saveAllBtn = document.getElementById('save-all');
     const searchEl = document.getElementById('search');
     const loadingEl = document.getElementById('loading');
-    const langSuggestionsEl = document.getElementById('lang-suggestions');
+    const langLoadingEl = document.getElementById('lang-loading');
     const fallbackEl = document.getElementById('fallback');
     const fallbackLoadingEl = document.getElementById('fallback-loading');
+    const toastEl = document.getElementById('toast');
 
     let currentItems = [];
     let changedQIDs = new Set();
@@ -135,7 +137,7 @@
     const PENDING_REFRESH_MS = 10000; // 10s between checks
     const MAX_PENDING_MS = 120000; // give up after 2 minutes
 
-    // Populate dynamic language suggestions (>=80% completion), and fallback options
+    // Populate dynamic fallback options (>=80% completion)
     async function populateSuggestions() {
       try {
         if (fallbackLoadingEl) fallbackLoadingEl.classList.add('active');
@@ -143,13 +145,6 @@
         if (!resp.ok) throw new Error(await resp.text());
         const data = await resp.json();
         const langs = Array.isArray(data.languages) ? data.languages : [];
-        // Fill datalist
-        langSuggestionsEl.innerHTML = '';
-        for (const lg of langs) {
-          const opt = document.createElement('option');
-          opt.value = lg;
-          langSuggestionsEl.appendChild(opt);
-        }
         // Fill fallback select: keep English first, then suggested langs
         const currentFallback = fallbackEl.value;
         fallbackEl.innerHTML = '';
@@ -171,6 +166,60 @@
         console.warn('Failed to populate suggestions:', e);
       } finally {
         if (fallbackLoadingEl) fallbackLoadingEl.classList.remove('active');
+      }
+    }
+
+    // Populate language select using Wikibase APIs
+    async function populateLanguageOptions() {
+      try {
+        if (langLoadingEl) langLoadingEl.classList.add('active');
+        // Fetch from backend to avoid CORS
+        const resp = await fetch('/translating/languages/');
+        if (!resp.ok) throw new Error('languages fetch failed: ' + (await resp.text()));
+        const data = await resp.json();
+        const arr = Array.isArray(data.languages) ? data.languages : [];
+
+        // Build options; infer default from navigator.languages when possible
+        const select = document.getElementById('lang');
+        const prev = select.value || '';
+        select.innerHTML = '';
+        const opts = arr.map(o => {
+          if (typeof o === 'string') {
+            return { code: o, label: `${o}`, name: o };
+          }
+          return { code: o.code, label: o.label || `${o.name || o.code} (${o.code})`, name: o.name || o.code };
+        });
+        for (const o of opts) {
+          const opt = document.createElement('option');
+          opt.value = o.code;
+          opt.textContent = o.label;
+          select.appendChild(opt);
+        }
+        // Restore previous or infer from browser preferences
+        const hasPrev = prev && Array.from(select.options).some(o => o.value === prev);
+        if (hasPrev) {
+          select.value = prev;
+        } else {
+          const browserLangs = Array.isArray(navigator.languages) && navigator.languages.length ? navigator.languages : [navigator.language].filter(Boolean);
+          const available = Array.from(select.options).map(o => o.value.toLowerCase());
+          let chosen = '';
+          for (const bl of browserLangs) {
+            const cand = (bl || '').toLowerCase();
+            if (!cand) continue;
+            // exact match first
+            if (available.includes(cand)) { chosen = cand; break; }
+            // try base language (e.g., 'pt' for 'pt-BR')
+            const base = cand.split('-')[0];
+            // find an available option that starts with base-
+            const regional = available.find(v => v === base || v.startsWith(base + '-'));
+            if (regional) { chosen = regional; break; }
+          }
+          select.value = chosen || (available.includes('en') ? 'en' : (available[0] || ''));
+        }
+      } catch (e) {
+        console.warn('Failed to populate language options:', e);
+      } finally {
+        if (langLoadingEl) langLoadingEl.classList.remove('active');
       }
     }
 
@@ -227,7 +276,10 @@
         tr.innerHTML = `
           <td><strong>${it.qid}</strong><br><span class="status ${statusClass}">${statusText}</span></td>
           <td><input ${disabledAttr} data-field="label" data-qid="${it.qid}" value="${it.label || ''}" placeholder="Label (${lang})"/></td>
-          <td><textarea ${disabledAttr} data-field="description" data-qid="${it.qid}" placeholder="Description (${lang})">${it.description || ''}</textarea></td>
+          <td>
+            <textarea ${disabledAttr} data-field="description" data-qid="${it.qid}" placeholder="Description (${lang})" maxlength="250">${it.description || ''}</textarea>
+            <div class="desc-counter" data-qid="${it.qid}" style="font-size:.7rem; color:#666; text-align:right; margin-top:.2rem;">${(it.description || '').length}/250</div>
+          </td>
           <td class="fallback"><strong>${it.fallback_label || ''}</strong>${it.fallback_description ? '<br>'+escapeHtml(it.fallback_description) : ''}</td>
           <td class="row-actions">
             <button ${disabledAttr} data-action="save" data-qid="${it.qid}" class="save-one">Save</button>
@@ -245,10 +297,32 @@
       tbl.style.display = visible ? 'table' : 'none';
       statsEl.textContent = `${visible} displayed / ${currentItems.length} total | Changed: ${changedQIDs.size}`;
       saveAllBtn.disabled = changedQIDs.size === 0;
+
+      // Attach description counter updates and hard-limit enforcement
+      const textareas = tbody.querySelectorAll('textarea[data-field="description"]');
+      textareas.forEach(ta => {
+        const qid = ta.dataset.qid;
+        const counter = tbody.querySelector(`.desc-counter[data-qid="${qid}"]`);
+        const update = () => {
+          if (ta.value.length > 250) ta.value = ta.value.slice(0, 250);
+          if (counter) counter.textContent = `${ta.value.length}/250`;
+        };
+        ta.addEventListener('input', update);
+        update();
+      });
     }
 
     function escapeHtml(s) {
       return (s || '').replace(/[&<>]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;'}[c]));
+    }
+
+    function showToast(message, opts={}) {
+      const kind = opts.kind || 'error';
+      toastEl.textContent = message;
+      toastEl.style.background = kind === 'error' ? '#b00020' : (kind === 'success' ? '#1976d2' : '#333');
+      toastEl.style.display = 'block';
+      clearTimeout(showToast._t);
+      showToast._t = setTimeout(() => { toastEl.style.display = 'none'; }, opts.duration || 5000);
     }
 
     async function load() {
@@ -377,7 +451,24 @@
           },
             body: JSON.stringify(payload)
         });
-        if (!resp.ok) throw new Error(await resp.text());
+        if (!resp.ok) {
+          let detail = 'Failed to submit.';
+          let field = null;
+          try {
+            const data = await resp.json();
+            detail = data.detail || detail;
+            field = data.field || null;
+            // If max_length provided, and field value exceeds, trim feedback
+            if (data.max_length && field === 'description') {
+              detail = `Description is too long (${(descEl?.value || '').length}). Max ${data.max_length}.`;
+            }
+          } catch (_) {
+            // Fallback to text body
+            try { detail = await resp.text(); } catch (_) {}
+          }
+          showToast(detail, { kind: resp.status === 403 ? 'error' : 'error' });
+          throw new Error(detail);
+        }
         // Keep changed marker while pending until server reflects values
         // Optimistically mark as pending without full reload
         const now = Date.now();
@@ -391,7 +482,7 @@
         markRowPending(qid);
         schedulePendingAutoRefresh();
       } catch (e) {
-        alert('Failed to submit: ' + e);
+        showToast(String(e));
         // Re-enable editing controls since save failed
         if (labelEl) labelEl.disabled = false;
         if (descEl) descEl.disabled = false;
@@ -487,7 +578,9 @@
     searchEl.addEventListener('input', renderRows);
     loadBtn.addEventListener('click', load);
     // Initial load first (with English fallback), then populate suggestions async
-    load();
+    populateLanguageOptions().then(() => {
+      load();
+    });
     populateSuggestions();
   </script>
 </body>
