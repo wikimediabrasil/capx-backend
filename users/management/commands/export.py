@@ -401,7 +401,9 @@ class Command(BaseCommand):
 
         profile_serializer = ProfileSerializer(Profile.objects.all(), many=True)
         meta_wiki_users = self.get_meta_wiki_users()
-        formatted_data, skills, badges_meta = self.process_profiles(profile_serializer.data, meta_wiki_users)
+        formatted_data, _skills, badges_meta = self.process_profiles(profile_serializer.data, meta_wiki_users)
+        # Overwrite skills with all skills in the DB instead of only those in use on Meta profiles
+        skills = list(Skill.objects.values_list('id', flat=True))
         output_users = self.create_output_users(formatted_data)
 
         skill_dict = self.get_skill_dict(skills)
