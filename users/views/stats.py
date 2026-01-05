@@ -78,9 +78,10 @@ class StatisticsView(APIView):
         ).count()
 
         # Calculate total messages and new messages this month
-        total_messages = Message.objects.count()
+        total_messages = Message.objects.filter(status='sent').count()
         new_messages = Message.objects.filter(
-            date__gte=last_30_days
+            date__gte=last_30_days,
+            status='sent'
         ).count()
 
         # Calculate total of organizations with managers and within this month
