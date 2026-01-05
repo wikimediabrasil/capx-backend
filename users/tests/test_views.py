@@ -962,7 +962,7 @@ class StatisticsViewTestCase(TestCase):
         Skill.objects.create(skill_wikidata_item="Q1")
 
         # Create a message with date this month
-        Message.objects.create(sender=self.user, receiver=self.user, method="email")
+        Message.objects.create(sender=self.user, receiver=self.user, method="email", status="sent")
 
         # Create an organization with managers and management joined this month
         org_type = OrganizationType.objects.create(type_name='Type', type_code='T')
