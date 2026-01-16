@@ -102,6 +102,14 @@ class Profile(models.Model):
         help_text="Short bio of the user.",
         default=""
     )
+    about_language = models.ForeignKey(
+        Language,
+        on_delete=models.RESTRICT,
+        verbose_name="Bio language",
+        help_text="Language of the user's bio.",
+        null=True,
+        default=None
+    )
     wikidata_qid = models.CharField(
         verbose_name="Wikidata Qid",
         max_length=10,
