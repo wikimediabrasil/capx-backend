@@ -77,7 +77,6 @@ jobs:
           key: ${{ secrets.KEY }}
           port: ${{ secrets.PORT }}
           request_pty: true
-          script_stop: true
           script: |
             become capx-backend git -C '$HOME/www/python/src' fetch origin
             become capx-backend git -C '$HOME/www/python/src' reset --hard origin/stable
