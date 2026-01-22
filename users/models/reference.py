@@ -8,6 +8,13 @@ class Territory(models.Model):
         unique=True,
         help_text="Name of the territory"
     )
+    territory_acronym = models.CharField(
+        verbose_name="Territory acronym",
+        max_length=32,
+        null=True, blank=True,
+        unique=True,
+        help_text="Acronym of the territory"
+    )
     parent_territory = models.ManyToManyField(
         "self",
         verbose_name="Parent territory",
