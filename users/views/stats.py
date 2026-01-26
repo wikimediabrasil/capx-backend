@@ -1,11 +1,12 @@
 from datetime import timedelta
 from django.utils import timezone
 from django.db import models
+from django.db.models import Count
 from rest_framework.views import APIView
 from rest_framework.response import Response
 from drf_spectacular.utils import extend_schema
 from knox.models import AuthToken
-from users.models import Profile, Language
+from users.models import Profile, Language, LanguageProficiency
 from skills.models import Skill
 from users.models import Territory
 from message.models import Message
@@ -159,3 +160,131 @@ class StatisticsView(APIView):
             "skill_available_user_counts": skill_available_user_counts,
             "skill_wanted_user_counts": skill_wanted_user_counts,
         })
+
+
+class LanguagesByTerritoryView(APIView):
+    """
+    Pre-aggregated language counts by territory.
+    Returns the number of users who speak each language, grouped by territory.
+    """
+
+    @extend_schema(
+        summary='Get language user counts by territory',
+        description='Returns pre-aggregated data of language speakers grouped by territory. '
+                    'Each territory contains a mapping of language IDs to user counts. '
+                    'Users with proficiency=0 are excluded.',
+        responses={(200, 'application/json'): {
+            'description': 'Language counts by territory retrieved successfully',
+            'type': 'object',
+            'additionalProperties': {
+                'type': 'object',
+                'description': 'Territory ID mapped to language counts',
+                'additionalProperties': {
+                    'type': 'integer',
+                    'description': 'Language ID mapped to user count'
+                }
+            },
+        }},
+    )
+    def get(self, request, *args, **kwargs):
+        # Get all active user profiles with their territories and languages
+        profiles_with_data = Profile.objects.filter(
+            user__is_active=True
+        ).prefetch_related(
+            'territory',
+            'languageproficiency_set__language'
+        )
+
+        # Aggregate data
+        result = {}
+
+        for profile in profiles_with_data:
+            # Get user's territories
+            territories = list(profile.territory.values_list('id', flat=True))
+
+            # Get user's languages (excluding proficiency=0)
+            languages = LanguageProficiency.objects.filter(
+                profile=profile
+            ).exclude(proficiency='0').values_list('language_id', flat=True)
+
+            # For each territory, count each language
+            for territory_id in territories:
+                territory_key = str(territory_id)
+                if territory_key not in result:
+                    result[territory_key] = {}
+
+                for language_id in languages:
+                    language_key = str(language_id)
+                    result[territory_key][language_key] = result[territory_key].get(language_key, 0) + 1
+
+        return Response(result)
+
+
+class CapacitiesByTerritoryView(APIView):
+    """
+    Pre-aggregated capacity counts by territory.
+    Returns the number of users with skills available and wanted, grouped by territory.
+    """
+
+    @extend_schema(
+        summary='Get capacity user counts by territory',
+        description='Returns pre-aggregated data of skill/capacity counts grouped by territory. '
+                    'Each territory contains a mapping of skill IDs to objects with available and wanted counts.',
+        responses={(200, 'application/json'): {
+            'description': 'Capacity counts by territory retrieved successfully',
+            'type': 'object',
+            'additionalProperties': {
+                'type': 'object',
+                'description': 'Territory ID mapped to capacity counts',
+                'additionalProperties': {
+                    'type': 'object',
+                    'properties': {
+                        'available': {'type': 'integer', 'description': 'Number of users with this skill available'},
+                        'wanted': {'type': 'integer', 'description': 'Number of users who want this skill'},
+                    }
+                }
+            },
+        }},
+    )
+    def get(self, request, *args, **kwargs):
+        # Get all active user profiles with their territories and skills
+        profiles_with_data = Profile.objects.filter(
+            user__is_active=True
+        ).prefetch_related(
+            'territory',
+            'skills_available',
+            'skills_wanted'
+        )
+
+        # Aggregate data
+        result = {}
+
+        for profile in profiles_with_data:
+            # Get user's territories
+            territories = list(profile.territory.values_list('id', flat=True))
+
+            # Get user's skills
+            skills_available = list(profile.skills_available.values_list('id', flat=True))
+            skills_wanted = list(profile.skills_wanted.values_list('id', flat=True))
+
+            # For each territory, count skills
+            for territory_id in territories:
+                territory_key = str(territory_id)
+                if territory_key not in result:
+                    result[territory_key] = {}
+
+                # Count available skills
+                for skill_id in skills_available:
+                    skill_key = str(skill_id)
+                    if skill_key not in result[territory_key]:
+                        result[territory_key][skill_key] = {'available': 0, 'wanted': 0}
+                    result[territory_key][skill_key]['available'] += 1
+
+                # Count wanted skills
+                for skill_id in skills_wanted:
+                    skill_key = str(skill_id)
+                    if skill_key not in result[territory_key]:
+                        result[territory_key][skill_key] = {'available': 0, 'wanted': 0}
+                    result[territory_key][skill_key]['wanted'] += 1
+
+        return Response(result)
