@@ -7,7 +7,7 @@ from orgs.models import Organization
 class TerritorySerializer(serializers.ModelSerializer):
     class Meta:
         model = Territory
-        fields = ['id', 'territory_name', 'parent_territory']
+        fields = ['id', 'territory_name', 'territory_acronym', 'parent_territory']
 
 
 class LanguageSerializer(serializers.ModelSerializer):
