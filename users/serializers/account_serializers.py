@@ -35,12 +35,8 @@ class ProfileSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = Profile
-        fields = [
-            'user', 'last_update', 'last_login', 'avatar', 'display_name', 'pronoun', 'about', 'wikidata_qid', 
-            'wiki_alt', 'territory', 'language', 'affiliation', 'wikimedia_project', 'team', 'skills_known', 
-            'skills_available', 'skills_wanted', 'contact', 'social', 'is_manager', 'badges', 'automated_lets_connect',
-        ]
         read_only_fields = ['is_manager', 'badges']
+        fields = "__all__"
 
     @extend_schema_field({
         'type': 'array', 'description': 'List of organization IDs where the user is a manager', 'items': {'type': 'integer'}
