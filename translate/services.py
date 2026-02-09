@@ -192,6 +192,69 @@ class MetabaseClient:
         if "error" in j or j.get("success") is False:
             raise RuntimeError(f"Metabase API error for {metabase_id}/{lang} {field}: {j}")
 
+    def create_item(self, label: str, description: str | None = None, lang: str = "en", wikidata_qid: str | None = None, editor_username: str = "admin") -> str:
+        """Create a new item in Metabase (Wikibase) with initial label/description and optional linkage to a Wikidata QID.
+
+        Returns the created Metabase item id (e.g., "Q12345").
+        """
+        if not self._session or not self._token:
+            raise RuntimeError("MetabaseClient not logged in")
+        # Build entity payload
+        data_obj: dict = {
+            "labels": {lang: {"language": lang, "value": label}},
+            "descriptions": {},
+            "statements": [
+                {
+                    "type": "statement",
+                    "rank": "normal",
+                    "mainsnak": {
+                        "snaktype": "value",
+                        "property": "P5",  # instance of → Skill (Q34531)
+                        "datavalue": {
+                            "type": "wikibase-entityid",
+                            "value": {"entity-type": "item", "id": "Q34531"},
+                        },
+                    },
+                }
+            ],
+        }
+        if description:
+            data_obj["descriptions"][lang] = {"language": lang, "value": description}
+        if wikidata_qid:
+            # Link to associated Wikidata item ID via property P67 (external identifier)
+            data_obj["statements"].append(
+                {
+                    "type": "statement",
+                    "rank": "normal",
+                    "mainsnak": {
+                        "snaktype": "value",
+                        "property": "P67",
+                        "datavalue": {"type": "string", "value": wikidata_qid},
+                    },
+                }
+            )
+
+        payload = {
+            "action": "wbeditentity",
+            "new": "item",
+            "data": json.dumps(data_obj),
+            "token": self._token,
+            "summary": f"CapX admin: create skill item by {editor_username}",
+            "format": "json",
+            "assert": "user",
+            "maxlag": "5",
+        }
+        r = self._session.post(METABASE_API_ENDPOINT, data=payload, timeout=60)
+        r.raise_for_status()
+        j = r.json()
+        if j.get("success") is False or "error" in j:
+            raise RuntimeError(f"Metabase API error creating item: {j}")
+        entity = j.get("entity", {}) or {}
+        item_id = entity.get("id")
+        if not item_id:
+            raise RuntimeError(f"Metabase API did not return entity id: {j}")
+        return item_id
+
     # --- Helpers
     def _parse_entity_id(self, uri: str) -> Optional[str]:
         try:
