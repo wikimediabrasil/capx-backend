@@ -4,11 +4,21 @@ from django.core.exceptions import ValidationError
 from django.db.models import Case, When, F, Value, IntegerField
 from django.utils.html import format_html
 
-from skills.models import Skill
+from skills.models import Skill, Hashtag
 from translate.services import MetabaseClient
 
 
 class SkillChoiceField(forms.ModelChoiceField):
+	def __init__(self, *args, label_map=None, **kwargs):
+		super().__init__(*args, **kwargs)
+		self._label_map = label_map or {}
+
+	def label_from_instance(self, obj):
+		qid = getattr(obj, "skill_wikidata_item", "")
+		return self._label_map.get(qid) or qid or str(obj)
+
+
+class SkillMultipleChoiceField(forms.ModelMultipleChoiceField):
 	def __init__(self, *args, label_map=None, **kwargs):
 		super().__init__(*args, **kwargs)
 		self._label_map = label_map or {}
@@ -74,6 +84,22 @@ class SkillEditForm(forms.ModelForm):
 			label_map=label_map,
 			label=self.fields["skill_type"].label,
 			help_text=self.fields["skill_type"].help_text,
+		)
+
+
+class HashtagForm(forms.ModelForm):
+	class Meta:
+		model = Hashtag
+		fields = ["name", "skills"]
+
+	def __init__(self, *args, **kwargs):
+		super().__init__(*args, **kwargs)
+		label_map = _build_label_map()
+		self.fields["skills"] = SkillMultipleChoiceField(
+			queryset=Skill.objects.all(),
+			required=False,
+			label_map=label_map,
+			label=self.fields["skills"].label,
 		)
 
 
@@ -146,3 +172,30 @@ class SkillAdmin(admin.ModelAdmin):
 			except Exception as e:
 				raise ValidationError({"__all__": f"Failed to create item on Metabase: {e}"})
 		super().save_model(request, obj, form, change)
+
+
+@admin.register(Hashtag)
+class HashtagAdmin(admin.ModelAdmin):
+	list_display = ("name", "skills_titles")
+	search_fields = ("name", "skills__skill_wikidata_item")
+	form = HashtagForm
+
+	_label_map_cache = None
+
+	def _get_label_map(self):
+		if self._label_map_cache is None:
+			self._label_map_cache = _build_label_map()
+		return self._label_map_cache
+
+	def get_queryset(self, request):
+		qs = super().get_queryset(request).prefetch_related("skills")
+		# refresh label map for current listing
+		self._label_map_cache = None
+		return qs
+
+	def skills_titles(self, obj):
+		label_map = self._get_label_map()
+		titles = [label_map.get(s.skill_wikidata_item) or s.skill_wikidata_item for s in obj.skills.all()]
+		return ", ".join(titles) if titles else "-"
+	skills_titles.short_description = "Skills"
+

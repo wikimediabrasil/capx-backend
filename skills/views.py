@@ -1,5 +1,5 @@
-from .models import Skill
-from .serializers import SkillSerializer
+from .models import Skill, Hashtag
+from .serializers import SkillSerializer, HashtagSerializer
 from rest_framework import status, viewsets, filters
 from rest_framework.response import Response
 from drf_spectacular.utils import extend_schema, extend_schema_view, OpenApiParameter, OpenApiTypes, OpenApiExample, OpenApiResponse
@@ -116,3 +116,8 @@ class SkillByTypeViewSet(viewsets.ReadOnlyModelViewSet):
     def list(self, request, *args, **kwargs):
         response = {'message': 'Please provide a skill_id to retrieve skills.'}
         return Response(response, status=status.HTTP_400_BAD_REQUEST)
+
+
+class HashtagViewSet(viewsets.ReadOnlyModelViewSet):
+    queryset = Hashtag.objects.all()
+    serializer_class = HashtagSerializer

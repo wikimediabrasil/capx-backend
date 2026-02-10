@@ -1,5 +1,5 @@
 from rest_framework import serializers
-from .models import Skill
+from .models import Skill, Hashtag
 
 
 class SkillSerializer(serializers.ModelSerializer):
@@ -9,4 +9,13 @@ class SkillSerializer(serializers.ModelSerializer):
             'id',
             'skill_wikidata_item',
             'skill_type',
+        ]
+
+class HashtagSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = Hashtag
+        fields = [
+            'id',
+            'name',
+            'skills',
         ]
