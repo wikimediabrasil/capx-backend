@@ -20,7 +20,7 @@ from django.urls import path, include, re_path
 from django.contrib.staticfiles.urls import staticfiles_urlpatterns
 from django.conf.urls.static import static
 from rest_framework.routers import DefaultRouter
-from skills.views import SkillViewSet, SkillByTypeViewSet
+from skills.views import SkillViewSet, SkillByTypeViewSet, HashtagViewSet
 from users.views import (
     ProfileViewSet, UsersViewSet, QuickListViewSet, AvatarViewSet, SavedItemViewSet,
     UsersBySkillViewSet, UsersByTagViewSet, TerritoryViewSet, WikimediaProjectViewSet,
@@ -38,6 +38,7 @@ from translate.views_api import CapacityTranslationViewSet, CapacityTranslationO
 
 router = DefaultRouter()
 router.register('skill', SkillViewSet, basename='skill')
+router.register('hashtag', HashtagViewSet, basename='hashtag')
 router.register('users', UsersViewSet, basename='users')
 router.register('profile', ProfileViewSet, basename='profile')
 router.register('wikimedia_project', WikimediaProjectViewSet, basename='wikimedia_project')

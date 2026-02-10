@@ -34,3 +34,11 @@ class Skill(models.Model):
                 if level >= 3:
                     raise ValidationError("Skills cannot be nested more than 3 levels deep.")
         super().save(*args, **kwargs)
+
+
+class Hashtag(models.Model):
+    name = models.CharField(max_length=255, unique=True)
+    skills = models.ManyToManyField('Skill', blank=True, related_name='hashtags')
+
+    def __str__(self):
+        return self.name
