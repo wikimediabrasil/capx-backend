@@ -202,6 +202,7 @@
     .subnav a:hover { background:#f7fafc; }
     .subnav a.active { background: var(--primary); color:#fff; border-color: var(--primary); }
     .section-desc { margin: -6px 0 12px; color: var(--muted); font-size: 0.92rem; }
+    .form-builder-host { border: 1px solid var(--border); border-radius: 10px; background: #fff; padding: 8px; min-height: 340px; }
 
     /* Django messages */
     .card[data-accent="messages"]::before {
@@ -456,7 +457,10 @@
 
         <div id="panel-mentorship-forms" role="tabpanel" aria-labelledby="tab-mentorship-forms">
           <h3 style="margin-top:0">Create form JSON</h3>
-          <form method="post" action="/portal/partner/mentorship/form/create/" aria-label="Create mentorship form" style="grid-template-columns: 1fr; max-width: 100%;">
+          <div class="muted">Visual form builder</div>
+          <div id="mentorship-form-builder" class="form-builder-host"></div>
+          <div id="mentorship-form-builder-status" class="muted">Use drag and drop to build the form. The JSON payload is generated automatically.</div>
+          <form id="mentorship-form-create" method="post" action="/portal/partner/mentorship/form/create/" aria-label="Create mentorship form" style="grid-template-columns: 1fr; max-width: 100%;">
             {% csrf_token %}
             <label for="mentorship-form-partner">Partner</label>
             <select id="mentorship-form-partner" name="partner_id" required style="padding:10px; border:1px solid var(--border); border-radius:10px;">
@@ -469,8 +473,7 @@
               <option value="mentor">Mentor</option>
               <option value="mentee">Mentee</option>
             </select>
-            <label for="mentorship-form-json">Form JSON schema</label>
-            <textarea id="mentorship-form-json" name="form_json" placeholder='{"title":"Mentor Form","fields":[{"name":"experience","type":"text"}]}' required></textarea>
+            <input id="mentorship-form-json" name="form_json" type="hidden" />
             <button type="submit" class="btn-primary" style="width:max-content;">Save form</button>
           </form>
 
@@ -700,6 +703,10 @@
         {{ partner_badges_awarded|json_script:"partner-badges-awarded-data" }}
       </div>
     </section>
+    <script src="https://tools-static.wmflabs.org/cdnjs/ajax/libs/jquery/3.7.1/jquery.min.js"></script>
+    <script src="https://tools-static.wmflabs.org/cdnjs/ajax/libs/jqueryui/1.14.1/jquery-ui.min.js"></script>
+    <script src="https://tools-static.wmflabs.org/cdnjs/ajax/libs/jQuery-formBuilder/3.21.1/form-render.min.js"></script>
+    <script src="https://tools-static.wmflabs.org/cdnjs/ajax/libs/jQuery-formBuilder/3.21.1/form-builder.min.js"></script>
     <script>
       (function() {
         var table = document.getElementById('users-table');
@@ -1159,6 +1166,42 @@
         }
         var lists = document.querySelectorAll('[role="tablist"]');
         for (var list of lists) initTablist(list);
+      })();
+
+      // Mentorship visual form builder
+      (function(){
+        var formElement = document.getElementById('mentorship-form-create');
+        var builderHost = document.getElementById('mentorship-form-builder');
+        var outputField = document.getElementById('mentorship-form-json');
+        var statusEl = document.getElementById('mentorship-form-builder-status');
+        if (!formElement || !builderHost || !outputField || !statusEl) return;
+
+        var jq = globalThis.jQuery;
+        if (!jq || !jq.fn || !jq.fn.formBuilder) {
+          outputField.style.display = '';
+          statusEl.textContent = 'Visual builder unavailable. Fill the JSON manually.';
+          return;
+        }
+
+        var formBuilderInstance = jq(builderHost).formBuilder({
+          disableFields: ['autocomplete', 'hidden', 'file', 'button'],
+          showActionButtons: false,
+        });
+
+        formElement.addEventListener('submit', function(event){
+          try {
+            var dataJson = formBuilderInstance.actions.getData('json');
+            if (!dataJson || dataJson === '[]') {
+              statusEl.textContent = 'Add at least one field to the form before saving.';
+              event.preventDefault();
+              return;
+            }
+            outputField.value = dataJson;
+          } catch (error) {
+            statusEl.textContent = 'Unable to export JSON from visual builder.';
+            event.preventDefault();
+          }
+        });
       })();
 
       // Mentorship client-side decrypt + CSV export
