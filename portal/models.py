@@ -58,7 +58,7 @@ class Partner(models.Model):
     name = models.CharField(max_length=255, unique=True)
     description = models.TextField(blank=True, default="")
     created_at = models.DateTimeField(auto_now_add=True)
-    organization = models.ForeignKey('organizations.Organization', on_delete=models.CASCADE, related_name='partners')
+    organization = models.ForeignKey('orgs.Organization', on_delete=models.CASCADE, related_name='partners', null=True, blank=True)
 
     def __str__(self):
         return self.name
