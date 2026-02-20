@@ -117,7 +117,16 @@ class SkillByTypeViewSet(viewsets.ReadOnlyModelViewSet):
         response = {'message': 'Please provide a skill_id to retrieve skills.'}
         return Response(response, status=status.HTTP_400_BAD_REQUEST)
 
-
+@extend_schema_view(
+    list=extend_schema(
+        summary='List all hashtags.',
+        description='This endpoint lists all hashtags.',
+    ),
+    retrieve=extend_schema(
+        summary='Retrieve a hashtag by ID.',
+        description='This endpoint retrieves a hashtag by its ID.',
+    ),
+)
 class HashtagViewSet(viewsets.ReadOnlyModelViewSet):
     queryset = Hashtag.objects.all()
     serializer_class = HashtagSerializer

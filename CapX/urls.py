@@ -24,7 +24,8 @@ from skills.views import SkillViewSet, SkillByTypeViewSet, HashtagViewSet
 from users.views import (
     ProfileViewSet, UsersViewSet, QuickListViewSet, AvatarViewSet, SavedItemViewSet,
     UsersBySkillViewSet, UsersByTagViewSet, TerritoryViewSet, WikimediaProjectViewSet,
-    BadgeViewSet, UserBadgeViewSet, StatisticsView, RecommendationView, LetsConnectViewSet,
+    BadgeViewSet, UserBadgeViewSet, StatisticsView, LanguagesByTerritoryView,
+    CapacitiesByTerritoryView, RecommendationView, LetsConnectViewSet,
     UserAuthView, AuthView, CheckView
 )
 from bugs.views import BugViewSet, AttachmentViewSet
@@ -32,6 +33,13 @@ from orgs.views import OrganizationViewSet, OrganizationTypeViewSet, TagDiffView
 from events.views import EventViewSet
 from message.views import MessageViewSet
 from projects.views import ProjectViewSet, ProjectMemberViewSet, ProjectMemberAcceptanceViewSet
+from portal.views_api import (
+    PartnerMentorshipAvailabilityViewSet,
+    PartnerMentorshipFormMentorViewSet,
+    PartnerMentorshipFormMentorResponseViewSet,
+    PartnerMentorshipFormMenteeViewSet,
+    PartnerMentorshipFormMenteeResponseViewSet,
+)
 from drf_spectacular.views import SpectacularAPIView, SpectacularSwaggerView
 from translate.views_api import CapacityTranslationViewSet, CapacityTranslationOauthViewSet
 
@@ -65,6 +73,11 @@ router.register('badges', BadgeViewSet, basename='badges')
 router.register('user_badge', UserBadgeViewSet, basename='user_badge')
 router.register('translating', CapacityTranslationViewSet, basename='translating')
 router.register('translating_oauth', CapacityTranslationOauthViewSet, basename='translating_oauth')
+router.register('mentorship_availability', PartnerMentorshipAvailabilityViewSet, basename='partner_mentorship_availability')
+router.register('mentorship_form_mentor', PartnerMentorshipFormMentorViewSet, basename='partner_mentorship_form_mentor')
+router.register('mentorship_form_mentee', PartnerMentorshipFormMenteeViewSet, basename='partner_mentorship_form_mentee')
+router.register('mentorship_form_mentor_response', PartnerMentorshipFormMentorResponseViewSet, basename='partner_mentorship_form_mentor_response')
+router.register('mentorship_form_mentee_response', PartnerMentorshipFormMenteeResponseViewSet, basename='partner_mentorship_form_mentee_response')
 
 urlpatterns = [
     path('admin/', admin.site.urls),
@@ -79,6 +92,8 @@ urlpatterns = [
     re_path(r'^api/login/social/knox/(?:(?P<provider>[a-zA-Z0-9_-]+)/?)?$', AuthView.as_view(), name='login_social_knox'),
     path('api/login/social/check/', CheckView.as_view(), name='login_social_check'),
     path('statistics/', StatisticsView.as_view(), name='statistics'),
+    path('statistics/languages-by-territory/', LanguagesByTerritoryView.as_view(), name='languages-by-territory'),
+    path('statistics/capacities-by-territory/', CapacitiesByTerritoryView.as_view(), name='capacities-by-territory'),
     path('recommendation/', RecommendationView.as_view(), name='recommendation'),
     path('', include(router.urls)),
 ]
