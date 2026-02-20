@@ -473,6 +473,12 @@
               <option value="mentor">Mentor</option>
               <option value="mentee">Mentee</option>
             </select>
+            <label for="mentorship-form-public-key">Public key</label>
+            <select id="mentorship-form-public-key" name="public_key_id" required style="padding:10px; border:1px solid var(--border); border-radius:10px;">
+              {% for k in mentorship_public_keys %}
+                <option value="{{ k.id }}" data-partner-id="{{ k.partner_id }}">Key #{{ k.id }} - {{ k.partner.name }}</option>
+              {% endfor %}
+            </select>
             <input id="mentorship-form-json" name="form_json" type="hidden" />
             <button type="submit" class="btn-primary" style="width:max-content;">Save form</button>
           </form>
@@ -481,12 +487,12 @@
             <div>
               <h3 style="margin-top:0">Mentor forms</h3>
               <table>
-                <thead><tr><th>Partner</th><th>Created at</th></tr></thead>
+                <thead><tr><th>Partner</th><th>Public key</th><th>Created at</th></tr></thead>
                 <tbody>
                   {% for form in mentorship_forms_mentor %}
-                    <tr><td>{{ form.partner.name }}</td><td>{{ form.created_at|date:"Y-m-d H:i:s" }}</td></tr>
+                    <tr><td>{{ form.partner.name }}</td><td>{% if form.public_key_id %}#{{ form.public_key_id }}{% else %}-{% endif %}</td><td>{{ form.created_at|date:"Y-m-d H:i:s" }}</td></tr>
                   {% empty %}
-                    <tr><td colspan="2" class="muted">No mentor forms yet.</td></tr>
+                    <tr><td colspan="3" class="muted">No mentor forms yet.</td></tr>
                   {% endfor %}
                 </tbody>
               </table>
@@ -494,12 +500,12 @@
             <div>
               <h3 style="margin-top:0">Mentee forms</h3>
               <table>
-                <thead><tr><th>Partner</th><th>Created at</th></tr></thead>
+                <thead><tr><th>Partner</th><th>Public key</th><th>Created at</th></tr></thead>
                 <tbody>
                   {% for form in mentorship_forms_mentee %}
-                    <tr><td>{{ form.partner.name }}</td><td>{{ form.created_at|date:"Y-m-d H:i:s" }}</td></tr>
+                    <tr><td>{{ form.partner.name }}</td><td>{% if form.public_key_id %}#{{ form.public_key_id }}{% else %}-{% endif %}</td><td>{{ form.created_at|date:"Y-m-d H:i:s" }}</td></tr>
                   {% empty %}
-                    <tr><td colspan="2" class="muted">No mentee forms yet.</td></tr>
+                    <tr><td colspan="3" class="muted">No mentee forms yet.</td></tr>
                   {% endfor %}
                 </tbody>
               </table>
@@ -1174,7 +1180,29 @@
         var builderHost = document.getElementById('mentorship-form-builder');
         var outputField = document.getElementById('mentorship-form-json');
         var statusEl = document.getElementById('mentorship-form-builder-status');
-        if (!formElement || !builderHost || !outputField || !statusEl) return;
+        var partnerField = document.getElementById('mentorship-form-partner');
+        var keyField = document.getElementById('mentorship-form-public-key');
+        if (!formElement || !builderHost || !outputField || !statusEl || !partnerField || !keyField) return;
+
+        function filterPublicKeysByPartner(){
+          var selectedPartner = String(partnerField.value || '');
+          var firstVisible = null;
+          Array.from(keyField.options).forEach(function(option){
+            var visible = String(option.dataset.partnerId || '') === selectedPartner;
+            option.hidden = !visible;
+            if (visible && !firstVisible) firstVisible = option;
+          });
+          if (!keyField.selectedOptions.length || keyField.selectedOptions[0].hidden) {
+            if (firstVisible) {
+              keyField.value = firstVisible.value;
+            } else {
+              keyField.value = '';
+            }
+          }
+          if (!firstVisible) {
+            statusEl.textContent = 'Create a public key for this partner before saving a form.';
+          }
+        }
 
         var jq = globalThis.jQuery;
         if (!jq || !jq.fn || !jq.fn.formBuilder) {
@@ -1202,6 +1230,9 @@
             event.preventDefault();
           }
         });
+
+        partnerField.addEventListener('change', filterPublicKeysByPartner);
+        filterPublicKeysByPartner();
       })();
 
       // Mentorship client-side decrypt + CSV export
@@ -1230,6 +1261,52 @@
 
         function currentResponses(){
           return typeSelect.value === 'mentor' ? mentorResponses : menteeResponses;
+        }
+
+        function getSelectedFormDefinition(formId){
+          var forms = currentForms();
+          for (var i = 0; i < forms.length; i++) {
+            if (String(forms[i].id) === String(formId)) return forms[i];
+          }
+          return null;
+        }
+
+        function normalizeFieldKey(key){
+          var s = String(key || '');
+          if (s.endsWith('[]')) return s.slice(0, -2);
+          return s;
+        }
+
+        function toObjectValue(value){
+          if (value == null) return {};
+          if (typeof value === 'object' && !Array.isArray(value)) return value;
+          if (typeof value !== 'string') return { value: value };
+          try {
+            var parsed = JSON.parse(value);
+            if (parsed && typeof parsed === 'object' && !Array.isArray(parsed)) return parsed;
+            return { value: parsed };
+          } catch (error) {
+            return { value: value };
+          }
+        }
+
+        function stringifyCellValue(value){
+          if (Array.isArray(value)) return value.join('; ');
+          if (value && typeof value === 'object') return JSON.stringify(value);
+          return value == null ? '' : String(value);
+        }
+
+        function buildSchemaFieldMap(formDefinition){
+          var schema = (formDefinition && formDefinition.json) || [];
+          var map = {};
+          if (!Array.isArray(schema)) return map;
+          schema.forEach(function(field){
+            var key = normalizeFieldKey(field && field.name);
+            if (!key) return;
+            var label = (field && field.label) ? String(field.label).trim() : key;
+            map[key] = label || key;
+          });
+          return map;
         }
 
         function repopulateForms(){
@@ -1342,25 +1419,49 @@
           try {
             var privateKey = await importPrivateKey(privatePem);
             var rows = currentResponses().filter(function(r){ return String(r.form_id) === formId; });
-            var lines = [
-              ['username', 'created_at', 'response_data'].map(escapeCSV).join(',')
-            ];
+            var selectedForm = getSelectedFormDefinition(formId);
+            var schemaFieldMap = buildSchemaFieldMap(selectedForm);
+            var decryptedObjects = [];
+            var dynamicKeys = Object.keys(schemaFieldMap);
+            var dynamicKeySet = {};
+            dynamicKeys.forEach(function(key){ dynamicKeySet[key] = true; });
 
             for (var i = 0; i < rows.length; i++) {
               var row = rows[i];
               var decrypted = await decryptPayload(row.data, privateKey);
-              var decryptedValue = decrypted;
-              if (typeof decrypted === 'string') {
-                try { decryptedValue = JSON.stringify(JSON.parse(decrypted)); } catch(e) { decryptedValue = decrypted; }
-              } else {
-                decryptedValue = JSON.stringify(decrypted);
-              }
-              lines.push([
-                escapeCSV(row.username),
-                escapeCSV(row.created_at),
-                escapeCSV(decryptedValue),
-              ].join(','));
+              var responseObject = toObjectValue(decrypted);
+              decryptedObjects.push(responseObject);
+
+              Object.keys(responseObject).forEach(function(rawKey){
+                var key = normalizeFieldKey(rawKey);
+                if (!dynamicKeySet[key]) {
+                  dynamicKeySet[key] = true;
+                  dynamicKeys.push(key);
+                }
+              });
             }
+
+            var header = ['username', 'created_at'];
+            dynamicKeys.forEach(function(key){
+              header.push(schemaFieldMap[key] || key);
+            });
+            var lines = [header.map(escapeCSV).join(',')];
+
+            for (var j = 0; j < rows.length; j++) {
+              var currentRow = rows[j];
+              var currentObject = decryptedObjects[j] || {};
+              var lineParts = [
+                escapeCSV(currentRow.username),
+                escapeCSV(currentRow.created_at),
+              ];
+
+              dynamicKeys.forEach(function(key){
+                var value = currentObject[key];
+                lineParts.push(escapeCSV(stringifyCellValue(value)));
+              });
+
+              lines.push(lineParts.join(','));
+              }
 
             var fileName = 'mentorship-' + typeSelect.value + '-form-' + formId + '.csv';
             downloadCSV(lines, fileName);

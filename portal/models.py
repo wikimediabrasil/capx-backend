@@ -7,6 +7,7 @@ import os
 from cryptography.hazmat.primitives import hashes, serialization
 from cryptography.hazmat.primitives.asymmetric import padding
 from cryptography.hazmat.primitives.ciphers.aead import AESGCM
+from users.models import CustomUser
 
 
 ENCRYPTED_MARKER = "__encrypted__"
@@ -66,7 +67,7 @@ class Partner(models.Model):
 
 class PartnerMembership(models.Model):
     partner = models.ForeignKey(Partner, on_delete=models.CASCADE, related_name='memberships')
-    user = models.ForeignKey('users.CustomUser', on_delete=models.CASCADE, related_name='partner_memberships')
+    user = models.ForeignKey(CustomUser, on_delete=models.CASCADE, related_name='partner_memberships')
     created_at = models.DateTimeField(auto_now_add=True)
 
     class Meta:
@@ -96,6 +97,7 @@ class PartnerMentorshipPublicKey(models.Model):
 
 class PartnerMentorshipFormMentor(models.Model):
     partner = models.ForeignKey(Partner, on_delete=models.CASCADE, related_name='mentorship_form_mentors')
+    public_key = models.ForeignKey(PartnerMentorshipPublicKey, on_delete=models.CASCADE, related_name='mentor_forms', null=True, blank=True)
     json = models.JSONField()
     created_at = models.DateTimeField(auto_now_add=True)
 
@@ -105,6 +107,7 @@ class PartnerMentorshipFormMentor(models.Model):
 
 class PartnerMentorshipFormMentee(models.Model):
     partner = models.ForeignKey(Partner, on_delete=models.CASCADE, related_name='mentorship_form_mentees')
+    public_key = models.ForeignKey(PartnerMentorshipPublicKey, on_delete=models.CASCADE, related_name='mentee_forms', null=True, blank=True)
     json = models.JSONField()
     created_at = models.DateTimeField(auto_now_add=True)
 
@@ -115,22 +118,18 @@ class PartnerMentorshipFormMentee(models.Model):
 class PartnerMentorshipFormMentorResponse(models.Model):
     partner = models.ForeignKey(Partner, on_delete=models.CASCADE, related_name='mentorship_form_mentor_responses')
     form = models.ForeignKey(PartnerMentorshipFormMentor, on_delete=models.CASCADE, related_name='responses')
-    user = models.ForeignKey('users.CustomUser', on_delete=models.CASCADE, related_name='mentor_responses')
+    user = models.ForeignKey(CustomUser, on_delete=models.CASCADE, related_name='mentor_responses')
     data = models.TextField()
-    public_key = models.ForeignKey(PartnerMentorshipPublicKey, on_delete=models.CASCADE, related_name='mentor_responses')
     created_at = models.DateTimeField(auto_now_add=True)
 
     def save(self, *args, **kwargs):
-        if self.public_key.partner_id != self.partner_id:
-            raise ValidationError("Public key must belong to the same partner")
+        self.partner = self.form.partner  # Ensure partner is always set to form's partner
 
         if self.pk:
-            current_data = type(self).objects.filter(pk=self.pk).values_list("data", flat=True).first()
-            if current_data == self.data:
-                return super().save(*args, **kwargs)
+            raise ValidationError("Updating mentor responses is not allowed")
 
         if not is_encrypted_data(self.data):
-            self.data = encrypt_data(self.data, self.public_key.public_key)
+            self.data = encrypt_data(self.data, self.form.public_key.public_key)
 
         return super().save(*args, **kwargs)
 
@@ -141,22 +140,18 @@ class PartnerMentorshipFormMentorResponse(models.Model):
 class PartnerMentorshipFormMenteeResponse(models.Model):
     partner = models.ForeignKey(Partner, on_delete=models.CASCADE, related_name='mentorship_form_mentee_responses')
     form = models.ForeignKey(PartnerMentorshipFormMentee, on_delete=models.CASCADE, related_name='responses')
-    user = models.ForeignKey('users.CustomUser', on_delete=models.CASCADE, related_name='mentee_responses')
+    user = models.ForeignKey(CustomUser, on_delete=models.CASCADE, related_name='mentee_responses')
     data = models.JSONField()
-    public_key = models.ForeignKey(PartnerMentorshipPublicKey, on_delete=models.CASCADE, related_name='mentee_responses')
     created_at = models.DateTimeField(auto_now_add=True)
 
     def save(self, *args, **kwargs):
-        if self.public_key.partner_id != self.partner_id:
-            raise ValidationError("Public key must belong to the same partner")
+        self.partner = self.form.partner  # Ensure partner is always set to form's partner
 
         if self.pk:
-            current_data = type(self).objects.filter(pk=self.pk).values_list("data", flat=True).first()
-            if current_data == self.data:
-                return super().save(*args, **kwargs)
+            raise ValidationError("Public key must belong to the same partner")
 
         if not is_encrypted_data(self.data):
-            self.data = encrypt_data(self.data, self.public_key.public_key)
+            self.data = encrypt_data(self.data, self.form.public_key.public_key)
 
         return super().save(*args, **kwargs)
 

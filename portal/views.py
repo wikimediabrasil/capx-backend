@@ -412,11 +412,12 @@ def _require_partner_scope(request, partner: Partner):
 @require_portal_access
 def mentorship_form_create(request):
     partner_id = request.POST.get('partner_id', '').strip()
+    public_key_id = request.POST.get('public_key_id', '').strip()
     form_type = request.POST.get('form_type', '').strip().lower()
     form_json_raw = request.POST.get('form_json', '').strip()
 
-    if not partner_id or not form_type or not form_json_raw:
-        messages.error(request, 'Partner, form type, and JSON are required.')
+    if not partner_id or not public_key_id or not form_type or not form_json_raw:
+        messages.error(request, 'Partner, public key, form type, and JSON are required.')
         return redirect(DASHBOARD_URL_NAME)
 
     try:
@@ -434,15 +435,21 @@ def mentorship_form_create(request):
         return redirect(DASHBOARD_URL_NAME)
 
     try:
+        public_key = PartnerMentorshipPublicKey.objects.get(id=public_key_id, partner=partner)
+    except PartnerMentorshipPublicKey.DoesNotExist:
+        messages.error(request, 'Selected public key is invalid for this partner.')
+        return redirect(DASHBOARD_URL_NAME)
+
+    try:
         parsed_json = json.loads(form_json_raw)
     except json.JSONDecodeError:
         messages.error(request, 'Invalid JSON for the mentorship form.')
         return redirect(DASHBOARD_URL_NAME)
 
     if form_type == 'mentor':
-        PartnerMentorshipFormMentor.objects.create(partner=partner, json=parsed_json)
+        PartnerMentorshipFormMentor.objects.create(partner=partner, public_key=public_key, json=parsed_json)
     elif form_type == 'mentee':
-        PartnerMentorshipFormMentee.objects.create(partner=partner, json=parsed_json)
+        PartnerMentorshipFormMentee.objects.create(partner=partner, public_key=public_key, json=parsed_json)
     else:
         messages.error(request, 'Invalid form type.')
         return redirect(DASHBOARD_URL_NAME)
