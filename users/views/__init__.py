@@ -24,7 +24,7 @@ from .saved_items import SavedItemViewSet
 from .badges import BadgeViewSet, UserBadgeViewSet
 
 # Statistics and recommendations
-from .stats import StatisticsView
+from .stats import StatisticsView, LanguagesByTerritoryView, CapacitiesByTerritoryView
 from .recommendations import RecommendationView
 
 # LetsConnect
@@ -52,6 +52,8 @@ __all__ = [
 	"UserBadgeViewSet",
 	# stats & recs
 	"StatisticsView",
+	"LanguagesByTerritoryView",
+	"CapacitiesByTerritoryView",
 	"RecommendationView",
     # letsconnect
     "LetsConnectViewSet",

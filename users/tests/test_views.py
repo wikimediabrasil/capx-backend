@@ -1109,16 +1109,338 @@ class UsersOrderingTestCase(TestCase):
         self.user1 = CustomUser.objects.create_user(username='alpha_user', password=str(secrets.randbits(16)))
         self.user2 = CustomUser.objects.create_user(username='beta_user', password=str(secrets.randbits(16)))
         self.user3 = CustomUser.objects.create_user(username='gamma_user', password=str(secrets.randbits(16)))
-        
+
     def test_users_ordering_by_last_update_desc(self):
         # Since last_update has auto_now=True, we need to update the profile to trigger a new timestamp
         # The last user to be saved will have the most recent last_update
         self.user3.profile.about = 'Updated bio for user3'
         self.user3.profile.save()
-        
+
         response = self.client.get('/users/?ordering=-last_update')
         self.assertEqual(response.status_code, status.HTTP_200_OK)
         results = response.data['results']
         self.assertGreaterEqual(len(results), 3)
         # user3 should be first as it was updated most recently
         self.assertEqual(results[0]['user']['username'], 'gamma_user')
+
+
+class LanguagesByTerritoryViewTestCase(TestCase):
+    def setUp(self):
+        self.client = APIClient()
+        self.user1 = CustomUser.objects.create_user(username='user1', password=str(secrets.randbits(16)))
+        self.user2 = CustomUser.objects.create_user(username='user2', password=str(secrets.randbits(16)))
+        self.user3 = CustomUser.objects.create_user(username='user3', password=str(secrets.randbits(16)))
+
+        # Create territories
+        self.territory1 = Territory.objects.create(territory_name='Territory 1')
+        self.territory2 = Territory.objects.create(territory_name='Territory 2')
+
+        # Create languages
+        self.lang_en = Language.objects.create(language_name='English', language_code='en')
+        self.lang_es = Language.objects.create(language_name='Spanish', language_code='es')
+        self.lang_fr = Language.objects.create(language_name='French', language_code='fr')
+
+    def test_languages_by_territory_empty(self):
+        """Test endpoint with no language/territory data"""
+        response = self.client.get('/statistics/languages-by-territory/')
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(response.data, {})
+
+    def test_languages_by_territory_no_auth_required(self):
+        """Test that endpoint works without authentication"""
+        client = APIClient()  # No auth
+        response = client.get('/statistics/languages-by-territory/')
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+
+    def test_languages_by_territory_basic(self):
+        """Test basic language aggregation by territory"""
+        # User1 in Territory1, speaks English
+        self.user1.profile.territory.set([self.territory1])
+        LanguageProficiency.objects.create(
+            profile=self.user1.profile,
+            language=self.lang_en,
+            proficiency='3'
+        )
+
+        response = self.client.get('/statistics/languages-by-territory/')
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+
+        # Check structure
+        self.assertIn(str(self.territory1.id), response.data)
+        self.assertIn(str(self.lang_en.id), response.data[str(self.territory1.id)])
+        self.assertEqual(response.data[str(self.territory1.id)][str(self.lang_en.id)], 1)
+
+    def test_languages_by_territory_multiple_users_same_territory(self):
+        """Test aggregation when multiple users in same territory speak same language"""
+        # Both users in Territory1, both speak English
+        self.user1.profile.territory.set([self.territory1])
+        self.user2.profile.territory.set([self.territory1])
+
+        LanguageProficiency.objects.create(
+            profile=self.user1.profile,
+            language=self.lang_en,
+            proficiency='3'
+        )
+        LanguageProficiency.objects.create(
+            profile=self.user2.profile,
+            language=self.lang_en,
+            proficiency='4'
+        )
+
+        response = self.client.get('/statistics/languages-by-territory/')
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+
+        # Should count 2 users for English in Territory1
+        self.assertEqual(response.data[str(self.territory1.id)][str(self.lang_en.id)], 2)
+
+    def test_languages_by_territory_excludes_zero_proficiency(self):
+        """Test that proficiency=0 languages are excluded"""
+        self.user1.profile.territory.set([self.territory1])
+
+        # English with proficiency 3 (should be counted)
+        LanguageProficiency.objects.create(
+            profile=self.user1.profile,
+            language=self.lang_en,
+            proficiency='3'
+        )
+        # Spanish with proficiency 0 (should NOT be counted)
+        LanguageProficiency.objects.create(
+            profile=self.user1.profile,
+            language=self.lang_es,
+            proficiency='0'
+        )
+
+        response = self.client.get('/statistics/languages-by-territory/')
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+
+        territory_data = response.data[str(self.territory1.id)]
+        self.assertIn(str(self.lang_en.id), territory_data)
+        self.assertNotIn(str(self.lang_es.id), territory_data)
+
+    def test_languages_by_territory_multiple_territories(self):
+        """Test aggregation across multiple territories"""
+        # User1 in Territory1, speaks English
+        self.user1.profile.territory.set([self.territory1])
+        LanguageProficiency.objects.create(
+            profile=self.user1.profile,
+            language=self.lang_en,
+            proficiency='3'
+        )
+
+        # User2 in Territory2, speaks Spanish
+        self.user2.profile.territory.set([self.territory2])
+        LanguageProficiency.objects.create(
+            profile=self.user2.profile,
+            language=self.lang_es,
+            proficiency='4'
+        )
+
+        response = self.client.get('/statistics/languages-by-territory/')
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+
+        # Territory1 should have English
+        self.assertIn(str(self.territory1.id), response.data)
+        self.assertEqual(response.data[str(self.territory1.id)][str(self.lang_en.id)], 1)
+
+        # Territory2 should have Spanish
+        self.assertIn(str(self.territory2.id), response.data)
+        self.assertEqual(response.data[str(self.territory2.id)][str(self.lang_es.id)], 1)
+
+    def test_languages_by_territory_user_in_multiple_territories(self):
+        """Test when a user belongs to multiple territories"""
+        # User1 in both territories, speaks English
+        self.user1.profile.territory.set([self.territory1, self.territory2])
+        LanguageProficiency.objects.create(
+            profile=self.user1.profile,
+            language=self.lang_en,
+            proficiency='3'
+        )
+
+        response = self.client.get('/statistics/languages-by-territory/')
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+
+        # Both territories should have English counted
+        self.assertEqual(response.data[str(self.territory1.id)][str(self.lang_en.id)], 1)
+        self.assertEqual(response.data[str(self.territory2.id)][str(self.lang_en.id)], 1)
+
+    def test_languages_by_territory_excludes_inactive_users(self):
+        """Test that inactive users are excluded"""
+        self.user1.profile.territory.set([self.territory1])
+        LanguageProficiency.objects.create(
+            profile=self.user1.profile,
+            language=self.lang_en,
+            proficiency='3'
+        )
+
+        # Deactivate user1
+        self.user1.is_active = False
+        self.user1.save()
+
+        response = self.client.get('/statistics/languages-by-territory/')
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+
+        # Territory1 should not appear since only user was inactive
+        self.assertNotIn(str(self.territory1.id), response.data)
+
+
+class CapacitiesByTerritoryViewTestCase(TestCase):
+    def setUp(self):
+        self.client = APIClient()
+        self.user1 = CustomUser.objects.create_user(username='user1', password=str(secrets.randbits(16)))
+        self.user2 = CustomUser.objects.create_user(username='user2', password=str(secrets.randbits(16)))
+
+        # Create territories
+        self.territory1 = Territory.objects.create(territory_name='Territory 1')
+        self.territory2 = Territory.objects.create(territory_name='Territory 2')
+
+        # Create skills/capacities
+        self.skill1 = Skill.objects.create(skill_wikidata_item='Q123')
+        self.skill2 = Skill.objects.create(skill_wikidata_item='Q456')
+
+    def test_capacities_by_territory_empty(self):
+        """Test endpoint with no capacity/territory data"""
+        response = self.client.get('/statistics/capacities-by-territory/')
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(response.data, {})
+
+    def test_capacities_by_territory_no_auth_required(self):
+        """Test that endpoint works without authentication"""
+        client = APIClient()  # No auth
+        response = client.get('/statistics/capacities-by-territory/')
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+
+    def test_capacities_by_territory_available_skills(self):
+        """Test aggregation of available skills by territory"""
+        self.user1.profile.territory.set([self.territory1])
+        self.user1.profile.skills_known.add(self.skill1)
+        self.user1.profile.skills_available.add(self.skill1)
+
+        response = self.client.get('/statistics/capacities-by-territory/')
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+
+        territory_data = response.data[str(self.territory1.id)]
+        skill_data = territory_data[str(self.skill1.id)]
+
+        self.assertEqual(skill_data['available'], 1)
+        self.assertEqual(skill_data['wanted'], 0)
+
+    def test_capacities_by_territory_wanted_skills(self):
+        """Test aggregation of wanted skills by territory"""
+        self.user1.profile.territory.set([self.territory1])
+        self.user1.profile.skills_wanted.add(self.skill1)
+
+        response = self.client.get('/statistics/capacities-by-territory/')
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+
+        territory_data = response.data[str(self.territory1.id)]
+        skill_data = territory_data[str(self.skill1.id)]
+
+        self.assertEqual(skill_data['available'], 0)
+        self.assertEqual(skill_data['wanted'], 1)
+
+    def test_capacities_by_territory_both_available_and_wanted(self):
+        """Test when different users have same skill available and wanted"""
+        # User1 has skill1 available
+        self.user1.profile.territory.set([self.territory1])
+        self.user1.profile.skills_known.add(self.skill1)
+        self.user1.profile.skills_available.add(self.skill1)
+
+        # User2 wants skill1
+        self.user2.profile.territory.set([self.territory1])
+        self.user2.profile.skills_wanted.add(self.skill1)
+
+        response = self.client.get('/statistics/capacities-by-territory/')
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+
+        territory_data = response.data[str(self.territory1.id)]
+        skill_data = territory_data[str(self.skill1.id)]
+
+        self.assertEqual(skill_data['available'], 1)
+        self.assertEqual(skill_data['wanted'], 1)
+
+    def test_capacities_by_territory_multiple_users_same_skill(self):
+        """Test aggregation when multiple users have same skill available"""
+        self.user1.profile.territory.set([self.territory1])
+        self.user1.profile.skills_known.add(self.skill1)
+        self.user1.profile.skills_available.add(self.skill1)
+
+        self.user2.profile.territory.set([self.territory1])
+        self.user2.profile.skills_known.add(self.skill1)
+        self.user2.profile.skills_available.add(self.skill1)
+
+        response = self.client.get('/statistics/capacities-by-territory/')
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+
+        territory_data = response.data[str(self.territory1.id)]
+        skill_data = territory_data[str(self.skill1.id)]
+
+        self.assertEqual(skill_data['available'], 2)
+
+    def test_capacities_by_territory_multiple_territories(self):
+        """Test aggregation across multiple territories"""
+        # User1 in Territory1 with skill1 available
+        self.user1.profile.territory.set([self.territory1])
+        self.user1.profile.skills_known.add(self.skill1)
+        self.user1.profile.skills_available.add(self.skill1)
+
+        # User2 in Territory2 with skill2 wanted
+        self.user2.profile.territory.set([self.territory2])
+        self.user2.profile.skills_wanted.add(self.skill2)
+
+        response = self.client.get('/statistics/capacities-by-territory/')
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+
+        # Territory1 should have skill1 available
+        self.assertEqual(response.data[str(self.territory1.id)][str(self.skill1.id)]['available'], 1)
+
+        # Territory2 should have skill2 wanted
+        self.assertEqual(response.data[str(self.territory2.id)][str(self.skill2.id)]['wanted'], 1)
+
+    def test_capacities_by_territory_user_in_multiple_territories(self):
+        """Test when a user belongs to multiple territories"""
+        self.user1.profile.territory.set([self.territory1, self.territory2])
+        self.user1.profile.skills_known.add(self.skill1)
+        self.user1.profile.skills_available.add(self.skill1)
+
+        response = self.client.get('/statistics/capacities-by-territory/')
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+
+        # Both territories should have skill1 available
+        self.assertEqual(response.data[str(self.territory1.id)][str(self.skill1.id)]['available'], 1)
+        self.assertEqual(response.data[str(self.territory2.id)][str(self.skill1.id)]['available'], 1)
+
+    def test_capacities_by_territory_excludes_inactive_users(self):
+        """Test that inactive users are excluded"""
+        self.user1.profile.territory.set([self.territory1])
+        self.user1.profile.skills_known.add(self.skill1)
+        self.user1.profile.skills_available.add(self.skill1)
+
+        # Deactivate user1
+        self.user1.is_active = False
+        self.user1.save()
+
+        response = self.client.get('/statistics/capacities-by-territory/')
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+
+        # Territory1 should not appear since only user was inactive
+        self.assertNotIn(str(self.territory1.id), response.data)
+
+    def test_capacities_by_territory_multiple_skills_per_user(self):
+        """Test when a user has multiple skills"""
+        self.user1.profile.territory.set([self.territory1])
+        self.user1.profile.skills_known.add(self.skill1, self.skill2)
+        self.user1.profile.skills_available.add(self.skill1)
+        self.user1.profile.skills_wanted.add(self.skill2)
+
+        response = self.client.get('/statistics/capacities-by-territory/')
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+
+        territory_data = response.data[str(self.territory1.id)]
+
+        # skill1 should be available
+        self.assertEqual(territory_data[str(self.skill1.id)]['available'], 1)
+        self.assertEqual(territory_data[str(self.skill1.id)]['wanted'], 0)
+
+        # skill2 should be wanted
+        self.assertEqual(territory_data[str(self.skill2.id)]['available'], 0)
+        self.assertEqual(territory_data[str(self.skill2.id)]['wanted'], 1)

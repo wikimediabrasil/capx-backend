@@ -24,7 +24,8 @@ from skills.views import SkillViewSet, SkillByTypeViewSet, HashtagViewSet
 from users.views import (
     ProfileViewSet, UsersViewSet, QuickListViewSet, AvatarViewSet, SavedItemViewSet,
     UsersBySkillViewSet, UsersByTagViewSet, TerritoryViewSet, WikimediaProjectViewSet,
-    BadgeViewSet, UserBadgeViewSet, StatisticsView, RecommendationView, LetsConnectViewSet,
+    BadgeViewSet, UserBadgeViewSet, StatisticsView, LanguagesByTerritoryView,
+    CapacitiesByTerritoryView, RecommendationView, LetsConnectViewSet,
     UserAuthView, AuthView, CheckView
 )
 from bugs.views import BugViewSet, AttachmentViewSet
@@ -91,6 +92,8 @@ urlpatterns = [
     re_path(r'^api/login/social/knox/(?:(?P<provider>[a-zA-Z0-9_-]+)/?)?$', AuthView.as_view(), name='login_social_knox'),
     path('api/login/social/check/', CheckView.as_view(), name='login_social_check'),
     path('statistics/', StatisticsView.as_view(), name='statistics'),
+    path('statistics/languages-by-territory/', LanguagesByTerritoryView.as_view(), name='languages-by-territory'),
+    path('statistics/capacities-by-territory/', CapacitiesByTerritoryView.as_view(), name='capacities-by-territory'),
     path('recommendation/', RecommendationView.as_view(), name='recommendation'),
     path('', include(router.urls)),
 ]
