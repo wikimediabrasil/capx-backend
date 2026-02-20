@@ -3,18 +3,31 @@ from django.contrib.auth.decorators import login_required as django_login_requir
 from django.shortcuts import render, redirect
 from django.contrib.auth import logout
 from django.contrib import messages
-from django.http import HttpResponseForbidden
+from django.http import HttpResponseForbidden, HttpResponse
 from orgs.models import Organization, Management
 from events.models import Events
 from django.urls import reverse
 from django.conf import settings
-from .models import Partner, PartnerMembership
+from django.core.mail import send_mail
+from .models import (
+    Partner,
+    PartnerMembership,
+    PartnerMentorshipAvailability,
+    PartnerMentorshipPublicKey,
+    PartnerMentorshipFormMentor,
+    PartnerMentorshipFormMentee,
+    PartnerMentorshipFormMentorResponse,
+    PartnerMentorshipFormMenteeResponse,
+)
 from social_django.utils import load_strategy, load_backend
 from users.models import AuthExtraInfo
 from CapX.useragent import get_user_agent
 from django.views.decorators.http import require_GET, require_POST
 from users.models import CustomUser, Profile, UserBadge, Badge
 from knox.models import AuthToken
+from cryptography.hazmat.primitives.asymmetric import rsa
+from cryptography.hazmat.primitives import serialization
+import json
 import requests
 
 DASHBOARD_URL_NAME = 'portal:dashboard'
@@ -240,6 +253,88 @@ def dashboard(request):
         for bid, uname in qs:
             awarded_map.setdefault(bid, []).append(uname)
 
+    mentorship_enabled_partners = (
+        partners_for_ui
+        .filter(mentorship_availabilities__status=True)
+        .distinct()
+        .order_by('name')
+    )
+    mentorship_forms_mentor = (
+        PartnerMentorshipFormMentor.objects
+        .select_related('partner')
+        .filter(partner__in=mentorship_enabled_partners)
+        .order_by('partner__name', '-created_at')
+    )
+    mentorship_forms_mentee = (
+        PartnerMentorshipFormMentee.objects
+        .select_related('partner')
+        .filter(partner__in=mentorship_enabled_partners)
+        .order_by('partner__name', '-created_at')
+    )
+    mentorship_public_keys = (
+        PartnerMentorshipPublicKey.objects
+        .select_related('partner')
+        .filter(partner__in=mentorship_enabled_partners)
+        .order_by('partner__name', '-created_at')
+    )
+
+    mentorship_mentor_responses = (
+        PartnerMentorshipFormMentorResponse.objects
+        .select_related('partner', 'form', 'user')
+        .filter(partner__in=mentorship_enabled_partners)
+        .order_by('partner__name', '-created_at')
+    )
+    mentorship_mentee_responses = (
+        PartnerMentorshipFormMenteeResponse.objects
+        .select_related('partner', 'form', 'user')
+        .filter(partner__in=mentorship_enabled_partners)
+        .order_by('partner__name', '-created_at')
+    )
+
+    mentor_forms_payload = [
+        {
+            'id': form.id,
+            'partner_id': form.partner_id,
+            'partner_name': form.partner.name,
+            'created_at': form.created_at.isoformat(),
+            'json': form.json,
+        }
+        for form in mentorship_forms_mentor
+    ]
+    mentee_forms_payload = [
+        {
+            'id': form.id,
+            'partner_id': form.partner_id,
+            'partner_name': form.partner.name,
+            'created_at': form.created_at.isoformat(),
+            'json': form.json,
+        }
+        for form in mentorship_forms_mentee
+    ]
+
+    mentor_responses_payload = [
+        {
+            'id': response.id,
+            'partner_id': response.partner_id,
+            'form_id': response.form_id,
+            'username': response.user.username,
+            'created_at': response.created_at.isoformat(),
+            'data': response.data,
+        }
+        for response in mentorship_mentor_responses
+    ]
+    mentee_responses_payload = [
+        {
+            'id': response.id,
+            'partner_id': response.partner_id,
+            'form_id': response.form_id,
+            'username': response.user.username,
+            'created_at': response.created_at.isoformat(),
+            'data': response.data,
+        }
+        for response in mentorship_mentee_responses
+    ]
+
     context = {
         'user': request.user,
         'organizations': orgs,
@@ -250,6 +345,14 @@ def dashboard(request):
         'partners_for_ui': partners_for_ui,
         'partner_members': partner_members,
         'partner_badges_awarded': awarded_map,
+        'mentorship_enabled_partners': mentorship_enabled_partners,
+        'mentorship_forms_mentor': mentorship_forms_mentor,
+        'mentorship_forms_mentee': mentorship_forms_mentee,
+        'mentorship_public_keys': mentorship_public_keys,
+        'mentorship_mentor_responses_data': mentor_responses_payload,
+        'mentorship_mentee_responses_data': mentee_responses_payload,
+        'mentorship_forms_mentor_data': mentor_forms_payload,
+        'mentorship_forms_mentee_data': mentee_forms_payload,
     }
     return render(request, 'portal/dashboard.html', context)
 
@@ -303,6 +406,147 @@ def _require_partner_scope(request, partner: Partner):
     if PartnerMembership.objects.filter(user=request.user, partner=partner).exists():
         return None
     return HttpResponseForbidden("You don't have permission for this partner.")
+
+
+@require_POST
+@require_portal_access
+def mentorship_form_create(request):
+    partner_id = request.POST.get('partner_id', '').strip()
+    form_type = request.POST.get('form_type', '').strip().lower()
+    form_json_raw = request.POST.get('form_json', '').strip()
+
+    if not partner_id or not form_type or not form_json_raw:
+        messages.error(request, 'Partner, form type, and JSON are required.')
+        return redirect(DASHBOARD_URL_NAME)
+
+    try:
+        partner = Partner.objects.get(id=partner_id)
+    except Partner.DoesNotExist:
+        messages.error(request, 'Partner not found.')
+        return redirect(DASHBOARD_URL_NAME)
+
+    scope_check = _require_partner_scope(request, partner)
+    if scope_check:
+        return scope_check
+
+    if not PartnerMentorshipAvailability.objects.filter(partner=partner, status=True).exists():
+        messages.error(request, 'Mentorship is not enabled for this partner.')
+        return redirect(DASHBOARD_URL_NAME)
+
+    try:
+        parsed_json = json.loads(form_json_raw)
+    except json.JSONDecodeError:
+        messages.error(request, 'Invalid JSON for the mentorship form.')
+        return redirect(DASHBOARD_URL_NAME)
+
+    if form_type == 'mentor':
+        PartnerMentorshipFormMentor.objects.create(partner=partner, json=parsed_json)
+    elif form_type == 'mentee':
+        PartnerMentorshipFormMentee.objects.create(partner=partner, json=parsed_json)
+    else:
+        messages.error(request, 'Invalid form type.')
+        return redirect(DASHBOARD_URL_NAME)
+
+    messages.success(request, f'Mentorship {form_type} form saved for {partner.name}.')
+    return redirect(DASHBOARD_URL_NAME)
+
+
+@require_POST
+@require_portal_access
+def mentorship_public_key_add(request):
+    partner_id = request.POST.get('partner_id', '').strip()
+    public_key_text = request.POST.get('public_key', '').strip()
+
+    if not partner_id or not public_key_text:
+        messages.error(request, 'Partner and public key are required.')
+        return redirect(DASHBOARD_URL_NAME)
+
+    try:
+        partner = Partner.objects.get(id=partner_id)
+    except Partner.DoesNotExist:
+        messages.error(request, 'Partner not found.')
+        return redirect(DASHBOARD_URL_NAME)
+
+    scope_check = _require_partner_scope(request, partner)
+    if scope_check:
+        return scope_check
+
+    try:
+        key_obj = serialization.load_pem_public_key(public_key_text.encode('utf-8'))
+    except Exception:
+        messages.error(request, 'Invalid public key. Use a PEM formatted key.')
+        return redirect(DASHBOARD_URL_NAME)
+
+    if not hasattr(key_obj, 'encrypt'):
+        messages.error(request, 'Only RSA public keys are supported.')
+        return redirect(DASHBOARD_URL_NAME)
+
+    PartnerMentorshipPublicKey.objects.create(partner=partner, public_key=public_key_text)
+    messages.success(request, f'Public key saved for {partner.name}.')
+    return redirect(DASHBOARD_URL_NAME)
+
+
+@require_POST
+@require_portal_access
+def mentorship_public_key_generate(request):
+    partner_id = request.POST.get('partner_id', '').strip()
+    delivery = request.POST.get('delivery', 'download').strip().lower()
+    email_to = request.POST.get('email_to', '').strip()
+
+    if not partner_id:
+        messages.error(request, 'Partner is required.')
+        return redirect(DASHBOARD_URL_NAME)
+
+    try:
+        partner = Partner.objects.get(id=partner_id)
+    except Partner.DoesNotExist:
+        messages.error(request, 'Partner not found.')
+        return redirect(DASHBOARD_URL_NAME)
+
+    scope_check = _require_partner_scope(request, partner)
+    if scope_check:
+        return scope_check
+
+    private_key = rsa.generate_private_key(public_exponent=65537, key_size=2048)
+    public_pem = private_key.public_key().public_bytes(
+        encoding=serialization.Encoding.PEM,
+        format=serialization.PublicFormat.SubjectPublicKeyInfo,
+    ).decode('utf-8')
+    private_pem = private_key.private_bytes(
+        encoding=serialization.Encoding.PEM,
+        format=serialization.PrivateFormat.PKCS8,
+        encryption_algorithm=serialization.NoEncryption(),
+    ).decode('utf-8')
+
+    key_record = PartnerMentorshipPublicKey.objects.create(partner=partner, public_key=public_pem)
+
+    if delivery == 'email':
+        target_email = email_to or getattr(request.user, 'email', '')
+        if not target_email:
+            messages.error(request, 'Provide an email address to send the private key.')
+            return redirect(DASHBOARD_URL_NAME)
+        try:
+            send_mail(
+                subject=f'Private mentorship key for {partner.name}',
+                message=(
+                    f'Partner: {partner.name}\n'
+                    f'Public key ID: {key_record.id}\n\n'
+                    'Store this private key securely:\n\n'
+                    f'{private_pem}'
+                ),
+                from_email=getattr(settings, 'DEFAULT_FROM_EMAIL', None),
+                recipient_list=[target_email],
+                fail_silently=False,
+            )
+            messages.success(request, f'Private key sent to {target_email}.')
+        except Exception:
+            messages.error(request, 'Unable to send email. The public key was saved, but private key delivery failed.')
+        return redirect(DASHBOARD_URL_NAME)
+
+    filename = f'mentorship-private-key-partner-{partner.id}-{key_record.id}.pem'
+    response = HttpResponse(private_pem, content_type='application/x-pem-file')
+    response['Content-Disposition'] = f'attachment; filename="{filename}"'
+    return response
 
 @require_POST
 def partner_create(request):

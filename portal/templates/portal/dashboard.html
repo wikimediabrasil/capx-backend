@@ -151,7 +151,17 @@
     input[type="text"], input[type="search"], input:not([type]) {
       padding: 10px 12px; border: 1px solid var(--border); border-radius: 10px; background: #fff; outline: none;
     }
+    textarea {
+      padding: 10px 12px;
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      background: #fff;
+      outline: none;
+      min-height: 110px;
+      font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
+    }
     input[type="text"]:focus, input:not([type]):focus { border-color: var(--primary); box-shadow: 0 0 0 3px rgba(37,99,235,0.15); }
+    textarea:focus { border-color: var(--primary); box-shadow: 0 0 0 3px rgba(37,99,235,0.15); }
     form button, li button, td button { padding: 10px 12px; border: 1px solid var(--border); border-radius: 10px; cursor: pointer; }
     
     /* Card accents + header for hierarchy/contrast */
@@ -173,6 +183,7 @@
     .card[data-accent="badges"]{ --accent-color: #8b5cf6; }
     .card[data-accent="admin"]{ --accent-color: var(--warn); }
     .card[data-accent="access"]{ --accent-color: #0ea5e9; }
+    .card[data-accent="mentorship"]{ --accent-color: #14b8a6; }
 
     /* Tabs for progressive disclosure */
     .tabs { display:flex; gap:8px; align-items:center; margin-bottom: 8px; flex-wrap: wrap; }
@@ -217,6 +228,7 @@
     <nav class="subnav" aria-label="Section navigation">
       <a href="#users" data-section-link>Users</a>
       <a href="#membership" data-section-link>Membership</a>
+      {% if mentorship_enabled_partners %}<a href="#mentorship" data-section-link>Mentorship</a>{% endif %}
       <a href="#badges" data-section-link>Badges</a>
       {% if user.is_staff %}<a href="#admin" data-section-link>Admin</a>{% endif %}
     </nav>
@@ -429,6 +441,153 @@
             {% endfor %}
           </tbody>
         </table>
+      </section>
+    {% endif %}
+
+    {% if mentorship_enabled_partners %}
+      <section class="card" data-accent="mentorship">
+        <a id="mentorship"></a>
+        <div class="card-head"><span class="icon-badge" aria-hidden="true">🧭</span><div><h2 style="margin:0">Mentorship</h2><p class="section-desc" style="margin:2px 0 0">Create mentorship forms, manage public keys, and export decrypted CSV responses client-side.</p></div></div>
+        <div class="tabs" role="tablist" aria-label="Mentorship tabs">
+          <button type="button" role="tab" aria-selected="true" aria-controls="panel-mentorship-forms" id="tab-mentorship-forms">Forms</button>
+          <button type="button" role="tab" aria-selected="false" aria-controls="panel-mentorship-keys" id="tab-mentorship-keys">Public keys</button>
+          <button type="button" role="tab" aria-selected="false" aria-controls="panel-mentorship-csv" id="tab-mentorship-csv">Responses CSV</button>
+        </div>
+
+        <div id="panel-mentorship-forms" role="tabpanel" aria-labelledby="tab-mentorship-forms">
+          <h3 style="margin-top:0">Create form JSON</h3>
+          <form method="post" action="/portal/partner/mentorship/form/create/" aria-label="Create mentorship form" style="grid-template-columns: 1fr; max-width: 100%;">
+            {% csrf_token %}
+            <label for="mentorship-form-partner">Partner</label>
+            <select id="mentorship-form-partner" name="partner_id" required style="padding:10px; border:1px solid var(--border); border-radius:10px;">
+              {% for p in mentorship_enabled_partners %}
+                <option value="{{ p.id }}">{{ p.name }}</option>
+              {% endfor %}
+            </select>
+            <label for="mentorship-form-type">Form type</label>
+            <select id="mentorship-form-type" name="form_type" required style="padding:10px; border:1px solid var(--border); border-radius:10px;">
+              <option value="mentor">Mentor</option>
+              <option value="mentee">Mentee</option>
+            </select>
+            <label for="mentorship-form-json">Form JSON schema</label>
+            <textarea id="mentorship-form-json" name="form_json" placeholder='{"title":"Mentor Form","fields":[{"name":"experience","type":"text"}]}' required></textarea>
+            <button type="submit" class="btn-primary" style="width:max-content;">Save form</button>
+          </form>
+
+          <div class="grid" style="grid-template-columns: 1fr 1fr; margin-top:12px;">
+            <div>
+              <h3 style="margin-top:0">Mentor forms</h3>
+              <table>
+                <thead><tr><th>Partner</th><th>Created at</th></tr></thead>
+                <tbody>
+                  {% for form in mentorship_forms_mentor %}
+                    <tr><td>{{ form.partner.name }}</td><td>{{ form.created_at|date:"Y-m-d H:i:s" }}</td></tr>
+                  {% empty %}
+                    <tr><td colspan="2" class="muted">No mentor forms yet.</td></tr>
+                  {% endfor %}
+                </tbody>
+              </table>
+            </div>
+            <div>
+              <h3 style="margin-top:0">Mentee forms</h3>
+              <table>
+                <thead><tr><th>Partner</th><th>Created at</th></tr></thead>
+                <tbody>
+                  {% for form in mentorship_forms_mentee %}
+                    <tr><td>{{ form.partner.name }}</td><td>{{ form.created_at|date:"Y-m-d H:i:s" }}</td></tr>
+                  {% empty %}
+                    <tr><td colspan="2" class="muted">No mentee forms yet.</td></tr>
+                  {% endfor %}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+
+        <div id="panel-mentorship-keys" role="tabpanel" aria-labelledby="tab-mentorship-keys" hidden>
+          <div class="grid" style="grid-template-columns: 1fr 1fr; align-items:start;">
+            <div>
+              <h3 style="margin-top:0">Insert existing public key</h3>
+              <form method="post" action="/portal/partner/mentorship/public-key/add/" aria-label="Insert mentorship public key" style="grid-template-columns:1fr; max-width:100%;">
+                {% csrf_token %}
+                <label for="mentorship-key-partner">Partner</label>
+                <select id="mentorship-key-partner" name="partner_id" required style="padding:10px; border:1px solid var(--border); border-radius:10px;">
+                  {% for p in mentorship_enabled_partners %}
+                    <option value="{{ p.id }}">{{ p.name }}</option>
+                  {% endfor %}
+                </select>
+                <label for="mentorship-public-key">Public key (PEM)</label>
+                <textarea id="mentorship-public-key" name="public_key" placeholder="-----BEGIN PUBLIC KEY-----" required></textarea>
+                <button type="submit" class="btn-primary" style="width:max-content;">Save public key</button>
+              </form>
+            </div>
+            <div>
+              <h3 style="margin-top:0">Generate new key pair</h3>
+              <form method="post" action="/portal/partner/mentorship/public-key/generate/" aria-label="Generate mentorship key pair" style="grid-template-columns:1fr; max-width:100%;">
+                {% csrf_token %}
+                <label for="mentorship-generate-partner">Partner</label>
+                <select id="mentorship-generate-partner" name="partner_id" required style="padding:10px; border:1px solid var(--border); border-radius:10px;">
+                  {% for p in mentorship_enabled_partners %}
+                    <option value="{{ p.id }}">{{ p.name }}</option>
+                  {% endfor %}
+                </select>
+                <label for="mentorship-key-delivery">Private key delivery</label>
+                <select id="mentorship-key-delivery" name="delivery" required style="padding:10px; border:1px solid var(--border); border-radius:10px;">
+                  <option value="download">Download</option>
+                  <option value="email">Send by email</option>
+                </select>
+                <label for="mentorship-key-email">Email (required when delivery is email)</label>
+                <input id="mentorship-key-email" name="email_to" type="text" placeholder="name@example.org" />
+                <button type="submit" class="btn-primary" style="width:max-content;">Generate and save key</button>
+              </form>
+            </div>
+          </div>
+
+          <h3>Saved public keys</h3>
+          <table>
+            <thead><tr><th>ID</th><th>Partner</th><th>Created at</th></tr></thead>
+            <tbody>
+              {% for k in mentorship_public_keys %}
+                <tr><td>{{ k.id }}</td><td>{{ k.partner.name }}</td><td>{{ k.created_at|date:"Y-m-d H:i:s" }}</td></tr>
+              {% empty %}
+                <tr><td colspan="3" class="muted">No public keys registered.</td></tr>
+              {% endfor %}
+            </tbody>
+          </table>
+        </div>
+
+        <div id="panel-mentorship-csv" role="tabpanel" aria-labelledby="tab-mentorship-csv" hidden>
+          <div class="grid" style="grid-template-columns: 1fr; gap:10px;">
+            <label for="mentorship-csv-partner">Partner</label>
+            <select id="mentorship-csv-partner" style="padding:10px; border:1px solid var(--border); border-radius:10px; max-width:520px;">
+              {% for p in mentorship_enabled_partners %}
+                <option value="{{ p.id }}">{{ p.name }}</option>
+              {% endfor %}
+            </select>
+
+            <label for="mentorship-csv-type">Response type</label>
+            <select id="mentorship-csv-type" style="padding:10px; border:1px solid var(--border); border-radius:10px; max-width:520px;">
+              <option value="mentor">Mentor</option>
+              <option value="mentee">Mentee</option>
+            </select>
+
+            <label for="mentorship-csv-form">Form</label>
+            <select id="mentorship-csv-form" style="padding:10px; border:1px solid var(--border); border-radius:10px; max-width:520px;"></select>
+
+            <label for="mentorship-csv-private-key">Private key (PEM)</label>
+            <textarea id="mentorship-csv-private-key" placeholder="-----BEGIN PRIVATE KEY-----" style="max-width:100%;"></textarea>
+
+            <div>
+              <button type="button" id="mentorship-csv-download-btn" class="btn-primary">Decrypt and download CSV</button>
+            </div>
+            <div id="mentorship-csv-status" class="muted"></div>
+          </div>
+        </div>
+
+        {{ mentorship_forms_mentor_data|json_script:"mentorship-forms-mentor-data" }}
+        {{ mentorship_forms_mentee_data|json_script:"mentorship-forms-mentee-data" }}
+        {{ mentorship_mentor_responses_data|json_script:"mentorship-responses-mentor-data" }}
+        {{ mentorship_mentee_responses_data|json_script:"mentorship-responses-mentee-data" }}
       </section>
     {% endif %}
 
@@ -1000,6 +1159,178 @@
         }
         var lists = document.querySelectorAll('[role="tablist"]');
         for (var list of lists) initTablist(list);
+      })();
+
+      // Mentorship client-side decrypt + CSV export
+      (function(){
+        var partnerSelect = document.getElementById('mentorship-csv-partner');
+        var typeSelect = document.getElementById('mentorship-csv-type');
+        var formSelect = document.getElementById('mentorship-csv-form');
+        var privateKeyInput = document.getElementById('mentorship-csv-private-key');
+        var downloadBtn = document.getElementById('mentorship-csv-download-btn');
+        var statusEl = document.getElementById('mentorship-csv-status');
+        if (!partnerSelect || !typeSelect || !formSelect || !privateKeyInput || !downloadBtn || !statusEl) return;
+
+        function parseJsonScript(id){
+          var el = document.getElementById(id);
+          if (!el) return [];
+          try { return JSON.parse(el.textContent || '[]'); } catch(e){ return []; }
+        }
+        var mentorForms = parseJsonScript('mentorship-forms-mentor-data');
+        var menteeForms = parseJsonScript('mentorship-forms-mentee-data');
+        var mentorResponses = parseJsonScript('mentorship-responses-mentor-data');
+        var menteeResponses = parseJsonScript('mentorship-responses-mentee-data');
+
+        function currentForms(){
+          return typeSelect.value === 'mentor' ? mentorForms : menteeForms;
+        }
+
+        function currentResponses(){
+          return typeSelect.value === 'mentor' ? mentorResponses : menteeResponses;
+        }
+
+        function repopulateForms(){
+          var pid = String(partnerSelect.value || '');
+          var forms = currentForms().filter(function(f){ return String(f.partner_id) === pid; });
+          formSelect.innerHTML = '';
+          forms.forEach(function(f){
+            var opt = document.createElement('option');
+            opt.value = String(f.id);
+            opt.textContent = 'ID ' + f.id + ' · ' + (f.created_at || '');
+            formSelect.appendChild(opt);
+          });
+          if (!forms.length){
+            var emptyOpt = document.createElement('option');
+            emptyOpt.value = '';
+            emptyOpt.textContent = 'No forms for this partner/type';
+            formSelect.appendChild(emptyOpt);
+          }
+        }
+
+        function b64ToBytes(base64){
+          var binary = atob(base64);
+          var len = binary.length;
+          var bytes = new Uint8Array(len);
+          for (var i = 0; i < len; i++) bytes[i] = binary.charCodeAt(i);
+          return bytes;
+        }
+
+        function pemToArrayBuffer(pem){
+          var clean = (pem || '')
+            .replace('-----BEGIN PRIVATE KEY-----', '')
+            .replace('-----END PRIVATE KEY-----', '')
+            .replace(/\s+/g, '');
+          return b64ToBytes(clean).buffer;
+        }
+
+        async function importPrivateKey(pem){
+          return await window.crypto.subtle.importKey(
+            'pkcs8',
+            pemToArrayBuffer(pem),
+            { name: 'RSA-OAEP', hash: 'SHA-256' },
+            false,
+            ['decrypt']
+          );
+        }
+
+        async function decryptPayload(recordData, privateKey){
+          var payload = (typeof recordData === 'string') ? JSON.parse(recordData) : recordData;
+          if (!payload || payload.__encrypted__ !== true) return recordData;
+
+          var encryptedKey = b64ToBytes(payload.key);
+          var nonce = b64ToBytes(payload.nonce);
+          var ciphertext = b64ToBytes(payload.ciphertext);
+
+          var aesRawKey = await window.crypto.subtle.decrypt(
+            { name: 'RSA-OAEP' },
+            privateKey,
+            encryptedKey
+          );
+          var aesKey = await window.crypto.subtle.importKey(
+            'raw',
+            aesRawKey,
+            { name: 'AES-GCM' },
+            false,
+            ['decrypt']
+          );
+          var plainBuffer = await window.crypto.subtle.decrypt(
+            { name: 'AES-GCM', iv: nonce },
+            aesKey,
+            ciphertext
+          );
+          return new TextDecoder().decode(plainBuffer);
+        }
+
+        function escapeCSV(value){
+          var s = String(value == null ? '' : value).replace(/"/g, '""');
+          return '"' + s + '"';
+        }
+
+        function downloadCSV(lines, fileName){
+          var csv = lines.join('\r\n');
+          var blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+          var url = URL.createObjectURL(blob);
+          var a = document.createElement('a');
+          a.href = url;
+          a.download = fileName;
+          document.body.appendChild(a);
+          a.click();
+          setTimeout(function(){ URL.revokeObjectURL(url); a.remove(); }, 0);
+        }
+
+        async function handleDownload(){
+          if (!window.crypto || !window.crypto.subtle) {
+            statusEl.textContent = 'WebCrypto is not available in this browser.';
+            return;
+          }
+          var formId = String(formSelect.value || '');
+          if (!formId) {
+            statusEl.textContent = 'Select a form first.';
+            return;
+          }
+          var privatePem = privateKeyInput.value.trim();
+          if (!privatePem) {
+            statusEl.textContent = 'Paste a private key in PEM format.';
+            return;
+          }
+
+          statusEl.textContent = 'Decrypting responses...';
+
+          try {
+            var privateKey = await importPrivateKey(privatePem);
+            var rows = currentResponses().filter(function(r){ return String(r.form_id) === formId; });
+            var lines = [
+              ['username', 'created_at', 'response_data'].map(escapeCSV).join(',')
+            ];
+
+            for (var i = 0; i < rows.length; i++) {
+              var row = rows[i];
+              var decrypted = await decryptPayload(row.data, privateKey);
+              var decryptedValue = decrypted;
+              if (typeof decrypted === 'string') {
+                try { decryptedValue = JSON.stringify(JSON.parse(decrypted)); } catch(e) { decryptedValue = decrypted; }
+              } else {
+                decryptedValue = JSON.stringify(decrypted);
+              }
+              lines.push([
+                escapeCSV(row.username),
+                escapeCSV(row.created_at),
+                escapeCSV(decryptedValue),
+              ].join(','));
+            }
+
+            var fileName = 'mentorship-' + typeSelect.value + '-form-' + formId + '.csv';
+            downloadCSV(lines, fileName);
+            statusEl.textContent = rows.length + ' response(s) decrypted and exported.';
+          } catch (e) {
+            statusEl.textContent = 'Unable to decrypt responses with this private key.';
+          }
+        }
+
+        partnerSelect.addEventListener('change', repopulateForms);
+        typeSelect.addEventListener('change', repopulateForms);
+        downloadBtn.addEventListener('click', function(){ handleDownload(); });
+        repopulateForms();
       })();
 
       // Badges manage/assignments JS
