@@ -32,6 +32,13 @@ from orgs.views import OrganizationViewSet, OrganizationTypeViewSet, TagDiffView
 from events.views import EventViewSet
 from message.views import MessageViewSet
 from projects.views import ProjectViewSet, ProjectMemberViewSet, ProjectMemberAcceptanceViewSet
+from portal.views_api import (
+    PartnerMentorshipAvailabilityViewSet,
+    PartnerMentorshipFormMentorViewSet,
+    PartnerMentorshipFormMentorResponseViewSet,
+    PartnerMentorshipFormMenteeViewSet,
+    PartnerMentorshipFormMenteeResponseViewSet,
+)
 from drf_spectacular.views import SpectacularAPIView, SpectacularSwaggerView
 from translate.views_api import CapacityTranslationViewSet, CapacityTranslationOauthViewSet
 
@@ -65,6 +72,11 @@ router.register('badges', BadgeViewSet, basename='badges')
 router.register('user_badge', UserBadgeViewSet, basename='user_badge')
 router.register('translating', CapacityTranslationViewSet, basename='translating')
 router.register('translating_oauth', CapacityTranslationOauthViewSet, basename='translating_oauth')
+router.register('mentorship_availability', PartnerMentorshipAvailabilityViewSet, basename='partner_mentorship_availability')
+router.register('mentorship_form_mentor', PartnerMentorshipFormMentorViewSet, basename='partner_mentorship_form_mentor')
+router.register('mentorship_form_mentee', PartnerMentorshipFormMenteeViewSet, basename='partner_mentorship_form_mentee')
+router.register('mentorship_form_mentor_response', PartnerMentorshipFormMentorResponseViewSet, basename='partner_mentorship_form_mentor_response')
+router.register('mentorship_form_mentee_response', PartnerMentorshipFormMenteeResponseViewSet, basename='partner_mentorship_form_mentee_response')
 
 urlpatterns = [
     path('admin/', admin.site.urls),
