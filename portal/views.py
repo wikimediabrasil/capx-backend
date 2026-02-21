@@ -541,7 +541,7 @@ def mentorship_public_key_generate(request):
                     'Store this private key securely:\n\n'
                     f'{private_pem}'
                 ),
-                from_email=getattr(settings, 'DEFAULT_FROM_EMAIL', None),
+                from_email=getattr(settings, 'SERVER_EMAIL', None), 
                 recipient_list=[target_email],
                 fail_silently=False,
             )
