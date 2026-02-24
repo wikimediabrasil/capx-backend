@@ -185,14 +185,16 @@ class LanguagesByTerritoryView(APIView):
                 }
             },
         }},
-        examples=OpenApiExample(
-            'Example Response',
-            value={
-                "1": {"1": 10, "2": 5},
-                "2": {"1": 4, "3": 6},
-            },
-            description='In this example, territory 1 has 10 users who speak language 1 and 5 users who speak language 2. Territory 2 has 4 users who speak language 1 and 6 users who speak language 3.',
-        ),
+        examples=[
+            OpenApiExample(
+                'Example Response',
+                value={
+                    "1": {"1": 10, "2": 5},
+                    "2": {"1": 4, "3": 6},
+                },
+                description='In this example, territory 1 has 10 users who speak language 1 and 5 users who speak language 2. Territory 2 has 4 users who speak language 1 and 6 users who speak language 3.',
+            ),
+        ],
     )
     def get(self, request, *args, **kwargs):
         # Get counts of users who speak each language, grouped by territory, excluding proficiency=0
@@ -247,20 +249,22 @@ class CapacitiesByTerritoryView(APIView):
                 }
             },
         }},
-        examples=OpenApiExample(
-            'Example Response',
-            value={
-                "1": {
-                    "1": {"available": 10, "wanted": 5},
-                    "2": {"available": 4, "wanted": 6},
+        examples=[
+            OpenApiExample(
+                'Example Response',
+                value={
+                    "1": {
+                        "1": {"available": 10, "wanted": 5},
+                        "2": {"available": 4, "wanted": 6},
+                    },
+                    "2": {
+                        "1": {"available": 7, "wanted": 3},
+                        "3": {"available": 2, "wanted": 8},
+                    },
                 },
-                "2": {
-                    "1": {"available": 7, "wanted": 3},
-                    "3": {"available": 2, "wanted": 8},
-                },
-            },
-            description='In this example, territory 1 has 10 users with skill 1 available and 5 users who want skill 1. It also has 4 users with skill 2 available and 6 users who want skill 2. Territory 2 has 7 users with skill 1 available and 3 users who want skill 1, as well as 2 users with skill 3 available and 8 users who want skill 3.',
-        ),
+                description='In this example, territory 1 has 10 users with skill 1 available and 5 users who want skill 1. It also has 4 users with skill 2 available and 6 users who want skill 2. Territory 2 has 7 users with skill 1 available and 3 users who want skill 1, as well as 2 users with skill 3 available and 8 users who want skill 3.',
+            ),
+        ],
     )
     def get(self, request, *args, **kwargs):
         # Get counts of users with skills available and wanted, grouped by territory and skill
