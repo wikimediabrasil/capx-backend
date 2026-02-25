@@ -497,7 +497,7 @@ def mentorship_public_key_add(request):
 @require_portal_access
 def mentorship_public_key_generate(request):
     partner_id = request.POST.get('partner_id', '').strip()
-    delivery = request.POST.get('delivery', 'download').strip().lower()
+    delivery = request.POST.get('delivery', '').strip().lower()
     email_to = request.POST.get('email_to', '').strip()
 
     if not partner_id:
@@ -514,6 +514,15 @@ def mentorship_public_key_generate(request):
     if scope_check:
         return scope_check
 
+    if delivery not in {'download', 'email', 'download_email'}:
+        messages.error(request, 'Invalid delivery option.')
+        return redirect(DASHBOARD_URL_NAME)
+
+    requires_email = delivery in {'email', 'download_email'}
+    if requires_email and not email_to:
+        messages.error(request, 'Provide an email address to send the private key.')
+        return redirect(DASHBOARD_URL_NAME)
+
     private_key = rsa.generate_private_key(public_exponent=65537, key_size=2048)
     public_pem = private_key.public_key().public_bytes(
         encoding=serialization.Encoding.PEM,
@@ -527,11 +536,7 @@ def mentorship_public_key_generate(request):
 
     key_record = PartnerMentorshipPublicKey.objects.create(partner=partner, public_key=public_pem)
 
-    if delivery == 'email':
-        target_email = email_to or getattr(request.user, 'email', '')
-        if not target_email:
-            messages.error(request, 'Provide an email address to send the private key.')
-            return redirect(DASHBOARD_URL_NAME)
+    if requires_email:
         try:
             send_mail(
                 subject=f'Private mentorship key for {partner.name}',
@@ -542,15 +547,21 @@ def mentorship_public_key_generate(request):
                     f'{private_pem}'
                 ),
                 from_email=getattr(settings, 'SERVER_EMAIL', None), 
-                recipient_list=[target_email],
+                recipient_list=[email_to],
                 fail_silently=False,
             )
-            messages.success(request, f'Private key sent to {target_email}.')
         except Exception:
-            messages.error(request, 'Unable to send email. The public key was saved, but private key delivery failed.')
-        return redirect(DASHBOARD_URL_NAME)
+            key_record.delete()
+            messages.error(request, 'Unable to send email. Key generation was reverted to avoid orphan public keys.')
+            return redirect(DASHBOARD_URL_NAME)
 
-    filename = f'mentorship-private-key-partner-{partner.id}-{key_record.id}.pem'
+        if delivery == 'email':
+            messages.success(request, f'Private key sent to {email_to}.')
+            return redirect(DASHBOARD_URL_NAME)
+
+        messages.success(request, f'Private key sent to {email_to}. Download will start now.')
+
+    filename = f'mentorship-private-key-{key_record.id}.pem'
     response = HttpResponse(private_pem, content_type='application/x-pem-file')
     response['Content-Disposition'] = f'attachment; filename="{filename}"'
     return response
