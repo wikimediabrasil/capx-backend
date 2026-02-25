@@ -514,9 +514,27 @@
         </div>
 
         <div id="panel-mentorship-keys" role="tabpanel" aria-labelledby="tab-mentorship-keys" hidden>
+          <div class="muted" style="margin-bottom:10px; padding:10px 12px; border:1px solid var(--border); border-radius:10px; background:#f8fafc; color:#334155;">
+            <strong>How this works:</strong>
+            A public/private key pair is required to unlock mentorship questionnaire results.
+            This requirement is mandatory and supports the project’s privacy-by-design commitment:
+            while response records are technically stored by the platform, they are stored only in encrypted form,
+            and private keys are not retained by the portal.
+            As a result, platform operators are not in a position to directly access participants’ non-public answers.
+          </div>
+          <div class="danger-hint" role="note" style="margin-bottom:12px;">
+            <strong>Important before creating keys:</strong>
+            If the private key is lost, encrypted mentorship responses cannot be recovered.
+            Keep the private key in a safe place, with backup access restricted to trusted people.
+          </div>
+          <p class="muted" style="margin-top:0; margin-bottom:12px;">
+            If you are new to this process, prefer <strong>Generate new key pair</strong>.
+            Use <strong>Insert existing public key</strong> only when you already have an external key-management process.
+          </p>
           <div class="grid" style="grid-template-columns: 1fr 1fr; align-items:start;">
             <div>
               <h3 style="margin-top:0">Insert existing public key</h3>
+              <p class="muted" style="margin-top:0;">Recommended only for advanced users who already manage keys outside this portal.</p>
               <form method="post" action="/portal/partner/mentorship/public-key/add/" aria-label="Insert mentorship public key" style="grid-template-columns:1fr; max-width:100%;">
                 {% csrf_token %}
                 <label for="mentorship-key-partner">Partner</label>
@@ -532,6 +550,7 @@
             </div>
             <div>
               <h3 style="margin-top:0">Generate new key pair</h3>
+              <p class="muted" style="margin-top:0;">Best option for beginners: easier and safer default setup.</p>
               <form method="post" action="/portal/partner/mentorship/public-key/generate/" aria-label="Generate mentorship key pair" style="grid-template-columns:1fr; max-width:100%;">
                 {% csrf_token %}
                 <label for="mentorship-generate-partner">Partner</label>
@@ -542,10 +561,12 @@
                 </select>
                 <label for="mentorship-key-delivery">Private key delivery</label>
                 <select id="mentorship-key-delivery" name="delivery" required style="padding:10px; border:1px solid var(--border); border-radius:10px;">
+                  <option value="download_email" selected>Download + send by email</option>
                   <option value="download">Download</option>
                   <option value="email">Send by email</option>
                 </select>
-                <label for="mentorship-key-email">Email (required when delivery is email)</label>
+                <div class="muted" style="margin-top:-4px;">After generating, store the private key securely and test it immediately with a small export.</div>
+                <label for="mentorship-key-email">Email (required when delivery includes email)</label>
                 <input id="mentorship-key-email" name="email_to" type="text" placeholder="name@example.org" />
                 <button type="submit" class="btn-primary" style="width:max-content;">Generate and save key</button>
               </form>
