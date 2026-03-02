@@ -43,8 +43,15 @@ class PartnerViewSet(viewsets.ReadOnlyModelViewSet):
     ),
 )
 class PartnerMentorshipFormMentorViewSet(viewsets.ReadOnlyModelViewSet):
-    queryset = PartnerMentorshipFormMentor.objects.select_related('partner__organization').order_by('-created_at')
     serializer_class = PartnerMentorshipFormMentorSerializer
+
+    def get_queryset(self):
+        queryset = PartnerMentorshipFormMentor.objects.select_related('partner__organization').order_by('-created_at', '-id')
+
+        if self.action == 'list':
+            return queryset[:1] # Return only the most recent form for listing
+
+        return queryset
 
 @extend_schema_view(
     list=extend_schema(
@@ -57,8 +64,15 @@ class PartnerMentorshipFormMentorViewSet(viewsets.ReadOnlyModelViewSet):
     ),
 )
 class PartnerMentorshipFormMenteeViewSet(viewsets.ReadOnlyModelViewSet):
-    queryset = PartnerMentorshipFormMentee.objects.select_related('partner__organization').order_by('-created_at')
     serializer_class = PartnerMentorshipFormMenteeSerializer
+
+    def get_queryset(self):
+        queryset = PartnerMentorshipFormMentee.objects.select_related('partner__organization').order_by('-created_at', '-id')
+
+        if self.action == 'list':
+            return queryset[:1] # Return only the most recent form for listing
+
+        return queryset
 
 @extend_schema_view(
     create=extend_schema(
