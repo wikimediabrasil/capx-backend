@@ -1,14 +1,14 @@
 from rest_framework import mixins, viewsets, permissions
 
 from portal.models import (
-    PartnerMentorshipAvailability,
+    Partner,
     PartnerMentorshipFormMentor,
     PartnerMentorshipFormMentorResponse,
     PartnerMentorshipFormMentee,
     PartnerMentorshipFormMenteeResponse,
 )
 from portal.serializers import (
-    PartnerMentorshipAvailabilitySerializer,
+    PartnerSerializer,
     PartnerMentorshipFormMentorSerializer,
     PartnerMentorshipFormMentorResponseSerializer,
     PartnerMentorshipFormMenteeSerializer,
@@ -19,17 +19,18 @@ from drf_spectacular.utils import extend_schema_view, extend_schema
 
 @extend_schema_view(
     list=extend_schema(
-        summary='List mentorship availabilities.',
-        description='This endpoint lists all partners that have the mentorship program available.',
+        summary='List partners.',
+        description='This endpoint lists all partners.',
     ),
     retrieve=extend_schema(
-        summary='Retrieve mentorship availability by ID.',
-        description='This endpoint retrieves a mentorship availability by its ID.',
+        summary='Retrieve partner by the organization ID.',
+        description='This endpoint retrieves a partner by the organization ID.',
     ),
 )
-class PartnerMentorshipAvailabilityViewSet(viewsets.ReadOnlyModelViewSet):
-    queryset = PartnerMentorshipAvailability.objects.select_related('partner__organization').order_by('-updated_at')
-    serializer_class = PartnerMentorshipAvailabilitySerializer
+class PartnerViewSet(viewsets.ReadOnlyModelViewSet):
+    queryset = Partner.objects.select_related('organization').order_by('-created_at')
+    serializer_class = PartnerSerializer
+
 
 @extend_schema_view(
     list=extend_schema(

@@ -1,7 +1,7 @@
 from rest_framework import serializers
 
 from portal.models import (
-    PartnerMentorshipAvailability,
+    Partner,
     PartnerMentorshipFormMentor,
     PartnerMentorshipFormMentorResponse,
     PartnerMentorshipFormMentee,
@@ -10,45 +10,63 @@ from portal.models import (
 
 from drf_spectacular.utils import extend_schema_field, OpenApiTypes
 
-class PartnerMentorshipAvailabilitySerializer(serializers.ModelSerializer):
-    organization = serializers.SerializerMethodField()
+class PartnerSerializer(serializers.ModelSerializer):
+    id = serializers.IntegerField(source='organization.id', read_only=True)
+    name = serializers.SerializerMethodField()
 
     class Meta:
-        model = PartnerMentorshipAvailability
+        model = Partner
         fields = [
             'id',
-            'partner',
-            'organization',
-            'status',
+            'name',
+            'mentorship',
+            'created_at',
             'updated_at',
         ]
-        read_only_fields = ['id', 'updated_at']
+        read_only_fields = ['id', 'created_at', 'updated_at']
 
-    @extend_schema_field(OpenApiTypes.INT)
-    def get_organization(self, obj):
-        return obj.partner.organization.id if obj.partner.organization else None
+    @extend_schema_field(OpenApiTypes.STR)
+    def get_name(self, obj):
+        return str(obj.organization.i18n_names.filter(language_code='en').first().name)
+
 
 class PartnerMentorshipFormMentorSerializer(serializers.ModelSerializer):
+    organization = serializers.IntegerField(source='partner.organization.id', read_only=True)
+    counter = serializers.SerializerMethodField()
+
     class Meta:
         model = PartnerMentorshipFormMentor
         fields = [
             'id',
-            'partner',
+            'organization',
+            'counter',
             'json',
             'created_at',
         ]
         read_only_fields = ['id', 'created_at']
 
+    @extend_schema_field(OpenApiTypes.INT)
+    def get_counter(self, obj):
+        return PartnerMentorshipFormMentorResponse.objects.filter(form=obj).count()
+
 class PartnerMentorshipFormMenteeSerializer(serializers.ModelSerializer):
+    organization = serializers.IntegerField(source='partner.organization.id', read_only=True)
+    counter = serializers.SerializerMethodField()
+
     class Meta:
         model = PartnerMentorshipFormMentee
         fields = [
             'id',
-            'partner',
+            'organization',
+            'counter',
             'json',
             'created_at',
         ]
         read_only_fields = ['id', 'created_at']
+
+    @extend_schema_field(OpenApiTypes.INT)
+    def get_counter(self, obj):
+        return PartnerMentorshipFormMenteeResponse.objects.filter(form=obj).count()
 
 
 class PartnerMentorshipFormMentorResponseSerializer(serializers.ModelSerializer):

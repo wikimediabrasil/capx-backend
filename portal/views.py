@@ -12,7 +12,6 @@ from django.core.mail import send_mail
 from .models import (
     Partner,
     PartnerMembership,
-    PartnerMentorshipAvailability,
     PartnerMentorshipPublicKey,
     PartnerMentorshipFormMentor,
     PartnerMentorshipFormMentee,
@@ -216,23 +215,34 @@ def dashboard(request):
     # Partner badges available for assignment in portal, scoped by membership unless staff
     if is_portal_admin(request.user):
         partner_badges = Badge.objects.filter(type='partner').order_by('name')
-        partners_for_ui = Partner.objects.all().order_by('name')
-        partner_members = PartnerMembership.objects.select_related('partner', 'user').order_by('partner__name', 'user__username')
+        partners_for_ui = Partner.objects.select_related('organization').all().order_by('organization__i18n_names__name')
+        partner_members = PartnerMembership.objects.select_related('partner__organization', 'user').order_by('partner__organization__i18n_names__name', 'user__username')
+        partner_org_candidates = (
+            Organization.objects
+            .exclude(id__in=Partner.objects.values_list('organization_id', flat=True))
+            .order_by('i18n_names__name')
+        )
     else:
         partner_badges = Badge.objects.filter(
             type='partner',
-            logic__partner__in=user_partners.values_list('id', flat=True)
+            logic__partner__in=user_partners.values_list('organization_id', flat=True)
         ).order_by('name')
-        partners_for_ui = user_partners.order_by('name')
-        partner_members = PartnerMembership.objects.filter(user=request.user, partner__in=partners_for_ui).order_by('partner__name')
+        partners_for_ui = user_partners.select_related('organization').order_by('organization__i18n_names__name')
+        partner_members = PartnerMembership.objects.filter(user=request.user, partner__in=partners_for_ui).select_related('partner__organization').order_by('partner__organization__i18n_names__name', 'user__username')
+        partner_org_candidates = Organization.objects.none()
 
-    # Attach partner_name to each partner badge, using the id stored in logic['partner']
+    # Attach partner_name to each partner badge, using organization id stored in logic['partner']
     try:
         pids = list({(b.logic or {}).get('partner') for b in partner_badges if (b.logic or {}).get('partner')})
     except Exception:
         pids = []
     if pids:
-        name_map = {pid: name for pid, name in Partner.objects.filter(id__in=pids).values_list('id', 'name')}
+        name_map = dict(
+            Partner.objects
+            .filter(organization_id__in=pids)
+            .select_related('organization')
+            .values_list('organization_id', 'organization__i18n_names__name')
+        )
     else:
         name_map = {}
     for b in partner_badges:
@@ -255,47 +265,47 @@ def dashboard(request):
 
     mentorship_enabled_partners = (
         partners_for_ui
-        .filter(mentorship_availabilities__status=True)
+        .filter(mentorship=True)
         .distinct()
-        .order_by('name')
+        .order_by('organization__i18n_names__name')
     )
     mentorship_forms_mentor = (
         PartnerMentorshipFormMentor.objects
-        .select_related('partner')
+        .select_related('partner__organization')
         .filter(partner__in=mentorship_enabled_partners)
-        .order_by('partner__name', '-created_at')
+        .order_by('partner__organization__i18n_names__name', '-created_at')
     )
     mentorship_forms_mentee = (
         PartnerMentorshipFormMentee.objects
-        .select_related('partner')
+        .select_related('partner__organization')
         .filter(partner__in=mentorship_enabled_partners)
-        .order_by('partner__name', '-created_at')
+        .order_by('partner__organization__i18n_names__name', '-created_at')
     )
     mentorship_public_keys = (
         PartnerMentorshipPublicKey.objects
-        .select_related('partner')
+        .select_related('partner__organization')
         .filter(partner__in=mentorship_enabled_partners)
-        .order_by('partner__name', '-created_at')
+        .order_by('partner__organization__i18n_names__name', '-created_at')
     )
 
     mentorship_mentor_responses = (
         PartnerMentorshipFormMentorResponse.objects
-        .select_related('partner', 'form', 'user')
+        .select_related('partner__organization', 'form', 'user')
         .filter(partner__in=mentorship_enabled_partners)
-        .order_by('partner__name', '-created_at')
+        .order_by('partner__organization__i18n_names__name', '-created_at')
     )
     mentorship_mentee_responses = (
         PartnerMentorshipFormMenteeResponse.objects
-        .select_related('partner', 'form', 'user')
+        .select_related('partner__organization', 'form', 'user')
         .filter(partner__in=mentorship_enabled_partners)
-        .order_by('partner__name', '-created_at')
+        .order_by('partner__organization__i18n_names__name', '-created_at')
     )
 
     mentor_forms_payload = [
         {
             'id': form.id,
-            'partner_id': form.partner_id,
-            'partner_name': form.partner.name,
+            'partner_id': form.partner.organization_id,
+            'partner_name': form.partner.organization.i18n_names.filter(language_code='en').first().name,
             'created_at': form.created_at.isoformat(),
             'json': form.json,
         }
@@ -304,8 +314,8 @@ def dashboard(request):
     mentee_forms_payload = [
         {
             'id': form.id,
-            'partner_id': form.partner_id,
-            'partner_name': form.partner.name,
+            'partner_id': form.partner.organization_id,
+            'partner_name': form.partner.organization.i18n_names.filter(language_code='en').first().name,
             'created_at': form.created_at.isoformat(),
             'json': form.json,
         }
@@ -315,7 +325,7 @@ def dashboard(request):
     mentor_responses_payload = [
         {
             'id': response.id,
-            'partner_id': response.partner_id,
+            'partner_id': response.partner.organization_id,
             'form_id': response.form_id,
             'username': response.user.username,
             'created_at': response.created_at.isoformat(),
@@ -326,7 +336,7 @@ def dashboard(request):
     mentee_responses_payload = [
         {
             'id': response.id,
-            'partner_id': response.partner_id,
+            'partner_id': response.partner.organization_id,
             'form_id': response.form_id,
             'username': response.user.username,
             'created_at': response.created_at.isoformat(),
@@ -344,6 +354,7 @@ def dashboard(request):
         'user_partners': user_partners,
         'partners_for_ui': partners_for_ui,
         'partner_members': partner_members,
+        'partner_org_candidates': partner_org_candidates,
         'partner_badges_awarded': awarded_map,
         'mentorship_enabled_partners': mentorship_enabled_partners,
         'mentorship_forms_mentor': mentorship_forms_mentor,
@@ -421,7 +432,7 @@ def mentorship_form_create(request):
         return redirect(DASHBOARD_URL_NAME)
 
     try:
-        partner = Partner.objects.get(id=partner_id)
+        partner = Partner.objects.get(organization_id=partner_id)
     except Partner.DoesNotExist:
         messages.error(request, 'Partner not found.')
         return redirect(DASHBOARD_URL_NAME)
@@ -430,7 +441,7 @@ def mentorship_form_create(request):
     if scope_check:
         return scope_check
 
-    if not PartnerMentorshipAvailability.objects.filter(partner=partner, status=True).exists():
+    if not partner.mentorship:
         messages.error(request, 'Mentorship is not enabled for this partner.')
         return redirect(DASHBOARD_URL_NAME)
 
@@ -469,7 +480,7 @@ def mentorship_public_key_add(request):
         return redirect(DASHBOARD_URL_NAME)
 
     try:
-        partner = Partner.objects.get(id=partner_id)
+        partner = Partner.objects.get(organization_id=partner_id)
     except Partner.DoesNotExist:
         messages.error(request, 'Partner not found.')
         return redirect(DASHBOARD_URL_NAME)
@@ -505,7 +516,7 @@ def mentorship_public_key_generate(request):
         return redirect(DASHBOARD_URL_NAME)
 
     try:
-        partner = Partner.objects.get(id=partner_id)
+        partner = Partner.objects.get(organization_id=partner_id)
     except Partner.DoesNotExist:
         messages.error(request, 'Partner not found.')
         return redirect(DASHBOARD_URL_NAME)
@@ -572,13 +583,32 @@ def partner_create(request):
     forbidden = _require_portal_admin(request)
     if forbidden:
         return forbidden
-    name = request.POST.get('name', '').strip()
+    organization_id = request.POST.get('organization_id', '').strip()
     description = request.POST.get('description', '').strip()
-    if not name:
-        messages.error(request, 'Partner name is required.')
+    if not organization_id:
+        messages.error(request, 'Organization is required.')
         return redirect(DASHBOARD_URL_NAME)
-    Partner.objects.get_or_create(name=name, defaults={'description': description})
-    messages.success(request, f'Partner "{name}" created.')
+
+    try:
+        organization = Organization.objects.get(id=organization_id)
+    except Organization.DoesNotExist:
+        messages.error(request, 'Organization not found.')
+        return redirect(DASHBOARD_URL_NAME)
+
+    partner, created = Partner.objects.get_or_create(
+        organization=organization,
+        defaults={
+            'description': description,
+        }
+    )
+
+    if created:
+        messages.success(request, f'Partner "{partner.name}" created.')
+    else:
+        if description and partner.description != description:
+            partner.description = description
+            partner.save(update_fields=['description'])
+        messages.info(request, f'Organization "{organization}" is already a partner.')
     return redirect(DASHBOARD_URL_NAME)
 
 @require_POST
@@ -589,7 +619,7 @@ def partner_delete(request):
         return forbidden
     partner_id = request.POST.get('partner_id', '').strip()
     try:
-        partner = Partner.objects.get(id=partner_id)
+        partner = Partner.objects.get(organization_id=partner_id)
     except Partner.DoesNotExist:
         messages.error(request, 'Partner not found.')
         return redirect(DASHBOARD_URL_NAME)
@@ -608,7 +638,7 @@ def partner_membership_add(request):
         messages.error(request, 'Partner and username are required.')
         return redirect(DASHBOARD_URL_NAME)
     try:
-        partner = Partner.objects.get(id=partner_id)
+        partner = Partner.objects.get(organization_id=partner_id)
     except Partner.DoesNotExist:
         messages.error(request, 'Partner not found.')
         return redirect(DASHBOARD_URL_NAME)
@@ -634,7 +664,7 @@ def partner_membership_remove(request):
         messages.error(request, 'Partner and username are required.')
         return redirect(DASHBOARD_URL_NAME)
     try:
-        partner = Partner.objects.get(id=partner_id)
+        partner = Partner.objects.get(organization_id=partner_id)
     except Partner.DoesNotExist:
         messages.error(request, 'Partner not found.')
         return redirect(DASHBOARD_URL_NAME)
@@ -662,7 +692,7 @@ def partner_badge_create(request):
         messages.error(request, 'Name, picture, and partner are required.')
         return redirect(DASHBOARD_URL_NAME)
     try:
-        partner = Partner.objects.get(id=partner_id)
+        partner = Partner.objects.get(organization_id=partner_id)
     except Partner.DoesNotExist:
         messages.error(request, 'Selected partner not found.')
         return redirect(DASHBOARD_URL_NAME)
@@ -676,7 +706,7 @@ def partner_badge_create(request):
         name=name,
         picture=picture,
         description=description or '',
-        logic={'partner': partner.id},
+        logic={'partner': partner.organization_id},
         type='partner',
     )
     messages.success(request, f'Created partner badge "{name}" for {partner.name}.')
@@ -699,7 +729,7 @@ def partner_badge_assign(request):
 
     # Permission: staff can assign any; non-staff must belong to the badge's partner
     if not is_portal_admin(request.user):
-        partner = Partner.objects.get(id=badge.logic.get('partner')) if badge.logic else None
+        partner = Partner.objects.get(organization_id=badge.logic.get('partner')) if badge.logic else None
         if not partner or not PartnerMembership.objects.filter(user=request.user, partner=partner).exists():
             return HttpResponseForbidden("You don't have permission to assign this partner's badges.")
 
@@ -766,7 +796,7 @@ def partner_badge_remove(request):
 
     # Permission: staff can remove any; non-staff must belong to the badge's partner
     if not is_portal_admin(request.user):
-        partner = Partner.objects.get(id=badge.logic.get('partner')) if badge.logic else None
+        partner = Partner.objects.get(organization_id=badge.logic.get('partner')) if badge.logic else None
         if not partner or not PartnerMembership.objects.filter(user=request.user, partner=partner).exists():
             return HttpResponseForbidden("You don't have permission to remove this partner's badges.")
 
@@ -790,7 +820,7 @@ def partner_badge_delete(request):
 
     # Permission: staff can delete any; non-staff must belong to the badge's partner
     if not is_portal_admin(request.user):
-        partner = Partner.objects.get(id=badge.logic.get('partner')) if badge.logic else None
+        partner = Partner.objects.get(organization_id=badge.logic.get('partner')) if badge.logic else None
         if not partner or not PartnerMembership.objects.filter(user=request.user, partner=partner).exists():
             return HttpResponseForbidden("You don't have permission to delete this partner's badges.")
 
@@ -817,7 +847,7 @@ def partner_badge_update(request):
         return redirect(DASHBOARD_URL_NAME)
 
     # Permission: staff can edit any; non-staff must belong to the badge's partner
-    partner = Partner.objects.get(id=badge.logic.get('partner')) if badge.logic else None
+    partner = Partner.objects.get(organization_id=badge.logic.get('partner')) if badge.logic else None
     if not is_portal_admin(request.user):
         if not partner or not PartnerMembership.objects.filter(user=request.user, partner=partner).exists():
             return HttpResponseForbidden("You don't have permission to edit this partner's badges.")

@@ -34,7 +34,7 @@ from events.views import EventViewSet
 from message.views import MessageViewSet
 from projects.views import ProjectViewSet, ProjectMemberViewSet, ProjectMemberAcceptanceViewSet
 from portal.views_api import (
-    PartnerMentorshipAvailabilityViewSet,
+    PartnerViewSet,
     PartnerMentorshipFormMentorViewSet,
     PartnerMentorshipFormMentorResponseViewSet,
     PartnerMentorshipFormMenteeViewSet,
@@ -73,7 +73,7 @@ router.register('badges', BadgeViewSet, basename='badges')
 router.register('user_badge', UserBadgeViewSet, basename='user_badge')
 router.register('translating', CapacityTranslationViewSet, basename='translating')
 router.register('translating_oauth', CapacityTranslationOauthViewSet, basename='translating_oauth')
-router.register('mentorship_availability', PartnerMentorshipAvailabilityViewSet, basename='partner_mentorship_availability')
+router.register('partners', PartnerViewSet, basename='partners')
 router.register('mentorship_form_mentor', PartnerMentorshipFormMentorViewSet, basename='partner_mentorship_form_mentor')
 router.register('mentorship_form_mentee', PartnerMentorshipFormMenteeViewSet, basename='partner_mentorship_form_mentee')
 router.register('mentorship_form_mentor_response', PartnerMentorshipFormMentorResponseViewSet, basename='partner_mentorship_form_mentor_response')
