@@ -1,7 +1,7 @@
 from rest_framework import serializers
 
 from portal.models import (
-    PartnerMentorshipAvailability,
+    Partner,
     PartnerMentorshipFormMentor,
     PartnerMentorshipFormMentorResponse,
     PartnerMentorshipFormMentee,
@@ -10,23 +10,28 @@ from portal.models import (
 
 from drf_spectacular.utils import extend_schema_field, OpenApiTypes
 
-class PartnerMentorshipAvailabilitySerializer(serializers.ModelSerializer):
-    organization = serializers.SerializerMethodField()
+class PartnerSerializer(serializers.ModelSerializer):
+    id = serializers.SerializerMethodField()
+    name = serializers.SerializerMethodField()
 
     class Meta:
-        model = PartnerMentorshipAvailability
+        model = Partner
         fields = [
             'id',
-            'partner',
-            'organization',
-            'status',
+            'name',
+            'mentorship',
+            'created_at',
             'updated_at',
         ]
-        read_only_fields = ['id', 'updated_at']
+        read_only_fields = ['id', 'created_at', 'updated_at']
 
     @extend_schema_field(OpenApiTypes.INT)
-    def get_organization(self, obj):
-        return obj.partner.organization.id if obj.partner.organization else None
+    def get_id(self, obj):
+        return str(obj.organization_id)
+
+    @extend_schema_field(OpenApiTypes.STR)
+    def get_name(self, obj):
+        return str(obj.organization.i18n_names.filter(language_code='en').first().name)
 
 class PartnerMentorshipFormMentorSerializer(serializers.ModelSerializer):
     class Meta:
