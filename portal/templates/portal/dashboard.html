@@ -358,7 +358,7 @@
           <label for="partner-membership-add-partner">Select partner</label>
           <select id="partner-membership-add-partner" name="partner_id" required style="padding:10px; border:1px solid var(--border); border-radius:10px;">
             {% for p in partners_for_ui %}
-              <option value="{{ p.id }}">{{ p.name }}</option>
+              <option value="{{ p.organization_id }}">{{ p.name }}</option>
             {% endfor %}
           </select>
           <button type="submit" class="btn-primary">Add membership</button>
@@ -372,7 +372,7 @@
           <label for="partner-membership-remove-partner">Select partner</label>
           <select id="partner-membership-remove-partner" name="partner_id" required style="padding:10px; border:1px solid var(--border); border-radius:10px;">
             {% for p in partners_for_ui %}
-              <option value="{{ p.id }}">{{ p.name }}</option>
+              <option value="{{ p.organization_id }}">{{ p.name }}</option>
             {% endfor %}
           </select>
           <div class="danger-hint" role="note">Removing a member immediately revokes their portal access for this partner.</div>
@@ -394,8 +394,14 @@
         <div id="panel-partner-create" role="tabpanel" aria-labelledby="tab-partner-create">
           <form method="post" action="/portal/partner/create/" aria-label="Create partner">
             {% csrf_token %}
-            <label for="partner-create-name">Partner name</label>
-            <input id="partner-create-name" name="name" placeholder="New partner name" required />
+            <label for="partner-create-organization">Organization</label>
+            <select id="partner-create-organization" name="organization_id" required style="padding:10px; border:1px solid var(--border); border-radius:10px;">
+              {% for org in partner_org_candidates %}
+                <option value="{{ org.id }}">{{ org }}</option>
+              {% empty %}
+                <option value="">No organizations available</option>
+              {% endfor %}
+            </select>
             <label for="partner-create-desc">Description</label>
             <input id="partner-create-desc" name="description" placeholder="Optional description" />
             <button type="submit" class="btn-primary">Create partner</button>
@@ -407,7 +413,7 @@
             <label for="partner-delete-id">Delete partner</label>
             <select id="partner-delete-id" name="partner_id" required style="padding:10px; border:1px solid var(--border); border-radius:10px;">
               {% for p in partners_for_ui %}
-                <option value="{{ p.id }}">{{ p.name }}</option>
+                <option value="{{ p.organization_id }}">{{ p.name }}</option>
               {% endfor %}
             </select>
             <div class="danger-hint" role="note">This will delete the partner and all its memberships. This action cannot be undone.</div>
@@ -465,7 +471,7 @@
             <label for="mentorship-form-partner">Partner</label>
             <select id="mentorship-form-partner" name="partner_id" required style="padding:10px; border:1px solid var(--border); border-radius:10px;">
               {% for p in mentorship_enabled_partners %}
-                <option value="{{ p.id }}">{{ p.name }}</option>
+                <option value="{{ p.organization_id }}">{{ p.name }}</option>
               {% endfor %}
             </select>
             <label for="mentorship-form-type">Form type</label>
@@ -476,7 +482,7 @@
             <label for="mentorship-form-public-key">Public key</label>
             <select id="mentorship-form-public-key" name="public_key_id" required style="padding:10px; border:1px solid var(--border); border-radius:10px;">
               {% for k in mentorship_public_keys %}
-                <option value="{{ k.id }}" data-partner-id="{{ k.partner_id }}">Key #{{ k.id }} - {{ k.partner.name }}</option>
+                <option value="{{ k.id }}" data-partner-id="{{ k.partner.organization_id }}">Key #{{ k.id }} - {{ k.partner.name }}</option>
               {% endfor %}
             </select>
             <input id="mentorship-form-json" name="form_json" type="hidden" />
@@ -540,7 +546,7 @@
                 <label for="mentorship-key-partner">Partner</label>
                 <select id="mentorship-key-partner" name="partner_id" required style="padding:10px; border:1px solid var(--border); border-radius:10px;">
                   {% for p in mentorship_enabled_partners %}
-                    <option value="{{ p.id }}">{{ p.name }}</option>
+                    <option value="{{ p.organization_id }}">{{ p.name }}</option>
                   {% endfor %}
                 </select>
                 <label for="mentorship-public-key">Public key (PEM)</label>
@@ -556,7 +562,7 @@
                 <label for="mentorship-generate-partner">Partner</label>
                 <select id="mentorship-generate-partner" name="partner_id" required style="padding:10px; border:1px solid var(--border); border-radius:10px;">
                   {% for p in mentorship_enabled_partners %}
-                    <option value="{{ p.id }}">{{ p.name }}</option>
+                    <option value="{{ p.organization_id }}">{{ p.name }}</option>
                   {% endfor %}
                 </select>
                 <label for="mentorship-key-delivery">Private key delivery</label>
@@ -591,7 +597,7 @@
             <label for="mentorship-csv-partner">Partner</label>
             <select id="mentorship-csv-partner" style="padding:10px; border:1px solid var(--border); border-radius:10px; max-width:520px;">
               {% for p in mentorship_enabled_partners %}
-                <option value="{{ p.id }}">{{ p.name }}</option>
+                <option value="{{ p.organization_id }}">{{ p.name }}</option>
               {% endfor %}
             </select>
 
@@ -689,7 +695,7 @@
           <label for="partner-badge-create-partner">Select partner</label>
           <select id="partner-badge-create-partner" name="partner_id" required style="padding:10px; border:1px solid var(--border); border-radius:10px;">
             {% for p in partners_for_ui %}
-              <option value="{{ p.id }}">{{ p.name }}</option>
+              <option value="{{ p.organization_id }}">{{ p.name }}</option>
             {% endfor %}
           </select>
           <button type="submit" class="btn-primary">Create partner badge</button>

@@ -56,13 +56,22 @@ def encrypt_data(plaintext, public_key_text):
 
 
 class Partner(models.Model):
-    name = models.CharField(max_length=255, unique=True)
+    organization = models.OneToOneField(
+        'orgs.Organization',
+        on_delete=models.CASCADE,
+        related_name='partner',
+    )
     description = models.TextField(blank=True, default="")
+    mentorship = models.BooleanField(default=False)
     created_at = models.DateTimeField(auto_now_add=True)
-    organization = models.ForeignKey('orgs.Organization', on_delete=models.CASCADE, related_name='partners', null=True, blank=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    @property
+    def name(self):
+        return str(self.organization)
 
     def __str__(self):
-        return self.name
+        return str(self.organization)
 
 
 class PartnerMembership(models.Model):
@@ -75,15 +84,6 @@ class PartnerMembership(models.Model):
 
     def __str__(self):
         return f"{self.user.username} @ {self.partner.name}"
-
-
-class PartnerMentorshipAvailability(models.Model):
-    partner = models.ForeignKey(Partner, on_delete=models.CASCADE, related_name='mentorship_availabilities')
-    status = models.BooleanField(default=False)
-    updated_at = models.DateTimeField(auto_now=True)
-
-    def __str__(self):
-        return f"{self.partner.name} Mentorship Available: {self.status}"
 
 
 class PartnerMentorshipPublicKey(models.Model):
