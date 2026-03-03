@@ -229,7 +229,7 @@ class CapacitiesByTerritoryView(APIView):
     @extend_schema(
         summary='Get capacity user counts by territory',
         description='Returns pre-aggregated data of skill/capacity counts grouped by territory. '
-                    'Each territory contains a mapping of skill IDs to objects with available and wanted counts.',
+                    'Each territory contains a mapping of skill IDs to objects with known, available and wanted counts.',
         responses={(200, 'application/json'): {
             'description': 'Capacity counts by territory retrieved successfully',
             'type': 'object',
@@ -239,6 +239,7 @@ class CapacitiesByTerritoryView(APIView):
                 'additionalProperties': {
                     'type': 'object',
                     'properties': {
+                        'known': {'type': 'integer', 'description': 'Number of users who know this skill'},
                         'available': {'type': 'integer', 'description': 'Number of users with this skill available'},
                         'wanted': {'type': 'integer', 'description': 'Number of users who want this skill'},
                     }
@@ -252,6 +253,7 @@ class CapacitiesByTerritoryView(APIView):
             user__is_active=True
         ).prefetch_related(
             'territory',
+            'skills_known',
             'skills_available',
             'skills_wanted'
         )
@@ -264,6 +266,7 @@ class CapacitiesByTerritoryView(APIView):
             territories = list(profile.territory.values_list('id', flat=True))
 
             # Get user's skills
+            skills_known = list(profile.skills_known.values_list('id', flat=True))
             skills_available = list(profile.skills_available.values_list('id', flat=True))
             skills_wanted = list(profile.skills_wanted.values_list('id', flat=True))
 
@@ -273,18 +276,25 @@ class CapacitiesByTerritoryView(APIView):
                 if territory_key not in result:
                     result[territory_key] = {}
 
+                # Count known skills
+                for skill_id in skills_known:
+                    skill_key = str(skill_id)
+                    if skill_key not in result[territory_key]:
+                        result[territory_key][skill_key] = {'known': 0, 'available': 0, 'wanted': 0}
+                    result[territory_key][skill_key]['known'] += 1
+
                 # Count available skills
                 for skill_id in skills_available:
                     skill_key = str(skill_id)
                     if skill_key not in result[territory_key]:
-                        result[territory_key][skill_key] = {'available': 0, 'wanted': 0}
+                        result[territory_key][skill_key] = {'known': 0, 'available': 0, 'wanted': 0}
                     result[territory_key][skill_key]['available'] += 1
 
                 # Count wanted skills
                 for skill_id in skills_wanted:
                     skill_key = str(skill_id)
                     if skill_key not in result[territory_key]:
-                        result[territory_key][skill_key] = {'available': 0, 'wanted': 0}
+                        result[territory_key][skill_key] = {'known': 0, 'available': 0, 'wanted': 0}
                     result[territory_key][skill_key]['wanted'] += 1
 
         return Response(result)
