@@ -1,6 +1,9 @@
+import requests
+from django.core.cache import cache
 from rest_framework import viewsets, status
 from rest_framework.response import Response
 from rest_framework.permissions import IsAuthenticated
+from rest_framework.views import APIView
 from drf_spectacular.utils import extend_schema, OpenApiParameter, OpenApiTypes
 from django.shortcuts import get_object_or_404
 from users.models import Profile, Language, Badge
@@ -10,6 +13,9 @@ from users.models import Territory, WikimediaProject
 from orgs.models import Organization
 from events.models import Events
 from projects.models import Project
+from CapX.useragent import get_user_agent
+
+WIKIDATA_SPARQL_ENDPOINT = "https://query.wikidata.org/sparql"
 
 
 class UsersBySkillViewSet(viewsets.ReadOnlyModelViewSet):
@@ -159,3 +165,100 @@ class UsersByTagViewSet(viewsets.ReadOnlyModelViewSet):
             return Response({'message': 'Invalid tag type. Options are: skill_known, skill_available, skill_wanted, language, territory, wikimedia_project, affiliation.'}, status=status.HTTP_400_BAD_REQUEST)
 
         return Response(self.get_serializer(queryset, many=True).data)
+
+
+class LanguageNamesView(APIView):
+    """
+    Returns all language names translated into a specific language using Wikidata.
+    Falls back to the stored autonym, then the English name, if Wikidata has no label.
+    """
+
+    @extend_schema(
+        summary='Get language names in a specific language',
+        description='Returns all available languages with their names translated into the requested language. '
+                    'Uses the Wikidata SPARQL endpoint to fetch translated names. '
+                    'Falls back to the stored autonym, then the English name, when no Wikidata label is found.',
+        parameters=[
+            OpenApiParameter(
+                'language_code',
+                OpenApiTypes.STR,
+                OpenApiParameter.PATH,
+                required=True,
+                description='BCP47 / ISO 639-1 code of the target language (e.g. "pt", "fr", "pt-br").',
+            ),
+        ],
+        responses={(200, 'application/json'): {
+            'description': 'Mapping of language IDs to their names in the requested language.',
+            'type': 'object',
+            'additionalProperties': {'type': 'string'},
+            'example': {'1': 'Inglês', '2': 'Português', '3': 'Espanhol'},
+        }},
+    )
+    def get(self, request, language_code, *args, **kwargs):
+        cache_key = f'language_names_{language_code}'
+        cached = cache.get(cache_key)
+        if cached is not None:
+            return Response(cached)
+
+        languages = list(Language.objects.all())
+        if not languages:
+            return Response({})
+
+        codes = [lang.language_code for lang in languages]
+        wikidata_labels = self._fetch_wikidata_labels(codes, language_code)
+
+        result = {}
+        for lang in languages:
+            label = (
+                wikidata_labels.get(lang.language_code)
+                or lang.language_autonym
+                or lang.language_name
+            )
+            result[lang.id] = label
+
+        cache.set(cache_key, result, 60 * 60 * 24)  # 24 hours
+        return Response(result)
+
+    def _fetch_wikidata_labels(self, codes, target_lang):
+        """Query Wikidata SPARQL for labels of the given language codes in target_lang.
+
+        Matches codes against P218 (ISO 639-1) and P305 (IETF BCP 47).
+        Returns a {code: label} dict; missing codes are simply absent.
+        """
+        values = ' '.join(f'"{c}"' for c in codes)
+        query = f"""
+SELECT ?code (SAMPLE(?label) AS ?label) WHERE {{
+  VALUES ?code {{ {values} }}
+  {{
+    ?item wdt:P218 ?code .
+  }} UNION {{
+    ?item wdt:P305 ?code .
+  }}
+  ?item rdfs:label ?label .
+  FILTER(LANG(?label) = "{target_lang}")
+}}
+GROUP BY ?code
+"""
+        headers = {
+            'Accept': 'application/sparql-results+json',
+            'User-Agent': get_user_agent('LanguageNames'),
+        }
+        try:
+            resp = requests.get(
+                WIKIDATA_SPARQL_ENDPOINT,
+                params={'query': query},
+                headers=headers,
+                timeout=15,
+            )
+            resp.raise_for_status()
+            data = resp.json()
+        except Exception:
+            return {}
+
+        labels = {}
+        for binding in data.get('results', {}).get('bindings', []):
+            code = binding.get('code', {}).get('value', '')
+            label = binding.get('label', {}).get('value', '')
+            if code and label:
+                labels[code] = label
+        return labels

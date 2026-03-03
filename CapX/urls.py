@@ -26,7 +26,7 @@ from users.views import (
     UsersBySkillViewSet, UsersByTagViewSet, TerritoryViewSet, WikimediaProjectViewSet,
     BadgeViewSet, UserBadgeViewSet, StatisticsView, LanguagesByTerritoryView,
     CapacitiesByTerritoryView, RecommendationView, LetsConnectViewSet,
-    UserAuthView, AuthView, CheckView
+    UserAuthView, AuthView, CheckView, LanguageNamesView
 )
 from bugs.views import BugViewSet, AttachmentViewSet
 from orgs.views import OrganizationViewSet, OrganizationTypeViewSet, TagDiffViewSet, DocumentViewSet, OrganizationNameViewSet
@@ -95,6 +95,7 @@ urlpatterns = [
     path('statistics/languages-by-territory/', LanguagesByTerritoryView.as_view(), name='languages-by-territory'),
     path('statistics/capacities-by-territory/', CapacitiesByTerritoryView.as_view(), name='capacities-by-territory'),
     path('recommendation/', RecommendationView.as_view(), name='recommendation'),
+    path('list/language/<str:language_code>/', LanguageNamesView.as_view(), name='language-names'),
     path('', include(router.urls)),
 ]
 

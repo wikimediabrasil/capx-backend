@@ -1444,3 +1444,106 @@ class CapacitiesByTerritoryViewTestCase(TestCase):
         # skill2 should be wanted
         self.assertEqual(territory_data[str(self.skill2.id)]['available'], 0)
         self.assertEqual(territory_data[str(self.skill2.id)]['wanted'], 1)
+
+
+class LanguageNamesViewTestCase(TestCase):
+    def setUp(self):
+        from django.core.cache import cache
+        cache.clear()
+        self.client = APIClient()
+        self.lang_en = Language.objects.create(
+            language_name='English', language_autonym='English', language_code='en'
+        )
+        self.lang_pt = Language.objects.create(
+            language_name='Portuguese', language_autonym='Português', language_code='pt'
+        )
+        self.lang_ptbr = Language.objects.create(
+            language_name='Brazilian Portuguese', language_autonym='Português (Brasil)', language_code='pt-br'
+        )
+
+    def _wikidata_response(self, bindings):
+        return {
+            'results': {
+                'bindings': [
+                    {'code': {'value': code}, 'label': {'value': label}}
+                    for code, label in bindings.items()
+                ]
+            }
+        }
+
+    def test_no_auth_required(self):
+        with patch('users.views.lists.requests.get') as mock_get:
+            mock_get.return_value.raise_for_status = lambda: None
+            mock_get.return_value.json.return_value = self._wikidata_response({})
+            response = APIClient().get('/list/language/pt/')
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+
+    def test_translated_names_from_wikidata(self):
+        """Wikidata labels are returned for the requested language."""
+        wikidata_labels = {'en': 'Inglês', 'pt': 'Português', 'pt-br': 'Português do Brasil'}
+        with patch('users.views.lists.requests.get') as mock_get:
+            mock_get.return_value.raise_for_status = lambda: None
+            mock_get.return_value.json.return_value = self._wikidata_response(wikidata_labels)
+            response = self.client.get('/list/language/pt/')
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(response.data[self.lang_en.id], 'Inglês')
+        self.assertEqual(response.data[self.lang_pt.id], 'Português')
+        self.assertEqual(response.data[self.lang_ptbr.id], 'Português do Brasil')
+
+    def test_fallback_to_autonym_when_wikidata_has_no_label(self):
+        """Falls back to language_autonym when Wikidata returns no label."""
+        with patch('users.views.lists.requests.get') as mock_get:
+            mock_get.return_value.raise_for_status = lambda: None
+            mock_get.return_value.json.return_value = self._wikidata_response({})
+            response = self.client.get('/list/language/xx/')
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(response.data[self.lang_en.id], 'English')
+        self.assertEqual(response.data[self.lang_pt.id], 'Português')
+
+    def test_fallback_to_language_name_when_no_autonym(self):
+        """Falls back to language_name when autonym is blank and Wikidata has nothing."""
+        lang_no_autonym = Language.objects.create(
+            language_name='German', language_autonym='', language_code='de'
+        )
+        with patch('users.views.lists.requests.get') as mock_get:
+            mock_get.return_value.raise_for_status = lambda: None
+            mock_get.return_value.json.return_value = self._wikidata_response({})
+            response = self.client.get('/list/language/xx/')
+        self.assertEqual(response.data[lang_no_autonym.id], 'German')
+
+    def test_wikidata_error_falls_back_gracefully(self):
+        """If Wikidata request raises an exception, falls back to stored names."""
+        with patch('users.views.lists.requests.get', side_effect=Exception('timeout')):
+            response = self.client.get('/list/language/pt/')
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(response.data[self.lang_en.id], 'English')
+
+    def test_empty_database_returns_empty(self):
+        Language.objects.all().delete()
+        with patch('users.views.lists.requests.get') as mock_get:
+            mock_get.return_value.raise_for_status = lambda: None
+            mock_get.return_value.json.return_value = self._wikidata_response({})
+            response = self.client.get('/list/language/pt/')
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(response.data, {})
+
+    def test_partial_wikidata_results(self):
+        """Only some languages found in Wikidata; rest fall back to stored names."""
+        with patch('users.views.lists.requests.get') as mock_get:
+            mock_get.return_value.raise_for_status = lambda: None
+            mock_get.return_value.json.return_value = self._wikidata_response({'en': 'Inglês'})
+            response = self.client.get('/list/language/pt/')
+        self.assertEqual(response.data[self.lang_en.id], 'Inglês')
+        # pt and pt-br not in Wikidata result → fall back to autonym
+        self.assertEqual(response.data[self.lang_pt.id], 'Português')
+        self.assertEqual(response.data[self.lang_ptbr.id], 'Português (Brasil)')
+
+    def test_result_is_cached(self):
+        """Second request does not call Wikidata again."""
+        wikidata_labels = {'en': 'Inglês', 'pt': 'Português', 'pt-br': 'Português do Brasil'}
+        with patch('users.views.lists.requests.get') as mock_get:
+            mock_get.return_value.raise_for_status = lambda: None
+            mock_get.return_value.json.return_value = self._wikidata_response(wikidata_labels)
+            self.client.get('/list/language/pt/')
+            self.client.get('/list/language/pt/')
+        self.assertEqual(mock_get.call_count, 1)
