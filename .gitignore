@@ -15,4 +15,5 @@ media/
 .vscode/
 pytest.ini
 coverage.xml
-static/
+static/*
+!**/static/**/dashboard*
