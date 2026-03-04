@@ -30,6 +30,7 @@ from drf_spectacular.utils import extend_schema_view, extend_schema
 class PartnerViewSet(viewsets.ReadOnlyModelViewSet):
     queryset = Partner.objects.select_related('organization').order_by('-created_at')
     serializer_class = PartnerSerializer
+    lookup_field = 'organization_id'
 
 
 @extend_schema_view(
