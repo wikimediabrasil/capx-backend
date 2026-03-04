@@ -487,7 +487,7 @@
               {% endfor %}
             </select>
             <input id="mentorship-form-json" name="form_json" type="hidden" />
-            <button type="submit" class="btn-primary" style="width:max-content;">Save form</button>
+            <button type="submit" id="mentorship-form-save-btn" class="btn-primary" style="width:max-content;">Save form</button>
           </form>
 
           <div class="grid" style="grid-template-columns: 1fr 1fr; margin-top:12px;">
@@ -575,7 +575,7 @@
                 <div class="muted" style="margin-top:-4px;">After generating, store the private key securely and test it immediately with a small export.</div>
                 <label for="mentorship-key-email">Email (required when delivery includes email)</label>
                 <input id="mentorship-key-email" name="email_to" type="text" placeholder="name@example.org" />
-                <button type="submit" class="btn-primary" style="width:max-content;">Generate and save key</button>
+                <button type="submit" id="mentorship-key-generate-btn" class="btn-primary" style="width:max-content;">Generate and save key</button>
               </form>
             </div>
           </div>
