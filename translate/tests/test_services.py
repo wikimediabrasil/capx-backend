@@ -1,5 +1,4 @@
 import json
-import pytest
 from django.test import TestCase
 from unittest.mock import Mock, patch, MagicMock
 from translate.services import MetabaseClient, build_capacity_list
@@ -52,7 +51,7 @@ class TestMetabaseClient(TestCase):
         mock_session.get.return_value = mock_get_response
 
         client = MetabaseClient()
-        with pytest.raises(RuntimeError, match="Failed to get login token."):
+        with self.assertRaisesRegex(RuntimeError, r"Failed to get login token\."):
             client.login_bot()
 
     @patch.dict('os.environ', {'METABASE_USERNAME': 'testuser', 'METABASE_PASSWORD': 'testpass'}, clear=True)
@@ -74,7 +73,7 @@ class TestMetabaseClient(TestCase):
         mock_session.post.return_value = mock_post_login
 
         client = MetabaseClient()
-        with pytest.raises(RuntimeError, match="Login failed for Metabase"):
+        with self.assertRaisesRegex(RuntimeError, r"Login failed for Metabase"):
             client.login_bot()
 
     @patch.dict('os.environ', {'METABASE_USERNAME': 'testuser', 'METABASE_PASSWORD': 'testpass'}, clear=True)
@@ -100,13 +99,13 @@ class TestMetabaseClient(TestCase):
         mock_session.post.return_value = mock_post_login
 
         client = MetabaseClient()
-        with pytest.raises(RuntimeError, match="Failed to obtain CSRF token."):
+        with self.assertRaisesRegex(RuntimeError, r"Failed to obtain CSRF token\."):
             client.login_bot()
     
     @patch.dict('os.environ', {}, clear=True)
     def test_login_bot_missing_credentials(self):
         client = MetabaseClient()
-        with pytest.raises(RuntimeError, match="Missing METABASE_USERNAME/METABASE_PASSWORD in settings_local.py or env"):
+        with self.assertRaisesRegex(RuntimeError, r"Missing METABASE_USERNAME/METABASE_PASSWORD in settings_local\.py or env"):
             client.login_bot()
     
     @patch.dict('os.environ', {
@@ -141,13 +140,13 @@ class TestMetabaseClient(TestCase):
         }, clear=True):
             with patch('translate.services.OAuth1Session', return_value=mock_session):
                 client = MetabaseClient()
-                with pytest.raises(RuntimeError, match="Failed to obtain CSRF token via OAuth session."):
+                with self.assertRaisesRegex(RuntimeError, r"Failed to obtain CSRF token via OAuth session\."):
                     client.login_user_oauth("access_token", "access_secret")
 
     @patch.dict('os.environ', {}, clear=True)
     def test_login_user_oauth_missing_consumer_keys(self):
         client = MetabaseClient()
-        with pytest.raises(RuntimeError, match="Missing METABASE_OAUTH_CONSUMER_KEY/SECRET"):
+        with self.assertRaisesRegex(RuntimeError, r"Missing METABASE_OAUTH_CONSUMER_KEY/SECRET"):
             client.login_user_oauth("access_token", "access_secret")
     
     @patch('translate.services.requests.get')
@@ -205,14 +204,14 @@ class TestMetabaseClient(TestCase):
     
     def test_set_term_not_logged_in(self):
         client = MetabaseClient()
-        with pytest.raises(RuntimeError, match="not logged in"):
+        with self.assertRaisesRegex(RuntimeError, r"not logged in"):
             client.set_term("Q1", "en", "label", "value", "user")
     
     def test_set_term_invalid_field(self):
         client = MetabaseClient()
         client._session = MagicMock()
         client._token = "token"
-        with pytest.raises(ValueError, match="field must be 'label' or 'description'"):
+        with self.assertRaisesRegex(ValueError, r"field must be 'label' or 'description'"):
             client.set_term("Q1", "en", "invalid", "value", "user")
     
     def test_set_term_success(self):
@@ -236,12 +235,12 @@ class TestMetabaseClient(TestCase):
         client._session.post.return_value.json.return_value = {"success": False, "error": "boom"}
         client._session.post.return_value.raise_for_status = Mock()
 
-        with pytest.raises(RuntimeError, match="boom"):
+        with self.assertRaisesRegex(RuntimeError, r"boom"):
             client.set_term("Q1", "en", "label", "New Label", "testuser")
     
     def test_create_item_not_logged_in(self):
         client = MetabaseClient()
-        with pytest.raises(RuntimeError, match="not logged in"):
+        with self.assertRaisesRegex(RuntimeError, r"not logged in"):
             client.create_item("Label")
     
     def test_create_item_success(self):
@@ -265,7 +264,7 @@ class TestMetabaseClient(TestCase):
         client._token = "token"
         client._session.post.return_value.json.return_value = {"success": False, "error": "Error message"}
         client._session.post.return_value.raise_for_status = Mock()
-        with pytest.raises(RuntimeError, match="Error message"):
+        with self.assertRaisesRegex(RuntimeError, r"Error message"):
             client.create_item("Test Skill", "A test skill", "en", "Q123", "admin")
 
     def test_create_item_missing_entity_id(self):
@@ -275,7 +274,7 @@ class TestMetabaseClient(TestCase):
         client._session.post.return_value.json.return_value = {"success": True, "entity": {}}
         client._session.post.return_value.raise_for_status = Mock()
 
-        with pytest.raises(RuntimeError, match="did not return entity id"):
+        with self.assertRaisesRegex(RuntimeError, r"did not return entity id"):
             client.create_item("Test Skill", "A test skill", "en", "Q123", "admin")
     
     def test_parse_entity_id_valid(self):
