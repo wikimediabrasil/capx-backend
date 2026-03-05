@@ -4,7 +4,7 @@ from django.db import models
 from django.db.models import Count
 from rest_framework.views import APIView
 from rest_framework.response import Response
-from drf_spectacular.utils import extend_schema
+from drf_spectacular.utils import extend_schema, OpenApiExample
 from knox.models import AuthToken
 from users.models import Profile, Language, LanguageProficiency
 from skills.models import Skill
@@ -185,6 +185,23 @@ class LanguagesByTerritoryView(APIView):
                 }
             },
         }},
+        examples=[
+            OpenApiExample(
+                name='Language counts by territory',
+                summary='Keys are territory IDs; nested keys are language IDs; values are user counts.',
+                description=(
+                    'Outer keys are territory IDs (e.g. "1" = Latin America, "2" = Africa). '
+                    'Inner keys are language IDs (e.g. "42" = English, "7" = Spanish, "3" = French). '
+                    'Values are the number of active users who speak that language in that territory.'
+                ),
+                value={
+                    '<territory_id>': {
+                        '<language_id>': 15,
+                    },
+                },
+                response_only=True,
+            ),
+        ],
     )
     def get(self, request, *args, **kwargs):
         # Get all active user profiles with their territories and languages
@@ -246,6 +263,23 @@ class CapacitiesByTerritoryView(APIView):
                 }
             },
         }},
+        examples=[
+            OpenApiExample(
+                name='Capacity counts by territory',
+                summary='Keys are territory IDs; nested keys are skill/capacity IDs.',
+                description=(
+                    'Outer keys are territory IDs (e.g. "1" = Latin America, "2" = Africa). '
+                    'Inner keys are skill/capacity IDs (e.g. "10" = Communication, "20" = Research). '
+                    '"known" = users who know the skill, "available" = users offering it, "wanted" = users seeking it.'
+                ),
+                value={
+                    '<territory_id>': {
+                        '<skill_id>': {'known': 15, 'available': 8, 'wanted': 3},
+                    },
+                },
+                response_only=True,
+            ),
+        ],
     )
     def get(self, request, *args, **kwargs):
         # Get all active user profiles with their territories and skills
