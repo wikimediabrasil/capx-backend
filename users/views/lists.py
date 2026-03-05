@@ -207,17 +207,12 @@ class LanguageNamesView(APIView):
 
         codes = [lang.language_code for lang in languages]
         wikidata_labels = self._fetch_wikidata_labels(codes, language_code)
-        english_labels = (
-            wikidata_labels
-            if language_code == 'en'
-            else self._fetch_wikidata_labels(codes, 'en')
-        )
 
         result = {}
         for lang in languages:
             label = (
                 wikidata_labels.get(lang.language_code)
-                or english_labels.get(lang.language_code)
+                or lang.language_autonym
                 or lang.language_name
             )
             result[lang.id] = label
