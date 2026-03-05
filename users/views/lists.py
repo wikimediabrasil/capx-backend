@@ -194,7 +194,8 @@ class LanguageNamesView(APIView):
             'example': {'1': 'Inglês', '2': 'Português', '3': 'Espanhol'},
         }},
     )
-    def get(self, request, language_code, *args, **kwargs):
+    def get(self, request, *args, **kwargs):
+        language_code = self.kwargs.get('language_code')
         cache_key = f'language_names_{language_code}'
         cached = cache.get(cache_key)
         if cached is not None:
@@ -206,12 +207,17 @@ class LanguageNamesView(APIView):
 
         codes = [lang.language_code for lang in languages]
         wikidata_labels = self._fetch_wikidata_labels(codes, language_code)
+        english_labels = (
+            wikidata_labels
+            if language_code == 'en'
+            else self._fetch_wikidata_labels(codes, 'en')
+        )
 
         result = {}
         for lang in languages:
             label = (
                 wikidata_labels.get(lang.language_code)
-                or lang.language_autonym
+                or english_labels.get(lang.language_code)
                 or lang.language_name
             )
             result[lang.id] = label
@@ -219,13 +225,39 @@ class LanguageNamesView(APIView):
         cache.set(cache_key, result, 60 * 60 * 24)  # 24 hours
         return Response(result)
 
+    @staticmethod
+    def _to_bcp47(code):
+        """Normalize a MediaWiki-style language code to standard BCP 47 capitalization.
+
+        Rules: language subtag → lowercase, script subtag (4 alpha chars) → Title case,
+        region subtag (2 alpha or 3 digit) → UPPERCASE.
+        Examples: "pt-br" → "pt-BR", "zh-hans" → "zh-Hans", "sh-cyrl" → "sh-Cyrl".
+        """
+        parts = code.split('-')
+        result = [parts[0].lower()]
+        for part in parts[1:]:
+            if len(part) == 4 and part.isalpha():
+                result.append(part.title())  # Script subtag: Hans, Hant, Cyrl, Latn, Arab
+            else:
+                result.append(part.upper())  # Region subtag: BR, CN, TW
+        return '-'.join(result)
+
     def _fetch_wikidata_labels(self, codes, target_lang):
         """Query Wikidata SPARQL for labels of the given language codes in target_lang.
 
         Matches codes against P218 (ISO 639-1) and P305 (IETF BCP 47).
-        Returns a {code: label} dict; missing codes are simply absent.
+        Normalizes codes to standard BCP 47 capitalization before querying (e.g. "pt-br"
+        → "pt-BR") since Wikidata P305 values are case-sensitive.
+        Returns a {original_code: label} dict; missing codes are simply absent.
         """
-        values = ' '.join(f'"{c}"' for c in codes)
+        # Build normalized BCP 47 codes and a reverse map bcp47 → original
+        bcp47_to_original = {}
+        for code in codes:
+            bcp47 = self._to_bcp47(code)
+            bcp47_to_original[bcp47] = code
+
+        values = ' '.join(f'"{c}"' for c in bcp47_to_original.keys())
+        normalized_target = self._to_bcp47(target_lang)
         query = f"""
 SELECT ?code (SAMPLE(?label) AS ?label) WHERE {{
   VALUES ?code {{ {values} }}
@@ -235,7 +267,7 @@ SELECT ?code (SAMPLE(?label) AS ?label) WHERE {{
     ?item wdt:P305 ?code .
   }}
   ?item rdfs:label ?label .
-  FILTER(LANG(?label) = "{target_lang}")
+  FILTER(LANG(?label) = "{normalized_target}")
 }}
 GROUP BY ?code
 """
@@ -257,8 +289,9 @@ GROUP BY ?code
 
         labels = {}
         for binding in data.get('results', {}).get('bindings', []):
-            code = binding.get('code', {}).get('value', '')
+            bcp47_code = binding.get('code', {}).get('value', '')
             label = binding.get('label', {}).get('value', '')
-            if code and label:
-                labels[code] = label
+            if bcp47_code and label:
+                original = bcp47_to_original.get(bcp47_code, bcp47_code)
+                labels[original] = label
         return labels
