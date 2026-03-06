@@ -1,0 +1,825 @@
+[
+  {
+    "model": "skills.skill",
+    "pk": 10,
+    "fields": {
+      "skill_wikidata_item": "Q10",
+      "skill_type": null,
+      "skill_date_of_creation": "2024-01-01T00:00:00Z"
+    }
+  },
+  {
+    "model": "skills.skill",
+    "pk": 11,
+    "fields": {
+      "skill_wikidata_item": "Q11",
+      "skill_type": 10,
+      "skill_date_of_creation": "2024-01-01T00:00:00Z"
+    }
+  },
+  {
+    "model": "skills.skill",
+    "pk": 12,
+    "fields": {
+      "skill_wikidata_item": "Q12",
+      "skill_type": 10,
+      "skill_date_of_creation": "2024-01-01T00:00:00Z"
+    }
+  },
+  {
+    "model": "skills.skill",
+    "pk": 36,
+    "fields": {
+      "skill_wikidata_item": "Q36",
+      "skill_type": null,
+      "skill_date_of_creation": "2024-01-01T00:00:00Z"
+    }
+  },
+  {
+    "model": "skills.skill",
+    "pk": 37,
+    "fields": {
+      "skill_wikidata_item": "Q37",
+      "skill_type": 36,
+      "skill_date_of_creation": "2024-01-01T00:00:00Z"
+    }
+  },
+  {
+    "model": "skills.skill",
+    "pk": 38,
+    "fields": {
+      "skill_wikidata_item": "Q38",
+      "skill_type": 36,
+      "skill_date_of_creation": "2024-01-01T00:00:00Z"
+    }
+  },
+  {
+    "model": "skills.skill",
+    "pk": 50,
+    "fields": {
+      "skill_wikidata_item": "Q50",
+      "skill_type": null,
+      "skill_date_of_creation": "2024-01-01T00:00:00Z"
+    }
+  },
+  {
+    "model": "skills.skill",
+    "pk": 51,
+    "fields": {
+      "skill_wikidata_item": "Q51",
+      "skill_type": 50,
+      "skill_date_of_creation": "2024-01-01T00:00:00Z"
+    }
+  },
+  {
+    "model": "skills.skill",
+    "pk": 56,
+    "fields": {
+      "skill_wikidata_item": "Q56",
+      "skill_type": null,
+      "skill_date_of_creation": "2024-01-01T00:00:00Z"
+    }
+  },
+  {
+    "model": "skills.skill",
+    "pk": 65,
+    "fields": {
+      "skill_wikidata_item": "Q65",
+      "skill_type": null,
+      "skill_date_of_creation": "2024-01-01T00:00:00Z"
+    }
+  },
+  {
+    "model": "skills.skill",
+    "pk": 74,
+    "fields": {
+      "skill_wikidata_item": "Q74",
+      "skill_type": null,
+      "skill_date_of_creation": "2024-01-01T00:00:00Z"
+    }
+  },
+  {
+    "model": "skills.skill",
+    "pk": 106,
+    "fields": {
+      "skill_wikidata_item": "Q106",
+      "skill_type": null,
+      "skill_date_of_creation": "2024-01-01T00:00:00Z"
+    }
+  },
+  {
+    "model": "skills.skill",
+    "pk": 107,
+    "fields": {
+      "skill_wikidata_item": "Q107",
+      "skill_type": 106,
+      "skill_date_of_creation": "2024-01-01T00:00:00Z"
+    }
+  },
+  {
+    "model": "skills.skill",
+    "pk": 108,
+    "fields": {
+      "skill_wikidata_item": "Q108",
+      "skill_type": 106,
+      "skill_date_of_creation": "2024-01-01T00:00:00Z"
+    }
+  },
+
+  {
+    "model": "users.territory",
+    "pk": 1,
+    "fields": {
+      "territory_name": "Northern America",
+      "parent_territory": []
+    }
+  },
+  {
+    "model": "users.territory",
+    "pk": 2,
+    "fields": {
+      "territory_name": "Latin America",
+      "parent_territory": []
+    }
+  },
+  {
+    "model": "users.territory",
+    "pk": 3,
+    "fields": {
+      "territory_name": "Europe",
+      "parent_territory": []
+    }
+  },
+  {
+    "model": "users.territory",
+    "pk": 4,
+    "fields": {
+      "territory_name": "Asia Pacific",
+      "parent_territory": []
+    }
+  },
+  {
+    "model": "users.territory",
+    "pk": 5,
+    "fields": {
+      "territory_name": "Middle East and Africa",
+      "parent_territory": []
+    }
+  },
+  {
+    "model": "users.territory",
+    "pk": 6,
+    "fields": {
+      "territory_name": "South Asia",
+      "parent_territory": []
+    }
+  },
+  {
+    "model": "users.territory",
+    "pk": 7,
+    "fields": {
+      "territory_name": "East, Southeast Asia and Pacific",
+      "parent_territory": []
+    }
+  },
+  {
+    "model": "users.territory",
+    "pk": 10,
+    "fields": {
+      "territory_name": "United States",
+      "parent_territory": [1]
+    }
+  },
+  {
+    "model": "users.territory",
+    "pk": 11,
+    "fields": {
+      "territory_name": "Canada",
+      "parent_territory": [1]
+    }
+  },
+  {
+    "model": "users.territory",
+    "pk": 20,
+    "fields": {
+      "territory_name": "Brazil",
+      "parent_territory": [2]
+    }
+  },
+  {
+    "model": "users.territory",
+    "pk": 21,
+    "fields": {
+      "territory_name": "Mexico",
+      "parent_territory": [2]
+    }
+  },
+  {
+    "model": "users.territory",
+    "pk": 30,
+    "fields": {
+      "territory_name": "Germany",
+      "parent_territory": [3]
+    }
+  },
+  {
+    "model": "users.territory",
+    "pk": 31,
+    "fields": {
+      "territory_name": "France",
+      "parent_territory": [3]
+    }
+  },
+
+  {
+    "model": "users.customuser",
+    "pk": 100,
+    "fields": {
+      "password": "pbkdf2_sha256$600000$test$test",
+      "last_login": null,
+      "is_superuser": false,
+      "username": "testuser1",
+      "first_name": "",
+      "last_name": "",
+      "email": "testuser1@example.com",
+      "is_staff": false,
+      "is_active": true,
+      "date_joined": "2024-01-15T10:00:00Z"
+    }
+  },
+  {
+    "model": "users.customuser",
+    "pk": 101,
+    "fields": {
+      "password": "pbkdf2_sha256$600000$test$test",
+      "last_login": null,
+      "is_superuser": false,
+      "username": "testuser2",
+      "first_name": "",
+      "last_name": "",
+      "email": "testuser2@example.com",
+      "is_staff": false,
+      "is_active": true,
+      "date_joined": "2024-01-16T10:00:00Z"
+    }
+  },
+  {
+    "model": "users.customuser",
+    "pk": 102,
+    "fields": {
+      "password": "pbkdf2_sha256$600000$test$test",
+      "last_login": null,
+      "is_superuser": false,
+      "username": "testuser3",
+      "first_name": "",
+      "last_name": "",
+      "email": "testuser3@example.com",
+      "is_staff": false,
+      "is_active": true,
+      "date_joined": "2024-01-17T10:00:00Z"
+    }
+  },
+  {
+    "model": "users.customuser",
+    "pk": 103,
+    "fields": {
+      "password": "pbkdf2_sha256$600000$test$test",
+      "last_login": null,
+      "is_superuser": false,
+      "username": "testuser4",
+      "first_name": "",
+      "last_name": "",
+      "email": "testuser4@example.com",
+      "is_staff": false,
+      "is_active": true,
+      "date_joined": "2024-01-18T10:00:00Z"
+    }
+  },
+  {
+    "model": "users.customuser",
+    "pk": 104,
+    "fields": {
+      "password": "pbkdf2_sha256$600000$test$test",
+      "last_login": null,
+      "is_superuser": false,
+      "username": "testuser5",
+      "first_name": "",
+      "last_name": "",
+      "email": "testuser5@example.com",
+      "is_staff": false,
+      "is_active": true,
+      "date_joined": "2024-01-19T10:00:00Z"
+    }
+  },
+  {
+    "model": "users.customuser",
+    "pk": 105,
+    "fields": {
+      "password": "pbkdf2_sha256$600000$test$test",
+      "last_login": null,
+      "is_superuser": false,
+      "username": "testuser6",
+      "first_name": "",
+      "last_name": "",
+      "email": "testuser6@example.com",
+      "is_staff": false,
+      "is_active": true,
+      "date_joined": "2024-01-20T10:00:00Z"
+    }
+  },
+  {
+    "model": "users.customuser",
+    "pk": 106,
+    "fields": {
+      "password": "pbkdf2_sha256$600000$test$test",
+      "last_login": null,
+      "is_superuser": false,
+      "username": "testuser7",
+      "first_name": "",
+      "last_name": "",
+      "email": "testuser7@example.com",
+      "is_staff": false,
+      "is_active": true,
+      "date_joined": "2024-01-21T10:00:00Z"
+    }
+  },
+  {
+    "model": "users.customuser",
+    "pk": 107,
+    "fields": {
+      "password": "pbkdf2_sha256$600000$test$test",
+      "last_login": null,
+      "is_superuser": false,
+      "username": "testuser8",
+      "first_name": "",
+      "last_name": "",
+      "email": "testuser8@example.com",
+      "is_staff": false,
+      "is_active": true,
+      "date_joined": "2024-01-22T10:00:00Z"
+    }
+  },
+  {
+    "model": "users.customuser",
+    "pk": 108,
+    "fields": {
+      "password": "pbkdf2_sha256$600000$test$test",
+      "last_login": null,
+      "is_superuser": false,
+      "username": "testuser9",
+      "first_name": "",
+      "last_name": "",
+      "email": "testuser9@example.com",
+      "is_staff": false,
+      "is_active": true,
+      "date_joined": "2024-01-23T10:00:00Z"
+    }
+  },
+  {
+    "model": "users.customuser",
+    "pk": 109,
+    "fields": {
+      "password": "pbkdf2_sha256$600000$test$test",
+      "last_login": null,
+      "is_superuser": false,
+      "username": "testuser10",
+      "first_name": "",
+      "last_name": "",
+      "email": "testuser10@example.com",
+      "is_staff": false,
+      "is_active": true,
+      "date_joined": "2024-01-24T10:00:00Z"
+    }
+  },
+
+  {
+    "model": "users.profile",
+    "pk": 100,
+    "fields": {
+      "user": 100,
+      "avatar": null,
+      "display_name": "Test User 1",
+      "pronoun": "he-him",
+      "about": "I am a developer from North America",
+      "about_language": 3,
+      "wikidata_qid": "",
+      "wiki_alt": "",
+      "team": "",
+      "contact": null,
+      "social": null,
+      "automated_lets_connect": null,
+      "territory": [1, 10],
+      "affiliation": [],
+      "wikimedia_project": [1],
+      "skills_known": [10, 11, 36, 107],
+      "skills_available": [11, 107],
+      "skills_wanted": [50, 51]
+    }
+  },
+  {
+    "model": "users.profile",
+    "pk": 101,
+    "fields": {
+      "user": 101,
+      "avatar": null,
+      "display_name": "Test User 2",
+      "pronoun": "she-her",
+      "about": "I am a designer from Brazil",
+      "about_language": 1,
+      "wikidata_qid": "",
+      "wiki_alt": "",
+      "team": "",
+      "contact": null,
+      "social": null,
+      "automated_lets_connect": null,
+      "territory": [2, 20],
+      "affiliation": [],
+      "wikimedia_project": [1, 2],
+      "skills_known": [36, 37, 38, 65],
+      "skills_available": [37, 38],
+      "skills_wanted": [106, 107, 108]
+    }
+  },
+  {
+    "model": "users.profile",
+    "pk": 102,
+    "fields": {
+      "user": 102,
+      "avatar": null,
+      "display_name": "Test User 3",
+      "pronoun": "they-them",
+      "about": "I am a researcher from Germany",
+      "about_language": 6,
+      "wikidata_qid": "",
+      "wiki_alt": "",
+      "team": "",
+      "contact": null,
+      "social": null,
+      "automated_lets_connect": null,
+      "territory": [3, 30],
+      "affiliation": [],
+      "wikimedia_project": [1, 3],
+      "skills_known": [50, 51, 74],
+      "skills_available": [50, 51],
+      "skills_wanted": [10, 11, 12]
+    }
+  },
+  {
+    "model": "users.profile",
+    "pk": 103,
+    "fields": {
+      "user": 103,
+      "avatar": null,
+      "display_name": "Test User 4",
+      "pronoun": "he-him",
+      "about": "I am a community organizer from India",
+      "about_language": 3,
+      "wikidata_qid": "",
+      "wiki_alt": "",
+      "team": "",
+      "contact": null,
+      "social": null,
+      "automated_lets_connect": null,
+      "territory": [6],
+      "affiliation": [],
+      "wikimedia_project": [1],
+      "skills_known": [56, 65, 74],
+      "skills_available": [56, 65],
+      "skills_wanted": [36, 37]
+    }
+  },
+  {
+    "model": "users.profile",
+    "pk": 104,
+    "fields": {
+      "user": 104,
+      "avatar": null,
+      "display_name": "Test User 5",
+      "pronoun": "she-her",
+      "about": "I am a translator from France",
+      "about_language": 5,
+      "wikidata_qid": "",
+      "wiki_alt": "",
+      "team": "",
+      "contact": null,
+      "social": null,
+      "automated_lets_connect": null,
+      "territory": [3, 31],
+      "affiliation": [],
+      "wikimedia_project": [1, 2],
+      "skills_known": [36, 37, 106, 107],
+      "skills_available": [36, 37],
+      "skills_wanted": [74, 65]
+    }
+  },
+  {
+    "model": "users.profile",
+    "pk": 105,
+    "fields": {
+      "user": 105,
+      "avatar": null,
+      "display_name": "Test User 6",
+      "pronoun": "he-him",
+      "about": "I am a developer from Japan",
+      "about_language": 7,
+      "wikidata_qid": "",
+      "wiki_alt": "",
+      "team": "",
+      "contact": null,
+      "social": null,
+      "automated_lets_connect": null,
+      "territory": [7],
+      "affiliation": [],
+      "wikimedia_project": [1, 3],
+      "skills_known": [106, 107, 108, 10],
+      "skills_available": [106, 107, 108],
+      "skills_wanted": [56, 65]
+    }
+  },
+  {
+    "model": "users.profile",
+    "pk": 106,
+    "fields": {
+      "user": 106,
+      "avatar": null,
+      "display_name": "Test User 7",
+      "pronoun": "they-them",
+      "about": "I am a content creator from Mexico",
+      "about_language": 4,
+      "wikidata_qid": "",
+      "wiki_alt": "",
+      "team": "",
+      "contact": null,
+      "social": null,
+      "automated_lets_connect": null,
+      "territory": [2, 21],
+      "affiliation": [],
+      "wikimedia_project": [1],
+      "skills_known": [36, 38, 50, 51],
+      "skills_available": [38, 50],
+      "skills_wanted": [106, 108]
+    }
+  },
+  {
+    "model": "users.profile",
+    "pk": 107,
+    "fields": {
+      "user": 107,
+      "avatar": null,
+      "display_name": "Test User 8",
+      "pronoun": "she-her",
+      "about": "I am a project manager from Canada",
+      "about_language": 3,
+      "wikidata_qid": "",
+      "wiki_alt": "",
+      "team": "",
+      "contact": null,
+      "social": null,
+      "automated_lets_connect": null,
+      "territory": [1, 11],
+      "affiliation": [],
+      "wikimedia_project": [1, 2, 3],
+      "skills_known": [74, 10, 11, 12],
+      "skills_available": [74, 10, 11],
+      "skills_wanted": [36, 38]
+    }
+  },
+  {
+    "model": "users.profile",
+    "pk": 108,
+    "fields": {
+      "user": 108,
+      "avatar": null,
+      "display_name": "Test User 9",
+      "pronoun": "he-him",
+      "about": "I am a data analyst from South Africa",
+      "about_language": 3,
+      "wikidata_qid": "",
+      "wiki_alt": "",
+      "team": "",
+      "contact": null,
+      "social": null,
+      "automated_lets_connect": null,
+      "territory": [5],
+      "affiliation": [],
+      "wikimedia_project": [1, 3],
+      "skills_known": [106, 108, 50],
+      "skills_available": [106, 108],
+      "skills_wanted": [11, 12, 37]
+    }
+  },
+  {
+    "model": "users.profile",
+    "pk": 109,
+    "fields": {
+      "user": 109,
+      "avatar": null,
+      "display_name": "Test User 10",
+      "pronoun": "she-her",
+      "about": "I am an educator from Australia",
+      "about_language": 3,
+      "wikidata_qid": "",
+      "wiki_alt": "",
+      "team": "",
+      "contact": null,
+      "social": null,
+      "automated_lets_connect": null,
+      "territory": [7],
+      "affiliation": [],
+      "wikimedia_project": [1, 4],
+      "skills_known": [50, 51, 56, 65],
+      "skills_available": [50, 51, 56],
+      "skills_wanted": [107, 108]
+    }
+  },
+
+  {
+    "model": "users.languageproficiency",
+    "pk": 1,
+    "fields": {
+      "profile": 100,
+      "language": 3,
+      "proficiency": "n"
+    }
+  },
+  {
+    "model": "users.languageproficiency",
+    "pk": 2,
+    "fields": {
+      "profile": 100,
+      "language": 4,
+      "proficiency": "3"
+    }
+  },
+  {
+    "model": "users.languageproficiency",
+    "pk": 3,
+    "fields": {
+      "profile": 101,
+      "language": 1,
+      "proficiency": "n"
+    }
+  },
+  {
+    "model": "users.languageproficiency",
+    "pk": 4,
+    "fields": {
+      "profile": 101,
+      "language": 3,
+      "proficiency": "4"
+    }
+  },
+  {
+    "model": "users.languageproficiency",
+    "pk": 5,
+    "fields": {
+      "profile": 101,
+      "language": 4,
+      "proficiency": "3"
+    }
+  },
+  {
+    "model": "users.languageproficiency",
+    "pk": 6,
+    "fields": {
+      "profile": 102,
+      "language": 6,
+      "proficiency": "n"
+    }
+  },
+  {
+    "model": "users.languageproficiency",
+    "pk": 7,
+    "fields": {
+      "profile": 102,
+      "language": 3,
+      "proficiency": "5"
+    }
+  },
+  {
+    "model": "users.languageproficiency",
+    "pk": 8,
+    "fields": {
+      "profile": 102,
+      "language": 5,
+      "proficiency": "3"
+    }
+  },
+  {
+    "model": "users.languageproficiency",
+    "pk": 9,
+    "fields": {
+      "profile": 103,
+      "language": 3,
+      "proficiency": "5"
+    }
+  },
+  {
+    "model": "users.languageproficiency",
+    "pk": 10,
+    "fields": {
+      "profile": 104,
+      "language": 5,
+      "proficiency": "n"
+    }
+  },
+  {
+    "model": "users.languageproficiency",
+    "pk": 11,
+    "fields": {
+      "profile": 104,
+      "language": 3,
+      "proficiency": "4"
+    }
+  },
+  {
+    "model": "users.languageproficiency",
+    "pk": 12,
+    "fields": {
+      "profile": 104,
+      "language": 6,
+      "proficiency": "3"
+    }
+  },
+  {
+    "model": "users.languageproficiency",
+    "pk": 13,
+    "fields": {
+      "profile": 105,
+      "language": 7,
+      "proficiency": "n"
+    }
+  },
+  {
+    "model": "users.languageproficiency",
+    "pk": 14,
+    "fields": {
+      "profile": 105,
+      "language": 3,
+      "proficiency": "4"
+    }
+  },
+  {
+    "model": "users.languageproficiency",
+    "pk": 15,
+    "fields": {
+      "profile": 106,
+      "language": 4,
+      "proficiency": "n"
+    }
+  },
+  {
+    "model": "users.languageproficiency",
+    "pk": 16,
+    "fields": {
+      "profile": 106,
+      "language": 3,
+      "proficiency": "3"
+    }
+  },
+  {
+    "model": "users.languageproficiency",
+    "pk": 17,
+    "fields": {
+      "profile": 107,
+      "language": 3,
+      "proficiency": "n"
+    }
+  },
+  {
+    "model": "users.languageproficiency",
+    "pk": 18,
+    "fields": {
+      "profile": 107,
+      "language": 5,
+      "proficiency": "4"
+    }
+  },
+  {
+    "model": "users.languageproficiency",
+    "pk": 19,
+    "fields": {
+      "profile": 108,
+      "language": 3,
+      "proficiency": "n"
+    }
+  },
+  {
+    "model": "users.languageproficiency",
+    "pk": 20,
+    "fields": {
+      "profile": 109,
+      "language": 3,
+      "proficiency": "n"
+    }
+  },
+  {
+    "model": "users.languageproficiency",
+    "pk": 21,
+    "fields": {
+      "profile": 109,
+      "language": 7,
+      "proficiency": "2"
+    }
+  }
+]
