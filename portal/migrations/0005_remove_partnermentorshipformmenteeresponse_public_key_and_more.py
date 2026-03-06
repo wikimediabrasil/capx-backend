@@ -4,7 +4,7 @@ import django.db.models.deletion
 from django.db import migrations, models
 
 
-def backfill_form_public_keys(apps, schema_editor):
+def backfill_form_public_keys(apps, schema_editor): # pragma: no cover
     MentorResponse = apps.get_model('portal', 'PartnerMentorshipFormMentorResponse')
     MenteeResponse = apps.get_model('portal', 'PartnerMentorshipFormMenteeResponse')
     MentorForm = apps.get_model('portal', 'PartnerMentorshipFormMentor')

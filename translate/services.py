@@ -27,7 +27,7 @@ class MetabaseClient:
         username = os.environ.get("METABASE_USERNAME")
         password = os.environ.get("METABASE_PASSWORD")
         if not username or not password:
-            raise RuntimeError("Missing CAPX_BOT_USERNAME/CAPX_BOT_PASSWORD in settings_local.py or env")
+            raise RuntimeError("Missing METABASE_USERNAME/METABASE_PASSWORD in settings_local.py or env")
         self._session, self._token = self._mw_login(METABASE_API_ENDPOINT, username, password)
         return self
 

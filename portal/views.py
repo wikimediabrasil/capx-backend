@@ -215,20 +215,46 @@ def dashboard(request):
     # Partner badges available for assignment in portal, scoped by membership unless staff
     if is_portal_admin(request.user):
         partner_badges = Badge.objects.filter(type='partner').order_by('name')
-        partners_for_ui = Partner.objects.select_related('organization').all().order_by('organization__i18n_names__name')
-        partner_members = PartnerMembership.objects.select_related('partner__organization', 'user').order_by('partner__organization__i18n_names__name', 'user__username')
+        partners_for_ui = (
+            Partner.objects
+            .select_related('organization')
+            .filter(organization__i18n_names__language_code='en')
+            .order_by('organization__i18n_names__name')
+            .distinct()
+        )
+        partner_members = (
+            PartnerMembership.objects
+            .select_related('partner__organization', 'user')
+            .filter(partner__organization__i18n_names__language_code='en')
+            .order_by('partner__organization__i18n_names__name', 'user__username')
+            .distinct()
+        )
         partner_org_candidates = (
             Organization.objects
             .exclude(id__in=Partner.objects.values_list('organization_id', flat=True))
+            .filter(i18n_names__language_code='en')
             .order_by('i18n_names__name')
+            .distinct()
         )
     else:
         partner_badges = Badge.objects.filter(
             type='partner',
             logic__partner__in=user_partners.values_list('organization_id', flat=True)
         ).order_by('name')
-        partners_for_ui = user_partners.select_related('organization').order_by('organization__i18n_names__name')
-        partner_members = PartnerMembership.objects.filter(user=request.user, partner__in=partners_for_ui).select_related('partner__organization').order_by('partner__organization__i18n_names__name', 'user__username')
+        partners_for_ui = (
+            user_partners
+            .select_related('organization')
+            .filter(organization__i18n_names__language_code='en')
+            .order_by('organization__i18n_names__name')
+            .distinct()
+        )
+        partner_members = (
+            PartnerMembership.objects
+            .filter(user=request.user, partner__in=partners_for_ui, partner__organization__i18n_names__language_code='en')
+            .select_related('partner__organization')
+            .order_by('partner__organization__i18n_names__name', 'user__username')
+            .distinct()
+        )
         partner_org_candidates = Organization.objects.none()
 
     # Attach partner_name to each partner badge, using organization id stored in logic['partner']
@@ -240,6 +266,7 @@ def dashboard(request):
         name_map = dict(
             Partner.objects
             .filter(organization_id__in=pids)
+            .filter(organization__i18n_names__language_code='en')
             .select_related('organization')
             .values_list('organization_id', 'organization__i18n_names__name')
         )
@@ -272,33 +299,38 @@ def dashboard(request):
     mentorship_forms_mentor = (
         PartnerMentorshipFormMentor.objects
         .select_related('partner__organization')
-        .filter(partner__in=mentorship_enabled_partners)
+        .filter(partner__in=mentorship_enabled_partners, partner__organization__i18n_names__language_code='en')
         .order_by('partner__organization__i18n_names__name', '-created_at')
+        .distinct()
     )
     mentorship_forms_mentee = (
         PartnerMentorshipFormMentee.objects
         .select_related('partner__organization')
-        .filter(partner__in=mentorship_enabled_partners)
+        .filter(partner__in=mentorship_enabled_partners, partner__organization__i18n_names__language_code='en')
         .order_by('partner__organization__i18n_names__name', '-created_at')
+        .distinct()
     )
     mentorship_public_keys = (
         PartnerMentorshipPublicKey.objects
         .select_related('partner__organization')
-        .filter(partner__in=mentorship_enabled_partners)
+        .filter(partner__in=mentorship_enabled_partners, partner__organization__i18n_names__language_code='en')
         .order_by('partner__organization__i18n_names__name', '-created_at')
+        .distinct()
     )
 
     mentorship_mentor_responses = (
         PartnerMentorshipFormMentorResponse.objects
         .select_related('partner__organization', 'form', 'user')
-        .filter(partner__in=mentorship_enabled_partners)
+        .filter(partner__in=mentorship_enabled_partners, partner__organization__i18n_names__language_code='en')
         .order_by('partner__organization__i18n_names__name', '-created_at')
+        .distinct()
     )
     mentorship_mentee_responses = (
         PartnerMentorshipFormMenteeResponse.objects
         .select_related('partner__organization', 'form', 'user')
-        .filter(partner__in=mentorship_enabled_partners)
+        .filter(partner__in=mentorship_enabled_partners, partner__organization__i18n_names__language_code='en')
         .order_by('partner__organization__i18n_names__name', '-created_at')
+        .distinct()
     )
 
     mentor_forms_payload = [
