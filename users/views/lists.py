@@ -46,56 +46,6 @@ class UsersBySkillViewSet(viewsets.ReadOnlyModelViewSet):
         response = {'message': 'Please provide a skill id.'}
         return Response(response, status=status.HTTP_400_BAD_REQUEST)
 
-class UsersByTagViewSet(viewsets.ReadOnlyModelViewSet):
-    queryset = Profile.objects.all()
-    serializer_class = UsersByTagSerializer
-
-    @extend_schema(
-        summary='Lists users by tag.',
-        description='This endpoint retrieves users by tag.',
-        parameters=[
-            OpenApiParameter(
-                "tag_type",
-                OpenApiTypes.STR,
-                OpenApiParameter.PATH,
-                required=True,
-                description='The type of tag to search for.',
-                enum=['skill_known', 'skill_available', 'skill_wanted', 'language', 'territory', 'wikimedia_project', 'affiliation'],
-            ),
-            OpenApiParameter(
-                "tag_id",
-                OpenApiTypes.INT,
-                OpenApiParameter.PATH,
-                required=True,
-                description='The ID of the tag to search for.',
-            ),
-        ],
-    )
-    def list(self, request, *args, **kwargs):
-        tag_type = kwargs.get('tag_type')
-        tag_id = kwargs.get('tag_id')
-        if not tag_type or not tag_id:
-            return Response({'message': 'Please provide a valid tag type and tag ID.'}, status=status.HTTP_400_BAD_REQUEST)
-
-        if tag_type == 'skill_known':
-            queryset = Profile.objects.filter(skills_known__id=tag_id)
-        elif tag_type == 'skill_available':
-            queryset = Profile.objects.filter(skills_available__id=tag_id)
-        elif tag_type == 'skill_wanted':
-            queryset = Profile.objects.filter(skills_wanted__id=tag_id)
-        elif tag_type == 'language':
-            queryset = Profile.objects.filter(languageproficiency__language__id=tag_id)
-        elif tag_type == 'territory':
-            queryset = Profile.objects.filter(territory__id=tag_id)
-        elif tag_type == 'wikimedia_project':
-            queryset = Profile.objects.filter(wikimedia_project__id=tag_id)
-        elif tag_type == 'affiliation':
-            queryset = Profile.objects.filter(affiliation__id=tag_id)
-        else:
-            return Response({'message': 'Invalid tag type. Options are: skill_known, skill_available, skill_wanted, language, territory, wikimedia_project, affiliation.'}, status=status.HTTP_400_BAD_REQUEST)
-
-        return Response(self.get_serializer(queryset, many=True).data)
-
 
 class QuickListViewSet(viewsets.ReadOnlyModelViewSet):
     lookup_url_kwarg = 'list_type'
@@ -319,5 +269,56 @@ class QuickListViewSet(viewsets.ReadOnlyModelViewSet):
     )
     def list(self, request, *args, **kwargs):
         return Response({'message': 'Please provide a valid list type.'}, status=status.HTTP_400_BAD_REQUEST)
+
+
+class UsersByTagViewSet(viewsets.ReadOnlyModelViewSet):
+    queryset = Profile.objects.all()
+    serializer_class = UsersByTagSerializer
+
+    @extend_schema(
+        summary='Lists users by tag.',
+        description='This endpoint retrieves users by tag.',
+        parameters=[
+            OpenApiParameter(
+                "tag_type",
+                OpenApiTypes.STR,
+                OpenApiParameter.PATH,
+                required=True,
+                description='The type of tag to search for.',
+                enum=['skill_known', 'skill_available', 'skill_wanted', 'language', 'territory', 'wikimedia_project', 'affiliation'],
+            ),
+            OpenApiParameter(
+                "tag_id",
+                OpenApiTypes.INT,
+                OpenApiParameter.PATH,
+                required=True,
+                description='The ID of the tag to search for.',
+            ),
+        ],
+    )
+    def list(self, request, *args, **kwargs):
+        tag_type = kwargs.get('tag_type')
+        tag_id = kwargs.get('tag_id')
+        if not tag_type or not tag_id:
+            return Response({'message': 'Please provide a valid tag type and tag ID.'}, status=status.HTTP_400_BAD_REQUEST)
+
+        if tag_type == 'skill_known':
+            queryset = Profile.objects.filter(skills_known__id=tag_id)
+        elif tag_type == 'skill_available':
+            queryset = Profile.objects.filter(skills_available__id=tag_id)
+        elif tag_type == 'skill_wanted':
+            queryset = Profile.objects.filter(skills_wanted__id=tag_id)
+        elif tag_type == 'language':
+            queryset = Profile.objects.filter(languageproficiency__language__id=tag_id)
+        elif tag_type == 'territory':
+            queryset = Profile.objects.filter(territory__id=tag_id)
+        elif tag_type == 'wikimedia_project':
+            queryset = Profile.objects.filter(wikimedia_project__id=tag_id)
+        elif tag_type == 'affiliation':
+            queryset = Profile.objects.filter(affiliation__id=tag_id)
+        else:
+            return Response({'message': 'Invalid tag type. Options are: skill_known, skill_available, skill_wanted, language, territory, wikimedia_project, affiliation.'}, status=status.HTTP_400_BAD_REQUEST)
+
+        return Response(self.get_serializer(queryset, many=True).data)
 
 
