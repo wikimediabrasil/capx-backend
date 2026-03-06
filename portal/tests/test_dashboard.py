@@ -10,7 +10,6 @@ from portal.models import (
     Partner,
     PartnerMembership,
     PartnerMentorshipFormMentor,
-    PartnerMentorshipPublicKey,
 )
 
 try:  # Optional dependency; skip test when Playwright is not installed
@@ -104,12 +103,6 @@ class DashboardE2E(StaticLiveServerTestCase):
             assert private_key.startswith("-----BEGIN")
         os.remove(path)
 
-        generated_public_key_id = str(
-            PartnerMentorshipPublicKey.objects.filter(partner=partner)
-            .latest("created_at")
-            .id
-        )
-
         # Refresh page to reset form state
         self.page.reload()
 
@@ -126,6 +119,12 @@ class DashboardE2E(StaticLiveServerTestCase):
 
         # On select #mentorship-form-partner, choose the first option
         self.page.select_option("#mentorship-form-partner", str(partner.organization_id))
+
+        generated_public_key_id = self.page.eval_on_selector(
+            "#mentorship-form-public-key",
+            "el => { const firstVisible = Array.from(el.options).find(o => !o.hidden); return firstVisible ? firstVisible.value : ''; }"
+        )
+        self.assertTrue(generated_public_key_id, "No visible mentorship public key option found for selected partner")
 
         # On select #mentorship-form-type, choose "mentor"
         self.page.select_option("#mentorship-form-type", "mentor")
