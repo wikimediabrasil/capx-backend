@@ -1,3 +1,6 @@
+from django.contrib.auth import get_user_model
+
+
 def get_username(strategy, details, user=None, *args, **kwargs):
     """
     This pipeline function customizes the behavior of python-social-auth to return the username 
@@ -14,4 +17,22 @@ def get_username(strategy, details, user=None, *args, **kwargs):
     - dict: A dictionary containing the username. If a user is provided, it returns {'username': user.username}. 
     """
     if user:
-        return {"username": user.username}
+        provider_username = details.get("username")
+        if provider_username and provider_username != user.username:
+            user_model = get_user_model()
+            username_taken = user_model.all_objects.exclude(pk=user.pk).filter(username=provider_username).exists()
+            if not username_taken:
+                user.username = provider_username
+                user.save(update_fields=["username"])
+        return {"user": user, "username": user.username}
+
+    username = details.get("username")
+    if not username:
+        return None
+
+    user_model = get_user_model()
+    existing_user = user_model.all_objects.filter(username=username).first()
+    if existing_user:
+        return {"user": existing_user, "username": existing_user.username}
+
+    return {"username": username}
