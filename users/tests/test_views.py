@@ -1321,6 +1321,7 @@ class CapacitiesByTerritoryViewTestCase(TestCase):
         territory_data = response.data[str(self.territory1.id)]
         skill_data = territory_data[str(self.skill1.id)]
 
+        self.assertEqual(skill_data['known'], 1)
         self.assertEqual(skill_data['available'], 1)
         self.assertEqual(skill_data['wanted'], 0)
 
@@ -1335,8 +1336,27 @@ class CapacitiesByTerritoryViewTestCase(TestCase):
         territory_data = response.data[str(self.territory1.id)]
         skill_data = territory_data[str(self.skill1.id)]
 
+        self.assertEqual(skill_data['known'], 0)
         self.assertEqual(skill_data['available'], 0)
         self.assertEqual(skill_data['wanted'], 1)
+
+    def test_capacities_by_territory_known_skills(self):
+        """Test aggregation of known skills by territory"""
+        self.user1.profile.territory.set([self.territory1])
+        self.user1.profile.skills_known.add(self.skill1)
+
+        self.user2.profile.territory.set([self.territory1])
+        self.user2.profile.skills_known.add(self.skill1)
+
+        response = self.client.get('/statistics/capacities-by-territory/')
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+
+        territory_data = response.data[str(self.territory1.id)]
+        skill_data = territory_data[str(self.skill1.id)]
+
+        self.assertEqual(skill_data['known'], 2)
+        self.assertEqual(skill_data['available'], 0)
+        self.assertEqual(skill_data['wanted'], 0)
 
     def test_capacities_by_territory_both_available_and_wanted(self):
         """Test when different users have same skill available and wanted"""
@@ -1355,6 +1375,7 @@ class CapacitiesByTerritoryViewTestCase(TestCase):
         territory_data = response.data[str(self.territory1.id)]
         skill_data = territory_data[str(self.skill1.id)]
 
+        self.assertEqual(skill_data['known'], 1)
         self.assertEqual(skill_data['available'], 1)
         self.assertEqual(skill_data['wanted'], 1)
 
@@ -1374,6 +1395,7 @@ class CapacitiesByTerritoryViewTestCase(TestCase):
         territory_data = response.data[str(self.territory1.id)]
         skill_data = territory_data[str(self.skill1.id)]
 
+        self.assertEqual(skill_data['known'], 2)
         self.assertEqual(skill_data['available'], 2)
 
     def test_capacities_by_territory_multiple_territories(self):
@@ -1437,10 +1459,12 @@ class CapacitiesByTerritoryViewTestCase(TestCase):
 
         territory_data = response.data[str(self.territory1.id)]
 
-        # skill1 should be available
+        # skill1 should be known and available
+        self.assertEqual(territory_data[str(self.skill1.id)]['known'], 1)
         self.assertEqual(territory_data[str(self.skill1.id)]['available'], 1)
         self.assertEqual(territory_data[str(self.skill1.id)]['wanted'], 0)
 
-        # skill2 should be wanted
+        # skill2 should be known and wanted
+        self.assertEqual(territory_data[str(self.skill2.id)]['known'], 1)
         self.assertEqual(territory_data[str(self.skill2.id)]['available'], 0)
         self.assertEqual(territory_data[str(self.skill2.id)]['wanted'], 1)
