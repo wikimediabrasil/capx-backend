@@ -34,7 +34,7 @@ from events.views import EventViewSet
 from message.views import MessageViewSet
 from projects.views import ProjectViewSet, ProjectMemberViewSet, ProjectMemberAcceptanceViewSet
 from portal.views_api import (
-    PartnerMentorshipAvailabilityViewSet,
+    PartnerViewSet,
     PartnerMentorshipFormMentorViewSet,
     PartnerMentorshipFormMentorResponseViewSet,
     PartnerMentorshipFormMenteeViewSet,
@@ -44,40 +44,41 @@ from drf_spectacular.views import SpectacularAPIView, SpectacularSwaggerView
 from translate.views_api import CapacityTranslationViewSet, CapacityTranslationOauthViewSet
 
 
-router = DefaultRouter()
-router.register('skill', SkillViewSet, basename='skill')
-router.register('hashtag', HashtagViewSet, basename='hashtag')
-router.register('users', UsersViewSet, basename='users')
-router.register('profile', ProfileViewSet, basename='profile')
-router.register('wikimedia_project', WikimediaProjectViewSet, basename='wikimedia_project')
-router.register('territory', TerritoryViewSet, basename='territory')
-router.register('avatar', AvatarViewSet, basename='avatar')
-router.register('saved_item', SavedItemViewSet, basename='saved_item')
-router.register('organizations', OrganizationViewSet, basename='organizations')
-router.register('organization_type', OrganizationTypeViewSet, basename='organization_type')
-router.register('organization_name', OrganizationNameViewSet, basename='organization_name')
-router.register('tag_diff', TagDiffViewSet, basename='tag_diff')
-router.register('document', DocumentViewSet, basename='document')
-router.register('bugs', BugViewSet, basename='bugs')
-router.register('attachment', AttachmentViewSet, basename='attachment')
-router.register('users_by_skill', UsersBySkillViewSet, basename='users_by_skill')
-router.register('skills_by_type', SkillByTypeViewSet, basename='skills_by_type')
-router.register('events', EventViewSet)
-router.register('messages', MessageViewSet, basename='messages')
-router.register('projects', ProjectViewSet, basename='projects')
-router.register('project_members', ProjectMemberViewSet, basename='project_members')
-router.register('project_member_acceptance', ProjectMemberAcceptanceViewSet, basename='project_member_acceptance')
-router.register('list', QuickListViewSet, basename='list')
-router.register('letsconnect', LetsConnectViewSet, basename='letsconnect')
-router.register('badges', BadgeViewSet, basename='badges')
-router.register('user_badge', UserBadgeViewSet, basename='user_badge')
-router.register('translating', CapacityTranslationViewSet, basename='translating')
-router.register('translating_oauth', CapacityTranslationOauthViewSet, basename='translating_oauth')
-router.register('mentorship_availability', PartnerMentorshipAvailabilityViewSet, basename='partner_mentorship_availability')
-router.register('mentorship_form_mentor', PartnerMentorshipFormMentorViewSet, basename='partner_mentorship_form_mentor')
-router.register('mentorship_form_mentee', PartnerMentorshipFormMenteeViewSet, basename='partner_mentorship_form_mentee')
-router.register('mentorship_form_mentor_response', PartnerMentorshipFormMentorResponseViewSet, basename='partner_mentorship_form_mentor_response')
-router.register('mentorship_form_mentee_response', PartnerMentorshipFormMenteeResponseViewSet, basename='partner_mentorship_form_mentee_response')
+if 'router' not in globals():
+    router = DefaultRouter()
+    router.register('skill', SkillViewSet, basename='skill')
+    router.register('hashtag', HashtagViewSet, basename='hashtag')
+    router.register('users', UsersViewSet, basename='users')
+    router.register('profile', ProfileViewSet, basename='profile')
+    router.register('wikimedia_project', WikimediaProjectViewSet, basename='wikimedia_project')
+    router.register('territory', TerritoryViewSet, basename='territory')
+    router.register('avatar', AvatarViewSet, basename='avatar')
+    router.register('saved_item', SavedItemViewSet, basename='saved_item')
+    router.register('organizations', OrganizationViewSet, basename='organizations')
+    router.register('organization_type', OrganizationTypeViewSet, basename='organization_type')
+    router.register('organization_name', OrganizationNameViewSet, basename='organization_name')
+    router.register('tag_diff', TagDiffViewSet, basename='tag_diff')
+    router.register('document', DocumentViewSet, basename='document')
+    router.register('bugs', BugViewSet, basename='bugs')
+    router.register('attachment', AttachmentViewSet, basename='attachment')
+    router.register('users_by_skill', UsersBySkillViewSet, basename='users_by_skill')
+    router.register('skills_by_type', SkillByTypeViewSet, basename='skills_by_type')
+    router.register('events', EventViewSet)
+    router.register('messages', MessageViewSet, basename='messages')
+    router.register('projects', ProjectViewSet, basename='projects')
+    router.register('project_members', ProjectMemberViewSet, basename='project_members')
+    router.register('project_member_acceptance', ProjectMemberAcceptanceViewSet, basename='project_member_acceptance')
+    router.register('list', QuickListViewSet, basename='list')
+    router.register('letsconnect', LetsConnectViewSet, basename='letsconnect')
+    router.register('badges', BadgeViewSet, basename='badges')
+    router.register('user_badge', UserBadgeViewSet, basename='user_badge')
+    router.register('translating', CapacityTranslationViewSet, basename='translating')
+    router.register('translating_oauth', CapacityTranslationOauthViewSet, basename='translating_oauth')
+    router.register('partners', PartnerViewSet, basename='partners')
+    router.register('mentorship_form_mentor', PartnerMentorshipFormMentorViewSet, basename='partner_mentorship_form_mentor')
+    router.register('mentorship_form_mentee', PartnerMentorshipFormMenteeViewSet, basename='partner_mentorship_form_mentee')
+    router.register('mentorship_form_mentor_response', PartnerMentorshipFormMentorResponseViewSet, basename='partner_mentorship_form_mentor_response')
+    router.register('mentorship_form_mentee_response', PartnerMentorshipFormMenteeResponseViewSet, basename='partner_mentorship_form_mentee_response')
 
 urlpatterns = [
     path('admin/', admin.site.urls),

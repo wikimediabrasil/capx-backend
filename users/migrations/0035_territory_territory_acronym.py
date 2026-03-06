@@ -295,7 +295,7 @@ def populate_acronyms(apps, schema_editor):
     for name, acr in mapping.items():
         territory.objects.filter(territory_name=name).update(territory_acronym=acr)
 
-def reverse_populate(apps, schema_editor):
+def reverse_populate(apps, schema_editor): # pragma: no cover
     territory = apps.get_model('users', 'Territory')
     territory.objects.update(territory_acronym=None)
 

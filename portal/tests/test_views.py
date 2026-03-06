@@ -2,6 +2,7 @@ from django.test import TestCase, Client
 from django.urls import reverse
 from django.contrib.auth import get_user_model
 from users.models import Badge, UserBadge
+from orgs.models import Organization, OrganizationName
 from portal.models import Partner, PartnerMembership
 import secrets
 
@@ -18,8 +19,13 @@ class PortalViewsTests(TestCase):
         self.missing_username = "ghost"
         self.admin = User.objects.create_user(username="admin", password=str(secrets.randbits(16)), is_staff=True)
 
-        # One partner and membership for user1
-        self.partner = Partner.objects.create(name="WMBR", description="Test partner")
+        # One organization mapped as partner and membership for user1
+        self.organization = Organization.objects.create(acronym="WMBR")
+        OrganizationName.objects.create(organization=self.organization, language_code="en", name="WMBR")
+        self.partner = Partner.objects.create(
+            organization=self.organization,
+            description="Test partner",
+        )
         PartnerMembership.objects.create(partner=self.partner, user=self.user1)
 
         # Partner badge scoped to the partner
@@ -27,7 +33,7 @@ class PortalViewsTests(TestCase):
             name="Helper",
             picture="https://example.org/badge.png",
             description="Test partner badge",
-            logic={"partner": self.partner.id},
+            logic={"partner": self.partner.organization_id},
             type="partner",
         )
 
@@ -100,7 +106,7 @@ class PortalViewsTests(TestCase):
         # Non-member cannot create for partner they don't belong to
         self.client.force_login(user=self.user2)
         url = reverse("portal:partner_badge_create")
-        payload = {"name": "X", "picture": "https://x", "partner_id": str(self.partner.id)}
+        payload = {"name": "X", "picture": "https://x", "partner_id": str(self.partner.organization_id)}
         resp = self.client.post(url, data=payload)
         self.assertEqual(resp.status_code, 403)
 
@@ -121,7 +127,7 @@ class PortalViewsTests(TestCase):
         self.client.force_login(user=self.admin)
         add_url = reverse("portal:partner_membership_add")
         rem_url = reverse("portal:partner_membership_remove")
-        data = {"partner_id": str(self.partner.id), "username": self.user2.username}
+        data = {"partner_id": str(self.partner.organization_id), "username": self.user2.username}
         add_resp = self.client.post(add_url, data=data)
         self.assertEqual(add_resp.status_code, 302)
         self.assertTrue(PartnerMembership.objects.filter(partner=self.partner, user=self.user2).exists())

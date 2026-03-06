@@ -204,35 +204,29 @@ class LanguagesByTerritoryView(APIView):
         ],
     )
     def get(self, request, *args, **kwargs):
-        # Get all active user profiles with their territories and languages
-        profiles_with_data = Profile.objects.filter(
-            user__is_active=True
-        ).prefetch_related(
-            'territory',
-            'languageproficiency_set__language'
+        # Get counts of users who speak each language, grouped by territory, excluding proficiency=0
+        aggregated_counts = (
+            LanguageProficiency.objects
+            .filter(
+                profile__user__is_active=True,
+                profile__territory__isnull=False,
+            )
+            .exclude(proficiency='0')
+            .values('profile__territory__id', 'language_id')
+            .annotate(user_count=Count('profile_id', distinct=True))
         )
 
-        # Aggregate data
         result = {}
 
-        for profile in profiles_with_data:
-            # Get user's territories
-            territories = list(profile.territory.values_list('id', flat=True))
+        # Build the result structure with territory as the first level and language counts as the second level
+        for row in aggregated_counts:
+            territory_key = str(row['profile__territory__id'])
+            language_key = str(row['language_id'])
 
-            # Get user's languages (excluding proficiency=0)
-            languages = LanguageProficiency.objects.filter(
-                profile=profile
-            ).exclude(proficiency='0').values_list('language_id', flat=True)
+            if territory_key not in result:
+                result[territory_key] = {}
 
-            # For each territory, count each language
-            for territory_id in territories:
-                territory_key = str(territory_id)
-                if territory_key not in result:
-                    result[territory_key] = {}
-
-                for language_id in languages:
-                    language_key = str(language_id)
-                    result[territory_key][language_key] = result[territory_key].get(language_key, 0) + 1
+            result[territory_key][language_key] = row['user_count']
 
         return Response(result)
 
@@ -282,53 +276,49 @@ class CapacitiesByTerritoryView(APIView):
         ],
     )
     def get(self, request, *args, **kwargs):
-        # Get all active user profiles with their territories and skills
-        profiles_with_data = Profile.objects.filter(
-            user__is_active=True
-        ).prefetch_related(
-            'territory',
-            'skills_known',
-            'skills_available',
-            'skills_wanted'
+        # Get counts of users with skills known, available and wanted, grouped by territory and skill
+        known_counts = (
+            Profile.objects
+            .filter(user__is_active=True, territory__isnull=False, skills_known__isnull=False)
+            .values('territory__id', 'skills_available__id')
+            .annotate(user_count=Count('id', distinct=True))
+        )
+        available_counts = (
+            Profile.objects
+            .filter(user__is_active=True, territory__isnull=False, skills_available__isnull=False)
+            .values('territory__id', 'skills_available__id')
+            .annotate(user_count=Count('id', distinct=True))
+        )
+        wanted_counts = (
+            Profile.objects
+            .filter(user__is_active=True, territory__isnull=False, skills_wanted__isnull=False)
+            .values('territory__id', 'skills_wanted__id')
+            .annotate(user_count=Count('id', distinct=True))
         )
 
-        # Aggregate data
         result = {}
 
-        for profile in profiles_with_data:
-            # Get user's territories
-            territories = list(profile.territory.values_list('id', flat=True))
+        # Combine available and wanted counts into a single structure
+        for row in available_counts:
+            territory_key = str(row['territory__id'])
+            skill_key = str(row['skills_available__id'])
 
-            # Get user's skills
-            skills_known = list(profile.skills_known.values_list('id', flat=True))
-            skills_available = list(profile.skills_available.values_list('id', flat=True))
-            skills_wanted = list(profile.skills_wanted.values_list('id', flat=True))
+            if territory_key not in result:
+                result[territory_key] = {}
+            if skill_key not in result[territory_key]:
+                result[territory_key][skill_key] = {'available': 0, 'wanted': 0}
 
-            # For each territory, count skills
-            for territory_id in territories:
-                territory_key = str(territory_id)
-                if territory_key not in result:
-                    result[territory_key] = {}
+            result[territory_key][skill_key]['available'] = row['user_count']
 
-                # Count known skills
-                for skill_id in skills_known:
-                    skill_key = str(skill_id)
-                    if skill_key not in result[territory_key]:
-                        result[territory_key][skill_key] = {'known': 0, 'available': 0, 'wanted': 0}
-                    result[territory_key][skill_key]['known'] += 1
+        for row in wanted_counts:
+            territory_key = str(row['territory__id'])
+            skill_key = str(row['skills_wanted__id'])
 
-                # Count available skills
-                for skill_id in skills_available:
-                    skill_key = str(skill_id)
-                    if skill_key not in result[territory_key]:
-                        result[territory_key][skill_key] = {'known': 0, 'available': 0, 'wanted': 0}
-                    result[territory_key][skill_key]['available'] += 1
+            if territory_key not in result:
+                result[territory_key] = {}
+            if skill_key not in result[territory_key]:
+                result[territory_key][skill_key] = {'known': 0,'available': 0, 'wanted': 0}
 
-                # Count wanted skills
-                for skill_id in skills_wanted:
-                    skill_key = str(skill_id)
-                    if skill_key not in result[territory_key]:
-                        result[territory_key][skill_key] = {'known': 0, 'available': 0, 'wanted': 0}
-                    result[territory_key][skill_key]['wanted'] += 1
+            result[territory_key][skill_key]['wanted'] = row['user_count']
 
         return Response(result)
