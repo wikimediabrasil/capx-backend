@@ -6,7 +6,12 @@ from django.urls import reverse
 from django.contrib.auth import get_user_model
 
 from orgs.models import Organization, OrganizationName
-from portal.models import Partner, PartnerMembership, PartnerMentorshipFormMentor
+from portal.models import (
+    Partner,
+    PartnerMembership,
+    PartnerMentorshipFormMentor,
+    PartnerMentorshipPublicKey,
+)
 
 try:  # Optional dependency; skip test when Playwright is not installed
     from playwright.sync_api import sync_playwright, TimeoutError as PlaywrightTimeoutError
@@ -99,6 +104,12 @@ class DashboardE2E(StaticLiveServerTestCase):
             assert private_key.startswith("-----BEGIN")
         os.remove(path)
 
+        generated_public_key_id = str(
+            PartnerMentorshipPublicKey.objects.filter(partner=partner)
+            .latest("created_at")
+            .id
+        )
+
         # Refresh page to reset form state
         self.page.reload()
 
@@ -119,8 +130,8 @@ class DashboardE2E(StaticLiveServerTestCase):
         # On select #mentorship-form-type, choose "mentor"
         self.page.select_option("#mentorship-form-type", "mentor")
 
-        # On #mentorship-form-public-key, choose the first
-        self.page.select_option("#mentorship-form-public-key", "1")
+        # On #mentorship-form-public-key, choose the key generated in this test
+        self.page.select_option("#mentorship-form-public-key", generated_public_key_id)
 
         # Submit form and expect "<li class="success">" success message after page loaded
         self.page.click("#mentorship-form-save-btn")
