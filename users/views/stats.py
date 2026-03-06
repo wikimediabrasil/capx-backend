@@ -280,7 +280,7 @@ class CapacitiesByTerritoryView(APIView):
         known_counts = (
             Profile.objects
             .filter(user__is_active=True, territory__isnull=False, skills_known__isnull=False)
-            .values('territory__id', 'skills_available__id')
+            .values('territory__id', 'skills_known__id')
             .annotate(user_count=Count('id', distinct=True))
         )
         available_counts = (
@@ -298,7 +298,18 @@ class CapacitiesByTerritoryView(APIView):
 
         result = {}
 
-        # Combine available and wanted counts into a single structure
+        # Combine known, available and wanted counts into a single structure
+        for row in known_counts:
+            territory_key = str(row['territory__id'])
+            skill_key = str(row['skills_known__id'])
+
+            if territory_key not in result:
+                result[territory_key] = {}
+            if skill_key not in result[territory_key]:
+                result[territory_key][skill_key] = {'known': 0, 'available': 0, 'wanted': 0}
+
+            result[territory_key][skill_key]['known'] = row['user_count']
+
         for row in available_counts:
             territory_key = str(row['territory__id'])
             skill_key = str(row['skills_available__id'])
@@ -306,7 +317,7 @@ class CapacitiesByTerritoryView(APIView):
             if territory_key not in result:
                 result[territory_key] = {}
             if skill_key not in result[territory_key]:
-                result[territory_key][skill_key] = {'available': 0, 'wanted': 0}
+                result[territory_key][skill_key] = {'known': 0, 'available': 0, 'wanted': 0}
 
             result[territory_key][skill_key]['available'] = row['user_count']
 
