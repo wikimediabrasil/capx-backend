@@ -1,5 +1,6 @@
-import requests
+import requests, re
 from django.core.cache import cache
+from babel import Locale, UnknownLocaleError
 from rest_framework import viewsets, status
 from rest_framework.response import Response
 from rest_framework.permissions import IsAuthenticated
@@ -13,9 +14,8 @@ from users.models import Territory, WikimediaProject
 from orgs.models import Organization
 from events.models import Events
 from projects.models import Project
-from CapX.useragent import get_user_agent
 
-WIKIDATA_SPARQL_ENDPOINT = "https://query.wikidata.org/sparql"
+MEDIAWIKI_LOCALNAMES_RAW_BASE = "https://raw.githubusercontent.com/wikimedia/mediawiki-extensions-cldr/master/LocalNames"
 
 
 class UsersBySkillViewSet(viewsets.ReadOnlyModelViewSet):
@@ -169,15 +169,16 @@ class UsersByTagViewSet(viewsets.ReadOnlyModelViewSet):
 
 class LanguageNamesView(APIView):
     """
-    Returns all language names translated into a specific language using Wikidata.
-    Falls back to the stored autonym, then the English name, if Wikidata has no label.
+    Returns all language names translated into a specific language using CLDR.
+    Complements CLDR with MediaWiki LocalNames overrides.
+    Falls back to the stored autonym, then the English name, if no translated label is found.
     """
 
     @extend_schema(
         summary='Get language names in a specific language',
         description='Returns all available languages with their names translated into the requested language. '
-                    'Uses the Wikidata SPARQL endpoint to fetch translated names. '
-                    'Falls back to the stored autonym, then the English name, when no Wikidata label is found.',
+                    'Uses CLDR as primary source and complements with MediaWiki LocalNames overrides. '
+                    'Falls back to the stored autonym, then the English name, when no translated label is found.',
         parameters=[
             OpenApiParameter(
                 'language_code',
@@ -206,12 +207,21 @@ class LanguageNamesView(APIView):
             return Response({})
 
         codes = [lang.language_code for lang in languages]
-        wikidata_labels = self._fetch_wikidata_labels(codes, language_code)
+        try:
+            cldr_labels = self._fetch_cldr_labels(codes, language_code)
+        except Exception:
+            cldr_labels = {}
+
+        try:
+            localnames_labels = self._fetch_localnames_labels(language_code)
+        except Exception:
+            localnames_labels = {}
 
         result = {}
         for lang in languages:
             label = (
-                wikidata_labels.get(lang.language_code)
+                localnames_labels.get(lang.language_code)
+                or cldr_labels.get(lang.language_code)
                 or lang.language_autonym
                 or lang.language_name
             )
@@ -237,56 +247,91 @@ class LanguageNamesView(APIView):
                 result.append(part.upper())  # Region subtag: BR, CN, TW
         return '-'.join(result)
 
-    def _fetch_wikidata_labels(self, codes, target_lang):
-        """Query Wikidata SPARQL for labels of the given language codes in target_lang.
+    @staticmethod
+    def _to_babel_locale(code):
+        return LanguageNamesView._to_bcp47(code).replace('-', '_')
 
-        Matches codes against P218 (ISO 639-1) and P305 (IETF BCP 47).
-        Normalizes codes to standard BCP 47 capitalization before querying (e.g. "pt-br"
-        → "pt-BR") since Wikidata P305 values are case-sensitive.
-        Returns a {original_code: label} dict; missing codes are simply absent.
-        """
-        # Build normalized BCP 47 codes and a reverse map bcp47 → original
-        bcp47_to_original = {}
-        for code in codes:
-            bcp47 = self._to_bcp47(code)
-            bcp47_to_original[bcp47] = code
+    @staticmethod
+    def _to_mediawiki_localnames_file(code):
+        normalized = code.lower().replace('_', '-')
+        parts = normalized.split('-')
+        first = parts[0].capitalize() if parts and parts[0] else ''
+        suffix = ''.join(f'_{part}' for part in parts[1:])
+        return f'LocalNames{first}{suffix}.php'
 
-        values = ' '.join(f'"{c}"' for c in bcp47_to_original.keys())
-        normalized_target = self._to_bcp47(target_lang)
-        query = f"""
-SELECT ?code (SAMPLE(?label) AS ?label) WHERE {{
-  VALUES ?code {{ {values} }}
-  {{
-    ?item wdt:P218 ?code .
-  }} UNION {{
-    ?item wdt:P305 ?code .
-  }}
-  ?item rdfs:label ?label .
-  FILTER(LANG(?label) = "{normalized_target}")
-}}
-GROUP BY ?code
-"""
-        headers = {
-            'Accept': 'application/sparql-results+json',
-            'User-Agent': get_user_agent('LanguageNames'),
-        }
-        try:
-            resp = requests.get(
-                WIKIDATA_SPARQL_ENDPOINT,
-                params={'query': query},
-                headers=headers,
-                timeout=15,
-            )
-            resp.raise_for_status()
-            data = resp.json()
-        except Exception:
+    @staticmethod
+    def _extract_localnames_map(php_text):
+
+        start = php_text.find('$languageNames = [')
+        if start == -1:
             return {}
 
+        end = php_text.find('];', start)
+        if end == -1:
+            return {}
+
+        body = php_text[start:end]
+        pattern = re.compile(r"'([^']+)'\s*=>\s*'((?:\\\\'|[^'])*)'", re.DOTALL)
+
+        result = {}
+        for code, label in pattern.findall(body):
+            clean_label = label.replace("\\'", "'").replace('\\\\', '\\')
+            if code and clean_label:
+                result[code.lower()] = clean_label
+        return result
+
+    def _fetch_cldr_labels(self, codes, target_lang):
+        """Resolve language labels from CLDR (Babel) for target_lang."""
         labels = {}
-        for binding in data.get('results', {}).get('bindings', []):
-            bcp47_code = binding.get('code', {}).get('value', '')
-            label = binding.get('label', {}).get('value', '')
-            if bcp47_code and label:
-                original = bcp47_to_original.get(bcp47_code, bcp47_code)
-                labels[original] = label
+
+        normalized_target = self._to_babel_locale(target_lang)
+        target_candidates = [normalized_target]
+        if '_' in normalized_target:
+            target_candidates.append(normalized_target.split('_', 1)[0])
+
+        target_locales = []
+        for candidate in target_candidates:
+            try:
+                target_locales.append(Locale.parse(candidate, sep='_'))
+            except (UnknownLocaleError, ValueError):
+                continue
+
+        if not target_locales:
+            return labels
+
+        for code in codes:
+            normalized_code = self._to_babel_locale(code)
+            primary_code = normalized_code.split('_', 1)[0].lower()
+
+            label = None
+            for target_locale in target_locales:
+                try:
+                    lang_locale = Locale.parse(normalized_code, sep='_')
+                    label = lang_locale.get_display_name(target_locale)
+                except (UnknownLocaleError, ValueError):
+                    label = target_locale.languages.get(primary_code)
+
+                if label:
+                    break
+
+            if label:
+                labels[code] = label
+
         return labels
+
+    def _fetch_localnames_labels(self, target_lang):
+        """Fetch LocalNames overrides from Wikimedia CLDR extension repository."""
+        file_name = self._to_mediawiki_localnames_file(target_lang)
+        url = f'{MEDIAWIKI_LOCALNAMES_RAW_BASE}/{file_name}'
+        try:
+            response = requests.get(url, timeout=10)
+            if response.status_code == 404 and '-' in target_lang:
+                primary = target_lang.split('-', 1)[0]
+                fallback_file = self._to_mediawiki_localnames_file(primary)
+                fallback_url = f'{MEDIAWIKI_LOCALNAMES_RAW_BASE}/{fallback_file}'
+                response = requests.get(fallback_url, timeout=10)
+
+            response.raise_for_status()
+            return self._extract_localnames_map(response.text)
+        except Exception:
+            return {}
