@@ -1446,7 +1446,7 @@ class CapacitiesByTerritoryViewTestCase(TestCase):
         self.assertEqual(territory_data[str(self.skill2.id)]['wanted'], 1)
 
 
-class LanguageNamesViewTestCase(TestCase):
+class LanguageNamesFromQuickListTestCase(TestCase):
     def setUp(self):
         from django.core.cache import cache
         cache.clear()
@@ -1462,17 +1462,17 @@ class LanguageNamesViewTestCase(TestCase):
         )
 
     def test_no_auth_required(self):
-        with patch('users.views.lists.LanguageNamesView._fetch_cldr_labels', return_value={}), \
-             patch('users.views.lists.LanguageNamesView._fetch_localnames_labels', return_value={}):
-            response = APIClient().get('/list/language/pt/')
+        with patch('users.views.lists.QuickListViewSet._fetch_cldr_labels', return_value={}), \
+             patch('users.views.lists.QuickListViewSet._fetch_localnames_labels', return_value={}):
+            response = APIClient().get('/list/language/?lang=pt')
         self.assertEqual(response.status_code, status.HTTP_200_OK)
 
     def test_translated_names_from_cldr(self):
         """CLDR labels are returned for the requested language."""
         cldr_labels = {'en': 'Inglês', 'pt': 'Português', 'pt-br': 'português (Brasil)'}
-        with patch('users.views.lists.LanguageNamesView._fetch_cldr_labels', return_value=cldr_labels), \
-             patch('users.views.lists.LanguageNamesView._fetch_localnames_labels', return_value={}):
-            response = self.client.get('/list/language/pt/')
+        with patch('users.views.lists.QuickListViewSet._fetch_cldr_labels', return_value=cldr_labels), \
+             patch('users.views.lists.QuickListViewSet._fetch_localnames_labels', return_value={}):
+            response = self.client.get('/list/language/?lang=pt')
         self.assertEqual(response.status_code, status.HTTP_200_OK)
         self.assertEqual(response.data[self.lang_en.id], 'Inglês')
         self.assertEqual(response.data[self.lang_pt.id], 'Português')
@@ -1481,17 +1481,17 @@ class LanguageNamesViewTestCase(TestCase):
     def test_localnames_overrides_cldr_when_available(self):
         cldr_labels = {'pt-br': 'português (Brasil)'}
         localnames_labels = {'pt-br': 'Português do Brasil'}
-        with patch('users.views.lists.LanguageNamesView._fetch_cldr_labels', return_value=cldr_labels), \
-             patch('users.views.lists.LanguageNamesView._fetch_localnames_labels', return_value=localnames_labels):
-            response = self.client.get('/list/language/pt/')
+        with patch('users.views.lists.QuickListViewSet._fetch_cldr_labels', return_value=cldr_labels), \
+             patch('users.views.lists.QuickListViewSet._fetch_localnames_labels', return_value=localnames_labels):
+            response = self.client.get('/list/language/?lang=pt')
         self.assertEqual(response.status_code, status.HTTP_200_OK)
         self.assertEqual(response.data[self.lang_ptbr.id], 'Português do Brasil')
 
     def test_fallback_to_autonym_when_sources_have_no_label(self):
         """Falls back to language_autonym when CLDR and LocalNames return no label."""
-        with patch('users.views.lists.LanguageNamesView._fetch_cldr_labels', return_value={}), \
-             patch('users.views.lists.LanguageNamesView._fetch_localnames_labels', return_value={}):
-            response = self.client.get('/list/language/xx/')
+        with patch('users.views.lists.QuickListViewSet._fetch_cldr_labels', return_value={}), \
+             patch('users.views.lists.QuickListViewSet._fetch_localnames_labels', return_value={}):
+            response = self.client.get('/list/language/?lang=xx')
         self.assertEqual(response.status_code, status.HTTP_200_OK)
         self.assertEqual(response.data[self.lang_en.id], 'English')
         self.assertEqual(response.data[self.lang_pt.id], 'Português')
@@ -1501,38 +1501,38 @@ class LanguageNamesViewTestCase(TestCase):
         lang_no_autonym = Language.objects.create(
             language_name='German', language_autonym='', language_code='de'
         )
-        with patch('users.views.lists.LanguageNamesView._fetch_cldr_labels', return_value={}), \
-             patch('users.views.lists.LanguageNamesView._fetch_localnames_labels', return_value={}):
-            response = self.client.get('/list/language/xx/')
+        with patch('users.views.lists.QuickListViewSet._fetch_cldr_labels', return_value={}), \
+             patch('users.views.lists.QuickListViewSet._fetch_localnames_labels', return_value={}):
+            response = self.client.get('/list/language/?lang=xx')
         self.assertEqual(response.data[lang_no_autonym.id], 'German')
 
     def test_source_error_falls_back_gracefully(self):
         """If one source fails, endpoint still falls back to stored names."""
-        with patch('users.views.lists.LanguageNamesView._fetch_cldr_labels', side_effect=Exception('cldr error')), \
-             patch('users.views.lists.LanguageNamesView._fetch_localnames_labels', return_value={}):
-            response = self.client.get('/list/language/pt/')
+        with patch('users.views.lists.QuickListViewSet._fetch_cldr_labels', side_effect=Exception('cldr error')), \
+             patch('users.views.lists.QuickListViewSet._fetch_localnames_labels', return_value={}):
+            response = self.client.get('/list/language/?lang=pt')
         self.assertEqual(response.status_code, status.HTTP_200_OK)
         self.assertEqual(response.data[self.lang_en.id], 'English')
 
     def test_localnames_fetch_error_returns_empty_map(self):
-        from users.views.lists import LanguageNamesView
+        from users.views.lists import QuickListViewSet
         with patch('users.views.lists.requests.get', side_effect=Exception('timeout')):
-            labels = LanguageNamesView()._fetch_localnames_labels('pt')
+            labels = QuickListViewSet()._fetch_localnames_labels('pt')
         self.assertEqual(labels, {})
 
     def test_empty_database_returns_empty(self):
         Language.objects.all().delete()
-        with patch('users.views.lists.LanguageNamesView._fetch_cldr_labels', return_value={}), \
-             patch('users.views.lists.LanguageNamesView._fetch_localnames_labels', return_value={}):
-            response = self.client.get('/list/language/pt/')
+        with patch('users.views.lists.QuickListViewSet._fetch_cldr_labels', return_value={}), \
+             patch('users.views.lists.QuickListViewSet._fetch_localnames_labels', return_value={}):
+            response = self.client.get('/list/language/?lang=pt')
         self.assertEqual(response.status_code, status.HTTP_200_OK)
         self.assertEqual(response.data, {})
 
     def test_partial_cldr_results(self):
         """Only some languages found in CLDR; rest fall back to stored names."""
-        with patch('users.views.lists.LanguageNamesView._fetch_cldr_labels', return_value={'en': 'Inglês'}), \
-             patch('users.views.lists.LanguageNamesView._fetch_localnames_labels', return_value={}):
-            response = self.client.get('/list/language/pt/')
+        with patch('users.views.lists.QuickListViewSet._fetch_cldr_labels', return_value={'en': 'Inglês'}), \
+             patch('users.views.lists.QuickListViewSet._fetch_localnames_labels', return_value={}):
+            response = self.client.get('/list/language/?lang=pt')
         self.assertEqual(response.data[self.lang_en.id], 'Inglês')
         # pt and pt-br not in external results → fall back to autonym
         self.assertEqual(response.data[self.lang_pt.id], 'Português')
@@ -1541,9 +1541,9 @@ class LanguageNamesViewTestCase(TestCase):
     def test_result_is_cached(self):
         """Second request does not resolve labels again."""
         cldr_labels = {'en': 'Inglês', 'pt': 'Português', 'pt-br': 'português (Brasil)'}
-        with patch('users.views.lists.LanguageNamesView._fetch_cldr_labels', return_value=cldr_labels) as mock_cldr, \
-             patch('users.views.lists.LanguageNamesView._fetch_localnames_labels', return_value={}) as mock_localnames:
-            self.client.get('/list/language/pt/')
-            self.client.get('/list/language/pt/')
+        with patch('users.views.lists.QuickListViewSet._fetch_cldr_labels', return_value=cldr_labels) as mock_cldr, \
+             patch('users.views.lists.QuickListViewSet._fetch_localnames_labels', return_value={}) as mock_localnames:
+            self.client.get('/list/language/?lang=pt')
+            self.client.get('/list/language/?lang=pt')
         self.assertEqual(mock_cldr.call_count, 1)
         self.assertEqual(mock_localnames.call_count, 1)

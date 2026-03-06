@@ -8,7 +8,7 @@ to continue working after splitting views into multiple modules.
 from .account import UsersViewSet, ProfileViewSet
 
 # Lists and tags
-from .lists import QuickListViewSet, UsersBySkillViewSet, UsersByTagViewSet, LanguageNamesView
+from .lists import QuickListViewSet, UsersBySkillViewSet, UsersByTagViewSet
 
 # Reference data (territories, wikimedia projects, avatars)
 from .reference import (
@@ -41,7 +41,6 @@ __all__ = [
 	"QuickListViewSet",
 	"UsersBySkillViewSet",
 	"UsersByTagViewSet",
-	"LanguageNamesView",
 	# reference
 	"TerritoryViewSet",
 	"WikimediaProjectViewSet",

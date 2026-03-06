@@ -46,76 +46,6 @@ class UsersBySkillViewSet(viewsets.ReadOnlyModelViewSet):
         response = {'message': 'Please provide a skill id.'}
         return Response(response, status=status.HTTP_400_BAD_REQUEST)
 
-
-class QuickListViewSet(viewsets.ReadOnlyModelViewSet):
-    lookup_url_kwarg = 'list_type'
-
-    def get_queryset(self):
-        list_type = self.kwargs.get('list_type')
-        if list_type == 'language':
-            return Language.objects.all()
-        elif list_type == 'wikimedia_project':
-            return WikimediaProject.objects.all()
-        elif list_type == 'affiliation':
-            return Organization.objects.all()
-        elif list_type == 'territory':
-            return Territory.objects.all()
-        elif list_type == 'event':
-            return Events.objects.all()
-        elif list_type == 'project':
-            return Project.objects.all()
-        elif list_type == 'skills':
-            return Skill.objects.all()
-        elif list_type == 'badges':
-            return Badge.objects.all()
-        elif list_type == 'users':
-            return Profile.objects.all()
-        else:
-            # Dummy empty queryset to avoid errors in the schema generation
-            return Profile.objects.none()
-    
-    def get_serializer_class(self): # pragma: no cover
-        # Dummy method to avoid errors in the schema generation
-        return ProfileSerializer
-
-    @extend_schema(
-        summary='List all items in a simplified way.',
-        description='This endpoint lists all items of a given type in a simplified way.',
-        parameters=[
-            OpenApiParameter(
-                "list_type",
-                OpenApiTypes.STR,
-                OpenApiParameter.PATH,
-                required=True,
-                description='The type of list to retrieve.',
-                enum=['language', 'wikimedia_project', 'affiliation', 'territory', 'skills', 'event', 'project', 'badges', 'users'],
-            ),
-        ],
-        responses={(200, 'application/json'): {
-            'description': 'A mapping of item IDs to item names.',
-            'type': 'object',
-            'additionalProperties': {
-                'type': 'string',
-            },
-            'example': {
-                '1': 'Label 1',
-                '2': 'Label 2',
-                '3': 'Label 3',
-            },
-        }},
-    )
-    def retrieve(self, request, *args, **kwargs):
-        queryset = self.get_queryset()
-        data = {item.id: str(item) for item in queryset}
-        return Response(data)
-
-    @extend_schema(
-        exclude=True
-    )
-    def list(self, request, *args, **kwargs):
-        return Response({'message': 'Please provide a valid list type.'}, status=status.HTTP_400_BAD_REQUEST)
-
-
 class UsersByTagViewSet(viewsets.ReadOnlyModelViewSet):
     queryset = Profile.objects.all()
     serializer_class = UsersByTagSerializer
@@ -167,44 +97,91 @@ class UsersByTagViewSet(viewsets.ReadOnlyModelViewSet):
         return Response(self.get_serializer(queryset, many=True).data)
 
 
-class LanguageNamesView(APIView):
-    """
-    Returns all language names translated into a specific language using CLDR.
-    Complements CLDR with MediaWiki LocalNames overrides.
-    Falls back to the stored autonym, then the English name, if no translated label is found.
-    """
+class QuickListViewSet(viewsets.ReadOnlyModelViewSet):
+    lookup_url_kwarg = 'list_type'
+
+    def get_queryset(self):
+        list_type = self.kwargs.get('list_type')
+        if list_type == 'language':
+            return Language.objects.all()
+        elif list_type == 'wikimedia_project':
+            return WikimediaProject.objects.all()
+        elif list_type == 'affiliation':
+            return Organization.objects.all()
+        elif list_type == 'territory':
+            return Territory.objects.all()
+        elif list_type == 'event':
+            return Events.objects.all()
+        elif list_type == 'project':
+            return Project.objects.all()
+        elif list_type == 'skills':
+            return Skill.objects.all()
+        elif list_type == 'badges':
+            return Badge.objects.all()
+        elif list_type == 'users':
+            return Profile.objects.all()
+        else:
+            # Dummy empty queryset to avoid errors in the schema generation
+            return Profile.objects.none()
+    
+    def get_serializer_class(self): # pragma: no cover
+        # Dummy method to avoid errors in the schema generation
+        return ProfileSerializer
 
     @extend_schema(
-        summary='Get language names in a specific language',
-        description='Returns all available languages with their names translated into the requested language. '
-                    'Uses CLDR as primary source and complements with MediaWiki LocalNames overrides. '
-                    'Falls back to the stored autonym, then the English name, when no translated label is found.',
+        summary='List all items in a simplified way.',
+        description='This endpoint lists all items of a given type in a simplified way. '
+                    'For list_type=language, you can pass ?lang=<code> to return translated '
+                    'names using CLDR plus MediaWiki LocalNames overrides.',
         parameters=[
             OpenApiParameter(
-                'language_code',
+                "list_type",
                 OpenApiTypes.STR,
                 OpenApiParameter.PATH,
                 required=True,
-                description='BCP47 / ISO 639-1 code of the target language (e.g. "pt", "fr", "pt-br").',
+                description='The type of list to retrieve.',
+                enum=['language', 'wikimedia_project', 'affiliation', 'territory', 'skills', 'event', 'project', 'badges', 'users'],
+            ),
+            OpenApiParameter(
+                'lang',
+                OpenApiTypes.STR,
+                OpenApiParameter.QUERY,
+                required=False,
+                description='Only used when list_type=language. BCP47 / ISO 639-1 code of the target language (e.g. "pt", "fr", "pt-br").',
             ),
         ],
         responses={(200, 'application/json'): {
-            'description': 'Mapping of language IDs to their names in the requested language.',
+            'description': 'A mapping of item IDs to item names.',
             'type': 'object',
-            'additionalProperties': {'type': 'string'},
-            'example': {'1': 'Inglês', '2': 'Português', '3': 'Espanhol'},
+            'additionalProperties': {
+                'type': 'string',
+            },
+            'example': {
+                '1': 'Label 1',
+                '2': 'Label 2',
+                '3': 'Label 3',
+            },
         }},
     )
-    def get(self, request, *args, **kwargs):
-        language_code = self.kwargs.get('language_code')
+    def retrieve(self, request, *args, **kwargs):
+        if self.kwargs.get('list_type') == 'language':
+            language_code = request.query_params.get('lang')
+            if language_code:
+                return Response(self._get_translated_language_names(language_code))
+
+        queryset = self.get_queryset()
+        data = {item.id: str(item) for item in queryset}
+        return Response(data)
+
+    def _get_translated_language_names(self, language_code):
         cache_key = f'language_names_{language_code}'
         cached = cache.get(cache_key)
         if cached is not None:
-            return Response(cached)
+            return cached
 
         languages = list(Language.objects.all())
         if not languages:
-            return Response({})
+            return {}
 
         codes = [lang.language_code for lang in languages]
         try:
@@ -219,16 +196,17 @@ class LanguageNamesView(APIView):
 
         result = {}
         for lang in languages:
+            normalized_code = (lang.language_code or '').lower()
             label = (
-                localnames_labels.get(lang.language_code)
-                or cldr_labels.get(lang.language_code)
+                localnames_labels.get(normalized_code)
+                or cldr_labels.get(normalized_code)
                 or lang.language_autonym
                 or lang.language_name
             )
             result[lang.id] = label
 
         cache.set(cache_key, result, 60 * 60 * 24)  # 24 hours
-        return Response(result)
+        return result
 
     @staticmethod
     def _to_bcp47(code):
@@ -249,7 +227,7 @@ class LanguageNamesView(APIView):
 
     @staticmethod
     def _to_babel_locale(code):
-        return LanguageNamesView._to_bcp47(code).replace('-', '_')
+        return QuickListViewSet._to_bcp47(code).replace('-', '_')
 
     @staticmethod
     def _to_mediawiki_localnames_file(code):
@@ -315,7 +293,7 @@ class LanguageNamesView(APIView):
                     break
 
             if label:
-                labels[code] = label
+                labels[code.lower()] = label
 
         return labels
 
@@ -335,3 +313,11 @@ class LanguageNamesView(APIView):
             return self._extract_localnames_map(response.text)
         except Exception:
             return {}
+
+    @extend_schema(
+        exclude=True
+    )
+    def list(self, request, *args, **kwargs):
+        return Response({'message': 'Please provide a valid list type.'}, status=status.HTTP_400_BAD_REQUEST)
+
+
