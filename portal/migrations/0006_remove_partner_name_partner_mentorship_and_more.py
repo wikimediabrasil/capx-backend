@@ -4,19 +4,19 @@ import django.db.models.deletion
 from django.db import migrations, models
 from django.core.exceptions import ValidationError
 
-def migrate_availability_to_mentorship(apps, schema_editor):
+def migrate_availability_to_mentorship(apps, schema_editor): # pragma: no cover
     partner_model = apps.get_model('portal', 'Partner')
     for partner in partner_model.objects.all():
         partner.mentorship = partner.mentorship_availabilities.filter(status=True).exists()
         partner.save()
 
-def migrate_mentorship_to_availability(apps, schema_editor):
+def migrate_mentorship_to_availability(apps, schema_editor): # pragma: no cover
     partner_model = apps.get_model('portal', 'Partner')
     availability_model = apps.get_model('portal', 'PartnerMentorshipAvailability')
     for partner in partner_model.objects.all():
         availability_model.objects.create(partner=partner, status=partner.mentorship)
 
-def migrate_orgs_foreign_key_to_one_to_one(apps, schema_editor):
+def migrate_orgs_foreign_key_to_one_to_one(apps, schema_editor): # pragma: no cover
     # Check if there are any partners without a corresponding organization or with multiple partners for the same organization
     if apps.get_model('portal', 'Partner').objects.filter(organization__isnull=True).exists():
         raise ValidationError("Cannot migrate to one-to-one: Some partners do not have an associated organization.")
@@ -28,7 +28,7 @@ def migrate_orgs_foreign_key_to_one_to_one(apps, schema_editor):
         partner.organization_new_id = partner.organization_id
         partner.save()
 
-def migrate_orgs_one_to_one_to_foreign_key(apps, schema_editor):
+def migrate_orgs_one_to_one_to_foreign_key(apps, schema_editor): # pragma: no cover
     partner_model = apps.get_model('portal', 'Partner')
     for partner in partner_model.objects.all():
         partner.organization_id = partner.organization_new_id

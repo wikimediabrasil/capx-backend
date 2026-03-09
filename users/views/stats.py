@@ -187,12 +187,19 @@ class LanguagesByTerritoryView(APIView):
         }},
         examples=[
             OpenApiExample(
-                'Example Response',
+                name='Language counts by territory',
+                summary='Keys are territory IDs; nested keys are language IDs; values are user counts.',
+                description=(
+                    'Outer keys are territory IDs (e.g. "1" = Latin America, "2" = Africa). '
+                    'Inner keys are language IDs (e.g. "42" = English, "7" = Spanish, "3" = French). '
+                    'Values are the number of active users who speak that language in that territory.'
+                ),
                 value={
-                    "1": {"1": 10, "2": 5},
-                    "2": {"1": 4, "3": 6},
+                    '<territory_id>': {
+                        '<language_id>': 15,
+                    },
                 },
-                description='In this example, territory 1 has 10 users who speak language 1 and 5 users who speak language 2. Territory 2 has 4 users who speak language 1 and 6 users who speak language 3.',
+                response_only=True,
             ),
         ],
     )
@@ -233,7 +240,7 @@ class CapacitiesByTerritoryView(APIView):
     @extend_schema(
         summary='Get capacity user counts by territory',
         description='Returns pre-aggregated data of skill/capacity counts grouped by territory. '
-                    'Each territory contains a mapping of skill IDs to objects with available and wanted counts.',
+                    'Each territory contains a mapping of skill IDs to objects with known, available and wanted counts.',
         responses={(200, 'application/json'): {
             'description': 'Capacity counts by territory retrieved successfully',
             'type': 'object',
@@ -243,6 +250,7 @@ class CapacitiesByTerritoryView(APIView):
                 'additionalProperties': {
                     'type': 'object',
                     'properties': {
+                        'known': {'type': 'integer', 'description': 'Number of users who know this skill'},
                         'available': {'type': 'integer', 'description': 'Number of users with this skill available'},
                         'wanted': {'type': 'integer', 'description': 'Number of users who want this skill'},
                     }
@@ -251,23 +259,30 @@ class CapacitiesByTerritoryView(APIView):
         }},
         examples=[
             OpenApiExample(
-                'Example Response',
+                name='Capacity counts by territory',
+                summary='Keys are territory IDs; nested keys are skill/capacity IDs.',
+                description=(
+                    'Outer keys are territory IDs (e.g. "1" = Latin America, "2" = Africa). '
+                    'Inner keys are skill/capacity IDs (e.g. "10" = Communication, "20" = Research). '
+                    '"known" = users who know the skill, "available" = users offering it, "wanted" = users seeking it.'
+                ),
                 value={
-                    "1": {
-                        "1": {"available": 10, "wanted": 5},
-                        "2": {"available": 4, "wanted": 6},
-                    },
-                    "2": {
-                        "1": {"available": 7, "wanted": 3},
-                        "3": {"available": 2, "wanted": 8},
+                    '<territory_id>': {
+                        '<skill_id>': {'known': 15, 'available': 8, 'wanted': 3},
                     },
                 },
-                description='In this example, territory 1 has 10 users with skill 1 available and 5 users who want skill 1. It also has 4 users with skill 2 available and 6 users who want skill 2. Territory 2 has 7 users with skill 1 available and 3 users who want skill 1, as well as 2 users with skill 3 available and 8 users who want skill 3.',
+                response_only=True,
             ),
         ],
     )
     def get(self, request, *args, **kwargs):
-        # Get counts of users with skills available and wanted, grouped by territory and skill
+        # Get counts of users with skills known, available and wanted, grouped by territory and skill
+        known_counts = (
+            Profile.objects
+            .filter(user__is_active=True, territory__isnull=False, skills_known__isnull=False)
+            .values('territory__id', 'skills_known__id')
+            .annotate(user_count=Count('id', distinct=True))
+        )
         available_counts = (
             Profile.objects
             .filter(user__is_active=True, territory__isnull=False, skills_available__isnull=False)
@@ -283,7 +298,18 @@ class CapacitiesByTerritoryView(APIView):
 
         result = {}
 
-        # Combine available and wanted counts into a single structure
+        # Combine known, available and wanted counts into a single structure
+        for row in known_counts:
+            territory_key = str(row['territory__id'])
+            skill_key = str(row['skills_known__id'])
+
+            if territory_key not in result:
+                result[territory_key] = {}
+            if skill_key not in result[territory_key]:
+                result[territory_key][skill_key] = {'known': 0, 'available': 0, 'wanted': 0}
+
+            result[territory_key][skill_key]['known'] = row['user_count']
+
         for row in available_counts:
             territory_key = str(row['territory__id'])
             skill_key = str(row['skills_available__id'])
@@ -291,7 +317,7 @@ class CapacitiesByTerritoryView(APIView):
             if territory_key not in result:
                 result[territory_key] = {}
             if skill_key not in result[territory_key]:
-                result[territory_key][skill_key] = {'available': 0, 'wanted': 0}
+                result[territory_key][skill_key] = {'known': 0, 'available': 0, 'wanted': 0}
 
             result[territory_key][skill_key]['available'] = row['user_count']
 
@@ -302,7 +328,7 @@ class CapacitiesByTerritoryView(APIView):
             if territory_key not in result:
                 result[territory_key] = {}
             if skill_key not in result[territory_key]:
-                result[territory_key][skill_key] = {'available': 0, 'wanted': 0}
+                result[territory_key][skill_key] = {'known': 0,'available': 0, 'wanted': 0}
 
             result[territory_key][skill_key]['wanted'] = row['user_count']
 

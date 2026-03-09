@@ -1321,6 +1321,7 @@ class CapacitiesByTerritoryViewTestCase(TestCase):
         territory_data = response.data[str(self.territory1.id)]
         skill_data = territory_data[str(self.skill1.id)]
 
+        self.assertEqual(skill_data['known'], 1)
         self.assertEqual(skill_data['available'], 1)
         self.assertEqual(skill_data['wanted'], 0)
 
@@ -1335,8 +1336,27 @@ class CapacitiesByTerritoryViewTestCase(TestCase):
         territory_data = response.data[str(self.territory1.id)]
         skill_data = territory_data[str(self.skill1.id)]
 
+        self.assertEqual(skill_data['known'], 0)
         self.assertEqual(skill_data['available'], 0)
         self.assertEqual(skill_data['wanted'], 1)
+
+    def test_capacities_by_territory_known_skills(self):
+        """Test aggregation of known skills by territory"""
+        self.user1.profile.territory.set([self.territory1])
+        self.user1.profile.skills_known.add(self.skill1)
+
+        self.user2.profile.territory.set([self.territory1])
+        self.user2.profile.skills_known.add(self.skill1)
+
+        response = self.client.get('/statistics/capacities-by-territory/')
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+
+        territory_data = response.data[str(self.territory1.id)]
+        skill_data = territory_data[str(self.skill1.id)]
+
+        self.assertEqual(skill_data['known'], 2)
+        self.assertEqual(skill_data['available'], 0)
+        self.assertEqual(skill_data['wanted'], 0)
 
     def test_capacities_by_territory_both_available_and_wanted(self):
         """Test when different users have same skill available and wanted"""
@@ -1355,6 +1375,7 @@ class CapacitiesByTerritoryViewTestCase(TestCase):
         territory_data = response.data[str(self.territory1.id)]
         skill_data = territory_data[str(self.skill1.id)]
 
+        self.assertEqual(skill_data['known'], 1)
         self.assertEqual(skill_data['available'], 1)
         self.assertEqual(skill_data['wanted'], 1)
 
@@ -1374,6 +1395,7 @@ class CapacitiesByTerritoryViewTestCase(TestCase):
         territory_data = response.data[str(self.territory1.id)]
         skill_data = territory_data[str(self.skill1.id)]
 
+        self.assertEqual(skill_data['known'], 2)
         self.assertEqual(skill_data['available'], 2)
 
     def test_capacities_by_territory_multiple_territories(self):
@@ -1437,10 +1459,115 @@ class CapacitiesByTerritoryViewTestCase(TestCase):
 
         territory_data = response.data[str(self.territory1.id)]
 
-        # skill1 should be available
+        # skill1 should be known and available
+        self.assertEqual(territory_data[str(self.skill1.id)]['known'], 1)
         self.assertEqual(territory_data[str(self.skill1.id)]['available'], 1)
         self.assertEqual(territory_data[str(self.skill1.id)]['wanted'], 0)
 
-        # skill2 should be wanted
+        # skill2 should be known and wanted
+        self.assertEqual(territory_data[str(self.skill2.id)]['known'], 1)
         self.assertEqual(territory_data[str(self.skill2.id)]['available'], 0)
         self.assertEqual(territory_data[str(self.skill2.id)]['wanted'], 1)
+
+
+class LanguageNamesFromQuickListTestCase(TestCase):
+    def setUp(self):
+        from django.core.cache import cache
+        cache.clear()
+        self.client = APIClient()
+        self.lang_en = Language.objects.create(
+            language_name='English', language_autonym='English', language_code='en'
+        )
+        self.lang_pt = Language.objects.create(
+            language_name='Portuguese', language_autonym='Português', language_code='pt'
+        )
+        self.lang_ptbr = Language.objects.create(
+            language_name='Brazilian Portuguese', language_autonym='Português (Brasil)', language_code='pt-br'
+        )
+
+    def test_no_auth_required(self):
+        with patch('users.views.lists.QuickListViewSet._fetch_cldr_labels', return_value={}), \
+             patch('users.views.lists.QuickListViewSet._fetch_localnames_labels', return_value={}):
+            response = APIClient().get('/list/language/?lang=pt')
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+
+    def test_translated_names_from_cldr(self):
+        """CLDR labels are returned for the requested language."""
+        cldr_labels = {'en': 'Inglês', 'pt': 'Português', 'pt-br': 'português (Brasil)'}
+        with patch('users.views.lists.QuickListViewSet._fetch_cldr_labels', return_value=cldr_labels), \
+             patch('users.views.lists.QuickListViewSet._fetch_localnames_labels', return_value={}):
+            response = self.client.get('/list/language/?lang=pt')
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(response.data[self.lang_en.id], 'Inglês')
+        self.assertEqual(response.data[self.lang_pt.id], 'Português')
+        self.assertEqual(response.data[self.lang_ptbr.id], 'português (Brasil)')
+
+    def test_localnames_overrides_cldr_when_available(self):
+        cldr_labels = {'pt-br': 'português (Brasil)'}
+        localnames_labels = {'pt-br': 'Português do Brasil'}
+        with patch('users.views.lists.QuickListViewSet._fetch_cldr_labels', return_value=cldr_labels), \
+             patch('users.views.lists.QuickListViewSet._fetch_localnames_labels', return_value=localnames_labels):
+            response = self.client.get('/list/language/?lang=pt')
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(response.data[self.lang_ptbr.id], 'Português do Brasil')
+
+    def test_fallback_to_autonym_when_sources_have_no_label(self):
+        """Falls back to language_autonym when CLDR and LocalNames return no label."""
+        with patch('users.views.lists.QuickListViewSet._fetch_cldr_labels', return_value={}), \
+             patch('users.views.lists.QuickListViewSet._fetch_localnames_labels', return_value={}):
+            response = self.client.get('/list/language/?lang=xx')
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(response.data[self.lang_en.id], 'English')
+        self.assertEqual(response.data[self.lang_pt.id], 'Português')
+
+    def test_fallback_to_language_name_when_no_autonym(self):
+        """Falls back to language_name when autonym is blank and external sources have nothing."""
+        lang_no_autonym = Language.objects.create(
+            language_name='German', language_autonym='', language_code='de'
+        )
+        with patch('users.views.lists.QuickListViewSet._fetch_cldr_labels', return_value={}), \
+             patch('users.views.lists.QuickListViewSet._fetch_localnames_labels', return_value={}):
+            response = self.client.get('/list/language/?lang=xx')
+        self.assertEqual(response.data[lang_no_autonym.id], 'German')
+
+    def test_source_error_falls_back_gracefully(self):
+        """If one source fails, endpoint still falls back to stored names."""
+        with patch('users.views.lists.QuickListViewSet._fetch_cldr_labels', side_effect=Exception('cldr error')), \
+             patch('users.views.lists.QuickListViewSet._fetch_localnames_labels', return_value={}):
+            response = self.client.get('/list/language/?lang=pt')
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(response.data[self.lang_en.id], 'English')
+
+    def test_localnames_fetch_error_returns_empty_map(self):
+        from users.views.lists import QuickListViewSet
+        with patch('users.views.lists.requests.get', side_effect=Exception('timeout')):
+            labels = QuickListViewSet()._fetch_localnames_labels('pt')
+        self.assertEqual(labels, {})
+
+    def test_empty_database_returns_empty(self):
+        Language.objects.all().delete()
+        with patch('users.views.lists.QuickListViewSet._fetch_cldr_labels', return_value={}), \
+             patch('users.views.lists.QuickListViewSet._fetch_localnames_labels', return_value={}):
+            response = self.client.get('/list/language/?lang=pt')
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(response.data, {})
+
+    def test_partial_cldr_results(self):
+        """Only some languages found in CLDR; rest fall back to stored names."""
+        with patch('users.views.lists.QuickListViewSet._fetch_cldr_labels', return_value={'en': 'Inglês'}), \
+             patch('users.views.lists.QuickListViewSet._fetch_localnames_labels', return_value={}):
+            response = self.client.get('/list/language/?lang=pt')
+        self.assertEqual(response.data[self.lang_en.id], 'Inglês')
+        # pt and pt-br not in external results → fall back to autonym
+        self.assertEqual(response.data[self.lang_pt.id], 'Português')
+        self.assertEqual(response.data[self.lang_ptbr.id], 'Português (Brasil)')
+
+    def test_result_is_cached(self):
+        """Second request does not resolve labels again."""
+        cldr_labels = {'en': 'Inglês', 'pt': 'Português', 'pt-br': 'português (Brasil)'}
+        with patch('users.views.lists.QuickListViewSet._fetch_cldr_labels', return_value=cldr_labels) as mock_cldr, \
+             patch('users.views.lists.QuickListViewSet._fetch_localnames_labels', return_value={}) as mock_localnames:
+            self.client.get('/list/language/?lang=pt')
+            self.client.get('/list/language/?lang=pt')
+        self.assertEqual(mock_cldr.call_count, 1)
+        self.assertEqual(mock_localnames.call_count, 1)

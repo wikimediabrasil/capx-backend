@@ -4,7 +4,7 @@ import users.models.profile
 from django.db import migrations, models
 
 
-def validate_existing_wiki_alt(apps, schema_editor):
+def validate_existing_wiki_alt(apps, schema_editor): # pragma: no cover
     """Data migration: validate existing wiki_alt values.
 
     For each Profile:
