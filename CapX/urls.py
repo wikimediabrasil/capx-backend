@@ -35,6 +35,7 @@ from message.views import MessageViewSet
 from projects.views import ProjectViewSet, ProjectMemberViewSet, ProjectMemberAcceptanceViewSet
 from portal.views_api import (
     PartnerViewSet,
+    PartnerSettingsViewSet,
     PartnerMentorshipFormMentorViewSet,
     PartnerMentorshipFormMentorResponseViewSet,
     PartnerMentorshipFormMenteeViewSet,
@@ -75,6 +76,7 @@ if 'router' not in globals():
     router.register('translating', CapacityTranslationViewSet, basename='translating')
     router.register('translating_oauth', CapacityTranslationOauthViewSet, basename='translating_oauth')
     router.register('partners', PartnerViewSet, basename='partners')
+    router.register('partner_mentorship_settings', PartnerSettingsViewSet, basename='partner_mentorship_settings')
     router.register('mentorship_form_mentor', PartnerMentorshipFormMentorViewSet, basename='partner_mentorship_form_mentor')
     router.register('mentorship_form_mentee', PartnerMentorshipFormMenteeViewSet, basename='partner_mentorship_form_mentee')
     router.register('mentorship_form_mentor_response', PartnerMentorshipFormMentorResponseViewSet, basename='partner_mentorship_form_mentor_response')
