@@ -11,6 +11,7 @@ from django.conf import settings
 from django.core.mail import send_mail
 from .models import (
     Partner,
+    PartnerMentorshipSettings,
     PartnerMembership,
     PartnerMentorshipPublicKey,
     PartnerMentorshipFormMentor,
@@ -22,7 +23,8 @@ from social_django.utils import load_strategy, load_backend
 from users.models import AuthExtraInfo
 from CapX.useragent import get_user_agent
 from django.views.decorators.http import require_GET, require_POST
-from users.models import CustomUser, Profile, UserBadge, Badge
+from users.models import CustomUser, Profile, UserBadge, Badge, Language
+from skills.models import Skill
 from knox.models import AuthToken
 from cryptography.hazmat.primitives.asymmetric import rsa
 from cryptography.hazmat.primitives import serialization
@@ -317,6 +319,16 @@ def dashboard(request):
         .order_by('partner__organization__i18n_names__name', '-created_at')
         .distinct()
     )
+    mentorship_settings = (
+        PartnerMentorshipSettings.objects
+        .select_related('partner__organization', 'mentor_form', 'mentee_form')
+        .prefetch_related('skills', 'languages')
+        .filter(partner__in=mentorship_enabled_partners, partner__organization__i18n_names__language_code='en')
+        .order_by('partner__organization__i18n_names__name', '-updated_at')
+        .distinct()
+    )
+    mentorship_available_skills = Skill.objects.order_by('skill_wikidata_item')
+    mentorship_available_languages = Language.objects.order_by('language_name')
 
     mentorship_mentor_responses = (
         PartnerMentorshipFormMentorResponse.objects
@@ -376,6 +388,17 @@ def dashboard(request):
         }
         for response in mentorship_mentee_responses
     ]
+    mentorship_settings_payload = [
+        {
+            'partner_id': settings_obj.partner.organization_id,
+            'description': settings_obj.description,
+            'mentor_form_id': settings_obj.mentor_form_id,
+            'mentee_form_id': settings_obj.mentee_form_id,
+            'skill_ids': list(settings_obj.skills.values_list('id', flat=True)),
+            'language_ids': list(settings_obj.languages.values_list('id', flat=True)),
+        }
+        for settings_obj in mentorship_settings
+    ]
 
     context = {
         'user': request.user,
@@ -392,10 +415,14 @@ def dashboard(request):
         'mentorship_forms_mentor': mentorship_forms_mentor,
         'mentorship_forms_mentee': mentorship_forms_mentee,
         'mentorship_public_keys': mentorship_public_keys,
+        'mentorship_settings': mentorship_settings,
+        'mentorship_available_skills': mentorship_available_skills,
+        'mentorship_available_languages': mentorship_available_languages,
         'mentorship_mentor_responses_data': mentor_responses_payload,
         'mentorship_mentee_responses_data': mentee_responses_payload,
         'mentorship_forms_mentor_data': mentor_forms_payload,
         'mentorship_forms_mentee_data': mentee_forms_payload,
+        'mentorship_settings_data': mentorship_settings_payload,
     }
     return render(request, 'portal/dashboard.html', context)
 
@@ -449,6 +476,75 @@ def _require_partner_scope(request, partner: Partner):
     if PartnerMembership.objects.filter(user=request.user, partner=partner).exists():
         return None
     return HttpResponseForbidden("You don't have permission for this partner.")
+
+
+@require_POST
+@require_portal_access
+def mentorship_settings_update(request):
+    partner_id = request.POST.get('partner_id', '').strip()
+    description = request.POST.get('description', '').strip()
+    mentor_form_id = request.POST.get('mentor_form_id', '').strip()
+    mentee_form_id = request.POST.get('mentee_form_id', '').strip()
+    skill_ids = [sid for sid in request.POST.getlist('skills') if sid]
+    language_ids = [lid for lid in request.POST.getlist('languages') if lid]
+
+    if not partner_id:
+        messages.error(request, 'Partner is required.')
+        return redirect(DASHBOARD_URL_NAME)
+
+    try:
+        partner = Partner.objects.get(organization_id=partner_id)
+    except Partner.DoesNotExist:
+        messages.error(request, 'Partner not found.')
+        return redirect(DASHBOARD_URL_NAME)
+
+    scope_check = _require_partner_scope(request, partner)
+    if scope_check:
+        return scope_check
+
+    if not partner.mentorship:
+        messages.error(request, 'Mentorship is not enabled for this partner.')
+        return redirect(DASHBOARD_URL_NAME)
+
+    mentor_form = None
+    if mentor_form_id:
+        try:
+            mentor_form = PartnerMentorshipFormMentor.objects.get(id=mentor_form_id, partner=partner)
+        except PartnerMentorshipFormMentor.DoesNotExist:
+            messages.error(request, 'Selected mentor form is invalid for this partner.')
+            return redirect(DASHBOARD_URL_NAME)
+
+    mentee_form = None
+    if mentee_form_id:
+        try:
+            mentee_form = PartnerMentorshipFormMentee.objects.get(id=mentee_form_id, partner=partner)
+        except PartnerMentorshipFormMentee.DoesNotExist:
+            messages.error(request, 'Selected mentee form is invalid for this partner.')
+            return redirect(DASHBOARD_URL_NAME)
+
+    clean_skill_ids = sorted({int(sid) for sid in skill_ids if sid.isdigit()})
+    clean_language_ids = sorted({int(lid) for lid in language_ids if lid.isdigit()})
+
+    selected_skills = list(Skill.objects.filter(id__in=clean_skill_ids))
+    if len(selected_skills) != len(clean_skill_ids):
+        messages.error(request, 'One or more selected skills are invalid.')
+        return redirect(DASHBOARD_URL_NAME)
+
+    selected_languages = list(Language.objects.filter(id__in=clean_language_ids))
+    if len(selected_languages) != len(clean_language_ids):
+        messages.error(request, 'One or more selected languages are invalid.')
+        return redirect(DASHBOARD_URL_NAME)
+
+    settings_obj, _ = PartnerMentorshipSettings.objects.get_or_create(partner=partner)
+    settings_obj.description = description
+    settings_obj.mentor_form = mentor_form
+    settings_obj.mentee_form = mentee_form
+    settings_obj.save()
+    settings_obj.skills.set(selected_skills)
+    settings_obj.languages.set(selected_languages)
+
+    messages.success(request, f'Mentorship settings updated for {partner.name}.')
+    return redirect(DASHBOARD_URL_NAME)
 
 
 @require_POST

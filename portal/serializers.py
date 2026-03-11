@@ -2,6 +2,7 @@ from rest_framework import serializers
 
 from portal.models import (
     Partner,
+    PartnerMentorshipSettings,
     PartnerMentorshipFormMentor,
     PartnerMentorshipFormMentorResponse,
     PartnerMentorshipFormMentee,
@@ -28,6 +29,25 @@ class PartnerSerializer(serializers.ModelSerializer):
     @extend_schema_field(OpenApiTypes.STR)
     def get_name(self, obj):
         return str(obj.organization.i18n_names.filter(language_code='en').first().name)
+
+
+class PartnerSettingsSerializer(serializers.ModelSerializer):
+    organization = serializers.IntegerField(source='partner.organization.id', read_only=True)
+
+    class Meta:
+        model = PartnerMentorshipSettings
+        fields = [
+            'id',
+            'organization',
+            'description',
+            'skills',
+            'languages',
+            'mentor_form',
+            'mentee_form',
+            'created_at',
+            'updated_at',
+        ]
+        read_only_fields = ['id', 'created_at', 'updated_at']
 
 
 class PartnerMentorshipFormMentorSerializer(serializers.ModelSerializer):
