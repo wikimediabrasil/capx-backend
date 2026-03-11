@@ -7,7 +7,8 @@ import os
 from cryptography.hazmat.primitives import hashes, serialization
 from cryptography.hazmat.primitives.asymmetric import padding
 from cryptography.hazmat.primitives.ciphers.aead import AESGCM
-from users.models import CustomUser
+from users.models import CustomUser, Language
+from skills.models import Skill
 
 
 ENCRYPTED_MARKER = "__encrypted__"
@@ -73,6 +74,18 @@ class Partner(models.Model):
     def __str__(self):
         return str(self.organization)
 
+class PartnerMentorshipSettings(models.Model):
+    partner = models.OneToOneField(Partner, on_delete=models.CASCADE, related_name='mentorship_settings')
+    description = models.TextField(blank=True, default="")
+    skills = models.ManyToManyField(Skill, related_name='mentorship_settings')
+    languages = models.ManyToManyField(Language, related_name='mentorship_settings')
+    mentor_form = models.ForeignKey('PartnerMentorshipFormMentor', on_delete=models.SET_NULL, null=True, blank=True, related_name='mentorship_settings_as_mentor_form')
+    mentee_form = models.ForeignKey('PartnerMentorshipFormMentee', on_delete=models.SET_NULL, null=True, blank=True, related_name='mentorship_settings_as_mentee_form')
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    def __str__(self):
+        return f"{self.partner.name} Mentorship Settings"
 
 class PartnerMembership(models.Model):
     partner = models.ForeignKey(Partner, on_delete=models.CASCADE, related_name='memberships')

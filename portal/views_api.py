@@ -2,6 +2,7 @@ from rest_framework import mixins, viewsets, permissions
 
 from portal.models import (
     Partner,
+    PartnerMentorshipSettings,
     PartnerMentorshipFormMentor,
     PartnerMentorshipFormMentorResponse,
     PartnerMentorshipFormMentee,
@@ -9,6 +10,7 @@ from portal.models import (
 )
 from portal.serializers import (
     PartnerSerializer,
+    PartnerSettingsSerializer,
     PartnerMentorshipFormMentorSerializer,
     PartnerMentorshipFormMentorResponseSerializer,
     PartnerMentorshipFormMenteeSerializer,
@@ -31,6 +33,22 @@ class PartnerViewSet(viewsets.ReadOnlyModelViewSet):
     queryset = Partner.objects.select_related('organization').order_by('-created_at')
     serializer_class = PartnerSerializer
     lookup_field = 'organization_id'
+
+
+@extend_schema_view(
+    list=extend_schema(
+        summary='List mentorship settings for partners.',
+        description='This endpoint lists all mentorship settings for partners.',
+    ),
+    retrieve=extend_schema(
+        summary='Retrieve mentorship settings for a partner by the organization ID.',
+        description='This endpoint retrieves mentorship settings for a partner by the organization ID.',
+    ),
+)
+class PartnerSettingsViewSet(viewsets.ReadOnlyModelViewSet):
+    queryset = PartnerMentorshipSettings.objects.select_related('partner__organization').prefetch_related('skills', 'languages').order_by('-created_at')
+    serializer_class = PartnerSettingsSerializer
+    lookup_field = 'partner__organization_id'
 
 
 @extend_schema_view(
