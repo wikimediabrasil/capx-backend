@@ -5,6 +5,7 @@ app_name = 'portal'
 
 urlpatterns = [
     path('', views.dashboard, name='dashboard'),
+    path('qid-labels/', views.qid_labels_view, name='qid_labels'),
     path('oauth/begin/', views.oauth_begin, name='oauth_begin'),
     path('login/', views.login_view, name='login'),
     path('logout/', views.logout_view, name='logout'),

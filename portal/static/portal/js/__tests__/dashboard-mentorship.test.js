@@ -78,13 +78,11 @@ describe('dashboard-mentorship.js', () => {
     expect(keyField.options[0].hidden).toBe(true);
   });
 
-  test('hydrates mentorship skill labels asynchronously', async () => {
+  test('hydrates all QID labels with a single request to /portal/qid-labels/', async () => {
     global.fetch = jest.fn().mockResolvedValue({
       ok: true,
       json: async () => ({
-        results: [
-          { qid: 'Q123', label: 'Facilitation', fallback_label: 'Facilitation' },
-        ],
+        labels: { Q123: 'Facilitation', Q456: 'Wikidata Item' },
       }),
     });
     window.fetch = global.fetch;
@@ -106,6 +104,7 @@ describe('dashboard-mentorship.js', () => {
         <option value="1" data-skill-qid="Q123">Q123</option>
       </select>
       <span data-skill-qid="Q123">Q123</span>
+      <span data-qid-label="Q456">Q456</span>
     `;
 
     require('../dashboard-mentorship.js');
@@ -113,9 +112,14 @@ describe('dashboard-mentorship.js', () => {
     await Promise.resolve();
     await new Promise((resolve) => setTimeout(resolve, 0));
 
-    expect(global.fetch).toHaveBeenCalledWith('/translating/?lang=mul&fallback=en', expect.objectContaining({ credentials: 'same-origin' }));
+    expect(global.fetch).toHaveBeenCalledWith(
+      '/portal/qid-labels/',
+      expect.objectContaining({ credentials: 'same-origin' })
+    );
+    expect(global.fetch).toHaveBeenCalledTimes(1);
     expect(document.querySelector('#mentorship-settings-skills option').textContent).toBe('Facilitation (Q123)');
     expect(document.querySelector('span[data-skill-qid="Q123"]').textContent).toBe('Facilitation');
+    expect(document.querySelector('span[data-qid-label="Q456"]').textContent).toBe('Wikidata Item');
   });
 
   test('uses formBuilder when jQuery is available and validates empty form', () => {

@@ -2,6 +2,7 @@ from django.test import TestCase, Client
 from django.urls import reverse
 from django.contrib.auth import get_user_model
 from datetime import date
+from unittest.mock import MagicMock, patch
 from users.models import Badge, UserBadge
 from users.models import Territory
 from orgs.models import Organization, OrganizationName

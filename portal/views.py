@@ -3,7 +3,7 @@ from django.contrib.auth.decorators import login_required as django_login_requir
 from django.shortcuts import render, redirect
 from django.contrib.auth import logout
 from django.contrib import messages
-from django.http import HttpResponseForbidden, HttpResponse
+from django.http import HttpResponseForbidden, HttpResponse, JsonResponse
 from orgs.models import Organization, Management
 from events.models import Events
 from django.urls import reverse
@@ -76,6 +76,44 @@ def logout_view(request):
     messages.success(request, 'You have been logged out.')
     return redirect('portal:login')
 
+
+@require_GET
+@require_portal_access
+def qid_labels_view(request):
+    qids = Skill.objects.all().values_list('skill_wikidata_item', flat=True)
+    if not qids:
+        return JsonResponse({'labels': {}})
+    try:
+        values = ' '.join(f'"{q}"' for q in sorted(set(qids)))
+        query = (
+            """
+            PREFIX wbt: <https://metabase.wikibase.cloud/prop/direct/>
+            SELECT ?item ?itemLabel ?itemDescription ?value WHERE {
+                VALUES ?value { %s }
+                ?item wbt:P1 ?value.
+                SERVICE wikibase:label { bd:serviceParam wikibase:language "mul, en". }
+            }
+            """ % values
+        )
+        resp = requests.get(
+            'https://metabase.wikibase.cloud/query/sparql',
+            params={'query': query, 'format': 'json'},
+            headers={'User-Agent': get_user_agent('Portal')},
+            timeout=15,
+        )
+        resp.raise_for_status()
+        data = resp.json()
+        mapping = {}
+        for row in data.get('results', {}).get('bindings', []):
+            val = row.get('value', {}).get('value')
+            label = row.get('itemLabel', {}).get('value')
+            if val and label:
+                mapping[val] = label
+        return JsonResponse({'labels': mapping})
+    except Exception:
+        return JsonResponse({'labels': {}})
+
+
 @require_GET
 @require_portal_access
 def dashboard(request):
@@ -98,55 +136,6 @@ def dashboard(request):
         )
         .order_by('user__username')
     )
-
-    # Resolve Wikidata QIDs to English labels using Metabase SPARQL
-    def fetch_qid_labels(qids):
-        qids = [q for q in qids if q]
-        if not qids:
-            return {}
-        try:
-            values = ' '.join(f'"{q}"' for q in sorted(set(qids)))
-            query = (
-                """
-                PREFIX wbt: <https://metabase.wikibase.cloud/prop/direct/>
-                SELECT ?item ?itemLabel ?itemDescription ?value WHERE {
-                    VALUES ?value { %s }
-                    ?item wbt:P1 ?value.
-                    SERVICE wikibase:label { bd:serviceParam wikibase:language "en". }
-                }
-                """ % values
-            )
-            resp = requests.get(
-                'https://metabase.wikibase.cloud/query/sparql',
-                params={'query': query, 'format': 'json'},
-                headers={'User-Agent': get_user_agent('Portal')}
-            )
-            data = resp.json()
-            mapping = {}
-            for row in data.get('results', {}).get('bindings', []):
-                val = row.get('value', {}).get('value')
-                label = row.get('itemLabel', {}).get('value')
-                if val and label:
-                    mapping[val] = label
-            return mapping
-        except Exception:
-            return {}
-
-    qid_labels = fetch_qid_labels(list(profiles.values_list('wikidata_qid', flat=True)))
-
-    # Collect all skill QIDs across profiles and resolve labels
-    skill_qids = set()
-    for p in profiles:
-        for s in p.skills_known.all():
-            if s.skill_wikidata_item:
-                skill_qids.add(s.skill_wikidata_item)
-        for s in p.skills_available.all():
-            if s.skill_wikidata_item:
-                skill_qids.add(s.skill_wikidata_item)
-        for s in p.skills_wanted.all():
-            if s.skill_wikidata_item:
-                skill_qids.add(s.skill_wikidata_item)
-    skill_labels = fetch_qid_labels(list(skill_qids))
 
     # Prepare manager organization per user to avoid N+1
     managers_map = {}
@@ -180,9 +169,9 @@ def dashboard(request):
         aff_str = ', '.join([_org_en_name(org) for org in p.affiliation.all()]) if p.affiliation.exists() else ''
         terr_str = ', '.join([t.territory_name for t in p.territory.all()]) if p.territory.exists() else ''
         proj_str = ', '.join([wp.wikimedia_project_name for wp in p.wikimedia_project.all()]) if p.wikimedia_project.exists() else ''
-        skills_known_str = ', '.join([skill_labels.get(s.skill_wikidata_item, s.skill_wikidata_item) for s in p.skills_known.all()]) if p.skills_known.exists() else ''
-        skills_available_str = ', '.join([skill_labels.get(s.skill_wikidata_item, s.skill_wikidata_item) for s in p.skills_available.all()]) if p.skills_available.exists() else ''
-        skills_wanted_str = ', '.join([skill_labels.get(s.skill_wikidata_item, s.skill_wikidata_item) for s in p.skills_wanted.all()]) if p.skills_wanted.exists() else ''
+        skills_known_qids = [s.skill_wikidata_item for s in p.skills_known.all() if s.skill_wikidata_item]
+        skills_available_qids = [s.skill_wikidata_item for s in p.skills_available.all() if s.skill_wikidata_item]
+        skills_wanted_qids = [s.skill_wikidata_item for s in p.skills_wanted.all() if s.skill_wikidata_item]
 
         # Languages (name + proficiency)
         languages = [
@@ -199,16 +188,15 @@ def dashboard(request):
             'last_login': last_login,
             'last_update': p.last_update,
             'wikidata_qid': p.wikidata_qid,
-            'wikidata_label': qid_labels.get(p.wikidata_qid),
             'wiki_alt': p.wiki_alt,
             'territory': terr_str,
             'language': languages,
             'affiliation': aff_str,
             'wikimedia_project': proj_str,
             'team': p.team,
-            'skills_known': skills_known_str,
-            'skills_available': skills_available_str,
-            'skills_wanted': skills_wanted_str,
+            'skills_known_qids': skills_known_qids,
+            'skills_available_qids': skills_available_qids,
+            'skills_wanted_qids': skills_wanted_qids,
             'is_manager': managers_map.get(u.id, []),
             'badges': badges_map.get(u.id, []),
             'automated_lets_connect': p.automated_lets_connect,

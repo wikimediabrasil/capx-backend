@@ -300,7 +300,7 @@
                 <td>{{ row.date_joined|date:"Y-m-d H:i:s" }}</td>
                 <td>{{ row.last_update|date:"Y-m-d H:i:s" }}</td>
                 <td>{{ row.last_login|date:"Y-m-d H:i:s" }}</td>
-                <td>{{ row.wikidata_qid }}</td>
+                <td>{% if row.wikidata_qid %}<span data-qid-label="{{ row.wikidata_qid }}">{{ row.wikidata_qid }}</span>{% endif %}</td>
                 <td>{{ row.wiki_alt }}</td>
                 <td>{{ row.territory }}</td>
                 <td>
@@ -313,9 +313,21 @@
                 <td>{{ row.affiliation }}</td>
                 <td>{{ row.wikimedia_project }}</td>
                 <td>{{ row.team }}</td>
-                <td>{{ row.skills_known }}</td>
-                <td>{{ row.skills_available }}</td>
-                <td>{{ row.skills_wanted }}</td>
+                <td>
+                  {% for qid in row.skills_known_qids %}
+                    <span class="chip" data-qid-label="{{ qid }}">{{ qid }}</span>
+                  {% endfor %}
+                </td>
+                <td>
+                  {% for qid in row.skills_available_qids %}
+                    <span class="chip" data-qid-label="{{ qid }}">{{ qid }}</span>
+                  {% endfor %}
+                </td>
+                <td>
+                  {% for qid in row.skills_wanted_qids %}
+                    <span class="chip" data-qid-label="{{ qid }}">{{ qid }}</span>
+                  {% endfor %}
+                </td>
                 <td>
                   {% if row.is_manager %}
                     {% for org_id in row.is_manager %}

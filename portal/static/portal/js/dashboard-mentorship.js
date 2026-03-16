@@ -1,53 +1,43 @@
 (function() {
-  var translatableSkillNodes = Array.from(document.querySelectorAll('[data-skill-qid]'));
-  if (!translatableSkillNodes.length || typeof window.fetch !== 'function') return;
+  var skillNodes = Array.from(document.querySelectorAll('[data-skill-qid]'));
+  var qidNodes   = Array.from(document.querySelectorAll('[data-qid-label]'));
+  var allNodes   = skillNodes.concat(qidNodes);
+  if (!allNodes.length || typeof window.fetch !== 'function') return;
 
-  function applySkillLabels(labelByQid) {
-    translatableSkillNodes.forEach(function(node) {
-      var qid = String(node.getAttribute('data-skill-qid') || '').trim();
-      if (!qid) return;
-
+  function applyLabels(labelByQid) {
+    skillNodes.forEach(function(node) {
+      var qid   = String(node.getAttribute('data-skill-qid') || '').trim();
       var label = labelByQid[qid];
-      if (!label) return;
-
+      if (!qid || !label) return;
       if (node.tagName === 'OPTION') {
         node.textContent = label + ' (' + qid + ')';
-        return;
+      } else {
+        node.textContent = label;
+        node.title = qid;
       }
-
+    });
+    qidNodes.forEach(function(node) {
+      var qid   = String(node.getAttribute('data-qid-label') || '').trim();
+      var label = labelByQid[qid];
+      if (!qid || !label) return;
       node.textContent = label;
       node.title = qid;
     });
   }
 
-  window.fetch('/translating/?lang=mul&fallback=en', {
+  window.fetch('/portal/qid-labels/', {
     headers: { 'X-Requested-With': 'XMLHttpRequest' },
     credentials: 'same-origin',
   })
     .then(function(response) {
-      if (!response.ok) {
-        throw new Error('Unable to load skill labels');
-      }
+      if (!response.ok) throw new Error('Unable to load labels');
       return response.json();
     })
     .then(function(payload) {
-      var labelByQid = {};
-      var results = Array.isArray(payload && payload.results) ? payload.results : [];
-
-      results.forEach(function(item) {
-        var qid = String((item && item.qid) || '').trim();
-        if (!qid) return;
-
-        var label = item.label || item.fallback_label || '';
-        if (label) {
-          labelByQid[qid] = label;
-        }
-      });
-
-      applySkillLabels(labelByQid);
+      applyLabels((payload && payload.labels) || {});
     })
     .catch(function() {
-      // Keep QIDs as the fallback when translations are unavailable.
+      // Keep QIDs as the fallback when labels are unavailable.
     });
 })();
 
