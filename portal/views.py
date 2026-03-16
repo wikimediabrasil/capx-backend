@@ -23,7 +23,8 @@ from social_django.utils import load_strategy, load_backend
 from users.models import AuthExtraInfo
 from CapX.useragent import get_user_agent
 from django.views.decorators.http import require_GET, require_POST
-from users.models import CustomUser, Profile, UserBadge, Badge, Language
+from django.utils.dateparse import parse_date
+from users.models import CustomUser, Profile, UserBadge, Badge, Language, Territory
 from skills.models import Skill
 from knox.models import AuthToken
 from cryptography.hazmat.primitives.asymmetric import rsa
@@ -321,7 +322,7 @@ def dashboard(request):
     )
     mentorship_settings = (
         PartnerMentorshipSettings.objects
-        .select_related('partner__organization', 'mentor_form', 'mentee_form')
+        .select_related('partner__organization', 'mentor_form', 'mentee_form', 'territory')
         .prefetch_related('skills', 'languages')
         .filter(partner__in=mentorship_enabled_partners, partner__organization__i18n_names__language_code='en')
         .order_by('partner__organization__i18n_names__name', '-updated_at')
@@ -329,6 +330,7 @@ def dashboard(request):
     )
     mentorship_available_skills = Skill.objects.order_by('skill_wikidata_item')
     mentorship_available_languages = Language.objects.order_by('language_name')
+    mentorship_available_territories = Territory.objects.order_by('territory_name')
 
     mentorship_mentor_responses = (
         PartnerMentorshipFormMentorResponse.objects
@@ -392,6 +394,9 @@ def dashboard(request):
         {
             'partner_id': settings_obj.partner.organization_id,
             'description': settings_obj.description,
+            'registration_open_date': settings_obj.registration_open_date.isoformat() if settings_obj.registration_open_date else '',
+            'registration_close_date': settings_obj.registration_close_date.isoformat() if settings_obj.registration_close_date else '',
+            'territory_id': settings_obj.territory_id,
             'mentor_form_id': settings_obj.mentor_form_id,
             'mentee_form_id': settings_obj.mentee_form_id,
             'skill_ids': list(settings_obj.skills.values_list('id', flat=True)),
@@ -418,6 +423,7 @@ def dashboard(request):
         'mentorship_settings': mentorship_settings,
         'mentorship_available_skills': mentorship_available_skills,
         'mentorship_available_languages': mentorship_available_languages,
+        'mentorship_available_territories': mentorship_available_territories,
         'mentorship_mentor_responses_data': mentor_responses_payload,
         'mentorship_mentee_responses_data': mentee_responses_payload,
         'mentorship_forms_mentor_data': mentor_forms_payload,
@@ -483,6 +489,9 @@ def _require_partner_scope(request, partner: Partner):
 def mentorship_settings_update(request):
     partner_id = request.POST.get('partner_id', '').strip()
     description = request.POST.get('description', '').strip()
+    registration_open_date_raw = request.POST.get('registration_open_date', '').strip()
+    registration_close_date_raw = request.POST.get('registration_close_date', '').strip()
+    territory_id = request.POST.get('territory_id', '').strip()
     mentor_form_id = request.POST.get('mentor_form_id', '').strip()
     mentee_form_id = request.POST.get('mentee_form_id', '').strip()
     skill_ids = [sid for sid in request.POST.getlist('skills') if sid]
@@ -505,6 +514,28 @@ def mentorship_settings_update(request):
     if not partner.mentorship:
         messages.error(request, 'Mentorship is not enabled for this partner.')
         return redirect(DASHBOARD_URL_NAME)
+
+    registration_open_date = None
+    if registration_open_date_raw:
+        registration_open_date = parse_date(registration_open_date_raw)
+        if registration_open_date is None:
+            messages.error(request, 'Registration opening date is invalid.')
+            return redirect(DASHBOARD_URL_NAME)
+
+    registration_close_date = None
+    if registration_close_date_raw:
+        registration_close_date = parse_date(registration_close_date_raw)
+        if registration_close_date is None:
+            messages.error(request, 'Registration closing date is invalid.')
+            return redirect(DASHBOARD_URL_NAME)
+
+    territory = None
+    if territory_id:
+        try:
+            territory = Territory.objects.get(id=territory_id)
+        except Territory.DoesNotExist:
+            messages.error(request, 'Selected territory is invalid.')
+            return redirect(DASHBOARD_URL_NAME)
 
     mentor_form = None
     if mentor_form_id:
@@ -537,6 +568,9 @@ def mentorship_settings_update(request):
 
     settings_obj, _ = PartnerMentorshipSettings.objects.get_or_create(partner=partner)
     settings_obj.description = description
+    settings_obj.registration_open_date = registration_open_date
+    settings_obj.registration_close_date = registration_close_date
+    settings_obj.territory = territory
     settings_obj.mentor_form = mentor_form
     settings_obj.mentee_form = mentee_form
     settings_obj.save()

@@ -1,4 +1,57 @@
 (function() {
+  var translatableSkillNodes = Array.from(document.querySelectorAll('[data-skill-qid]'));
+  if (!translatableSkillNodes.length || typeof window.fetch !== 'function') return;
+
+  function applySkillLabels(labelByQid) {
+    translatableSkillNodes.forEach(function(node) {
+      var qid = String(node.getAttribute('data-skill-qid') || '').trim();
+      if (!qid) return;
+
+      var label = labelByQid[qid];
+      if (!label) return;
+
+      if (node.tagName === 'OPTION') {
+        node.textContent = label + ' (' + qid + ')';
+        return;
+      }
+
+      node.textContent = label;
+      node.title = qid;
+    });
+  }
+
+  window.fetch('/translating/?lang=mul&fallback=en', {
+    headers: { 'X-Requested-With': 'XMLHttpRequest' },
+    credentials: 'same-origin',
+  })
+    .then(function(response) {
+      if (!response.ok) {
+        throw new Error('Unable to load skill labels');
+      }
+      return response.json();
+    })
+    .then(function(payload) {
+      var labelByQid = {};
+      var results = Array.isArray(payload && payload.results) ? payload.results : [];
+
+      results.forEach(function(item) {
+        var qid = String((item && item.qid) || '').trim();
+        if (!qid) return;
+
+        var label = item.label || item.fallback_label || '';
+        if (label) {
+          labelByQid[qid] = label;
+        }
+      });
+
+      applySkillLabels(labelByQid);
+    })
+    .catch(function() {
+      // Keep QIDs as the fallback when translations are unavailable.
+    });
+})();
+
+(function() {
   var formElement = document.getElementById('mentorship-form-create');
   var builderHost = document.getElementById('mentorship-form-builder');
   var outputField = document.getElementById('mentorship-form-json');

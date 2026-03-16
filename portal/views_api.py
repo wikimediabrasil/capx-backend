@@ -1,4 +1,5 @@
 from rest_framework import mixins, viewsets, permissions
+from django.db.models import Max, Subquery
 
 from portal.models import (
     Partner,
@@ -46,7 +47,7 @@ class PartnerViewSet(viewsets.ReadOnlyModelViewSet):
     ),
 )
 class PartnerSettingsViewSet(viewsets.ReadOnlyModelViewSet):
-    queryset = PartnerMentorshipSettings.objects.select_related('partner__organization').prefetch_related('skills', 'languages').order_by('-created_at')
+    queryset = PartnerMentorshipSettings.objects.select_related('partner__organization', 'territory').prefetch_related('skills', 'languages').order_by('-created_at')
     serializer_class = PartnerSettingsSerializer
     lookup_field = 'partner__organization_id'
 
@@ -66,9 +67,14 @@ class PartnerMentorshipFormMentorViewSet(viewsets.ReadOnlyModelViewSet):
 
     def get_queryset(self):
         queryset = PartnerMentorshipFormMentor.objects.select_related('partner__organization').order_by('-created_at', '-id')
+        partner_org_id = self.request.query_params.get('partner')
+
+        if partner_org_id:
+            queryset = queryset.filter(partner__organization_id=partner_org_id)
 
         if self.action == 'list':
-            return queryset[:1] # Return only the most recent form for listing
+            latest_ids = queryset.values('partner_id').annotate(latest_id=Max('id')).values('latest_id')
+            return queryset.filter(id__in=Subquery(latest_ids))
 
         return queryset
 
@@ -87,9 +93,14 @@ class PartnerMentorshipFormMenteeViewSet(viewsets.ReadOnlyModelViewSet):
 
     def get_queryset(self):
         queryset = PartnerMentorshipFormMentee.objects.select_related('partner__organization').order_by('-created_at', '-id')
+        partner_org_id = self.request.query_params.get('partner')
+
+        if partner_org_id:
+            queryset = queryset.filter(partner__organization_id=partner_org_id)
 
         if self.action == 'list':
-            return queryset[:1] # Return only the most recent form for listing
+            latest_ids = queryset.values('partner_id').annotate(latest_id=Max('id')).values('latest_id')
+            return queryset.filter(id__in=Subquery(latest_ids))
 
         return queryset
 

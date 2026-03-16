@@ -478,6 +478,20 @@
             <label for="mentorship-settings-description">Description</label>
             <textarea id="mentorship-settings-description" name="description" placeholder="Optional public description for this partner mentorship program"></textarea>
 
+            <label for="mentorship-settings-registration-open-date">Registration opens on</label>
+            <input id="mentorship-settings-registration-open-date" name="registration_open_date" type="date" style="padding:10px; border:1px solid var(--border); border-radius:10px; max-width:500px;" />
+
+            <label for="mentorship-settings-registration-close-date">Registration closes on</label>
+            <input id="mentorship-settings-registration-close-date" name="registration_close_date" type="date" style="padding:10px; border:1px solid var(--border); border-radius:10px; max-width:500px;" />
+
+            <label for="mentorship-settings-territory">Territory</label>
+            <select id="mentorship-settings-territory" name="territory_id" style="padding:10px; border:1px solid var(--border); border-radius:10px; max-width:520px;">
+              <option value="">Global</option>
+              {% for territory in mentorship_available_territories %}
+                <option value="{{ territory.id }}">{{ territory.territory_name }}</option>
+              {% endfor %}
+            </select>
+
             <label for="mentorship-settings-mentor-form">Active mentor form</label>
             <select id="mentorship-settings-mentor-form" name="mentor_form_id" style="padding:10px; border:1px solid var(--border); border-radius:10px; max-width:520px;">
               <option value="">None</option>
@@ -497,7 +511,7 @@
             <label for="mentorship-settings-skills">Skills (multiple)</label>
             <select id="mentorship-settings-skills" name="skills" multiple size="8" style="padding:10px; border:1px solid var(--border); border-radius:10px; max-width:520px;">
               {% for skill in mentorship_available_skills %}
-                <option value="{{ skill.id }}">{{ skill.skill_wikidata_item }}</option>
+                <option value="{{ skill.id }}" data-skill-qid="{{ skill.skill_wikidata_item }}">{{ skill.skill_wikidata_item }}</option>
               {% endfor %}
             </select>
 
@@ -514,16 +528,19 @@
 
           <h3>Current settings</h3>
           <table>
-            <thead><tr><th>Partner</th><th>Mentor form</th><th>Mentee form</th><th>Skills</th><th>Languages</th><th>Updated at</th></tr></thead>
+            <thead><tr><th>Partner</th><th>Territory</th><th>Registration opens</th><th>Registration closes</th><th>Mentor form</th><th>Mentee form</th><th>Skills</th><th>Languages</th><th>Updated at</th></tr></thead>
             <tbody>
               {% for row in mentorship_settings %}
                 <tr>
                   <td>{{ row.partner.name }}</td>
+                  <td>{% if row.territory_id %}{{ row.territory.territory_name }}{% else %}<span class="muted">Global</span>{% endif %}</td>
+                  <td>{% if row.registration_open_date %}{{ row.registration_open_date|date:"Y-m-d" }}{% else %}-{% endif %}</td>
+                  <td>{% if row.registration_close_date %}{{ row.registration_close_date|date:"Y-m-d" }}{% else %}-{% endif %}</td>
                   <td>{% if row.mentor_form_id %}#{{ row.mentor_form_id }}{% else %}-{% endif %}</td>
                   <td>{% if row.mentee_form_id %}#{{ row.mentee_form_id }}{% else %}-{% endif %}</td>
                   <td>
                     {% for s in row.skills.all %}
-                      <span class="chip">{{ s.skill_wikidata_item }}</span>
+                      <span class="chip" data-skill-qid="{{ s.skill_wikidata_item }}">{{ s.skill_wikidata_item }}</span>
                     {% empty %}
                       <span class="muted">None</span>
                     {% endfor %}
@@ -538,7 +555,7 @@
                   <td>{{ row.updated_at|date:"Y-m-d H:i:s" }}</td>
                 </tr>
               {% empty %}
-                <tr><td colspan="6" class="muted">No mentorship settings saved yet.</td></tr>
+                <tr><td colspan="9" class="muted">No mentorship settings saved yet.</td></tr>
               {% endfor %}
             </tbody>
           </table>
@@ -714,6 +731,9 @@
             const dataNode = document.getElementById('mentorship-settings-data');
             const partnerField = document.getElementById('mentorship-settings-partner');
             const descriptionField = document.getElementById('mentorship-settings-description');
+            const registrationOpenDateField = document.getElementById('mentorship-settings-registration-open-date');
+            const registrationCloseDateField = document.getElementById('mentorship-settings-registration-close-date');
+            const territoryField = document.getElementById('mentorship-settings-territory');
             const mentorFormField = document.getElementById('mentorship-settings-mentor-form');
             const menteeFormField = document.getElementById('mentorship-settings-mentee-form');
             const skillsField = document.getElementById('mentorship-settings-skills');
@@ -763,6 +783,9 @@
               filterOptionsByPartner(menteeFormField, partnerId);
 
               descriptionField.value = current ? (current.description || '') : '';
+              registrationOpenDateField.value = current ? (current.registration_open_date || '') : '';
+              registrationCloseDateField.value = current ? (current.registration_close_date || '') : '';
+              territoryField.value = current && current.territory_id ? String(current.territory_id) : '';
               mentorFormField.value = current && current.mentor_form_id ? String(current.mentor_form_id) : '';
               menteeFormField.value = current && current.mentee_form_id ? String(current.mentee_form_id) : '';
               setMultiSelect(skillsField, current ? current.skill_ids : []);

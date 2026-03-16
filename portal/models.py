@@ -7,7 +7,7 @@ import os
 from cryptography.hazmat.primitives import hashes, serialization
 from cryptography.hazmat.primitives.asymmetric import padding
 from cryptography.hazmat.primitives.ciphers.aead import AESGCM
-from users.models import CustomUser, Language
+from users.models import CustomUser, Language, Territory
 from skills.models import Skill
 
 
@@ -77,12 +77,27 @@ class Partner(models.Model):
 class PartnerMentorshipSettings(models.Model):
     partner = models.OneToOneField(Partner, on_delete=models.CASCADE, related_name='mentorship_settings')
     description = models.TextField(blank=True, default="")
+    registration_open_date = models.DateField(null=True, blank=True)
+    registration_close_date = models.DateField(null=True, blank=True)
+    territory = models.ForeignKey(Territory, on_delete=models.SET_NULL, null=True, blank=True, related_name='mentorship_settings')
     skills = models.ManyToManyField(Skill, related_name='mentorship_settings')
     languages = models.ManyToManyField(Language, related_name='mentorship_settings')
     mentor_form = models.ForeignKey('PartnerMentorshipFormMentor', on_delete=models.SET_NULL, null=True, blank=True, related_name='mentorship_settings_as_mentor_form')
     mentee_form = models.ForeignKey('PartnerMentorshipFormMentee', on_delete=models.SET_NULL, null=True, blank=True, related_name='mentorship_settings_as_mentee_form')
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
+
+    def clean(self):
+        if self.mentor_form_id and self.mentor_form and self.mentor_form.partner_id != self.partner_id:
+            raise ValidationError("Mentor form must belong to the same partner")
+        if self.mentee_form_id and self.mentee_form and self.mentee_form.partner_id != self.partner_id:
+            raise ValidationError("Mentee form must belong to the same partner")
+        if self.registration_open_date and self.registration_close_date and self.registration_open_date > self.registration_close_date:
+            raise ValidationError("Registration opening date must be on or before closing date")
+
+    def save(self, *args, **kwargs):
+        self.full_clean()
+        return super().save(*args, **kwargs)
 
     def __str__(self):
         return f"{self.partner.name} Mentorship Settings"
@@ -114,6 +129,14 @@ class PartnerMentorshipFormMentor(models.Model):
     json = models.JSONField()
     created_at = models.DateTimeField(auto_now_add=True)
 
+    def clean(self):
+        if self.public_key_id and self.public_key and self.public_key.partner_id != self.partner_id:
+            raise ValidationError("Public key must belong to the same partner")
+
+    def save(self, *args, **kwargs):
+        self.full_clean()
+        return super().save(*args, **kwargs)
+
     def __str__(self):
         return f"{self.partner.name} Mentorship Form Mentor"
 
@@ -123,6 +146,14 @@ class PartnerMentorshipFormMentee(models.Model):
     public_key = models.ForeignKey(PartnerMentorshipPublicKey, on_delete=models.CASCADE, related_name='mentee_forms', null=True, blank=True)
     json = models.JSONField()
     created_at = models.DateTimeField(auto_now_add=True)
+
+    def clean(self):
+        if self.public_key_id and self.public_key and self.public_key.partner_id != self.partner_id:
+            raise ValidationError("Public key must belong to the same partner")
+
+    def save(self, *args, **kwargs):
+        self.full_clean()
+        return super().save(*args, **kwargs)
 
     def __str__(self):
         return f"{self.partner.name} Mentorship Form Mentee"
@@ -140,6 +171,9 @@ class PartnerMentorshipFormMentorResponse(models.Model):
 
         if self.pk:
             raise ValidationError("Updating mentor responses is not allowed")
+
+        if not self.form.public_key_id:
+            raise ValidationError("Mentor form does not have an active public key")
 
         if not is_encrypted_data(self.data):
             self.data = encrypt_data(self.data, self.form.public_key.public_key)
@@ -162,6 +196,9 @@ class PartnerMentorshipFormMenteeResponse(models.Model):
 
         if self.pk:
             raise ValidationError("Public key must belong to the same partner")
+
+        if not self.form.public_key_id:
+            raise ValidationError("Mentee form does not have an active public key")
 
         if not is_encrypted_data(self.data):
             self.data = encrypt_data(self.data, self.form.public_key.public_key)

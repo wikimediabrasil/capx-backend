@@ -1,9 +1,11 @@
 from django.test import TestCase, Client
 from django.urls import reverse
 from django.contrib.auth import get_user_model
+from datetime import date
 from users.models import Badge, UserBadge
+from users.models import Territory
 from orgs.models import Organization, OrganizationName
-from portal.models import Partner, PartnerMembership
+from portal.models import Partner, PartnerMembership, PartnerMentorshipSettings
 import secrets
 
 
@@ -159,3 +161,28 @@ class PortalViewsTests(TestCase):
         del_resp = self.client.post(delete_url, data={"badge_id": str(self.badge.id)})
         self.assertEqual(del_resp.status_code, 302)
         self.assertFalse(Badge.objects.filter(id=self.badge.id).exists())
+
+    def test_mentorship_settings_update_saves_dates_and_territory(self):
+        self.partner.mentorship = True
+        self.partner.save(update_fields=['mentorship'])
+        territory = Territory.objects.create(territory_name='Brazil')
+
+        self.client.force_login(user=self.admin)
+        response = self.client.post(
+            reverse('portal:mentorship_settings_update'),
+            data={
+                'partner_id': str(self.partner.organization_id),
+                'description': 'Mentoria 2026',
+                'registration_open_date': '2026-04-01',
+                'registration_close_date': '2026-04-30',
+                'territory_id': str(territory.id),
+            },
+        )
+
+        self.assertEqual(response.status_code, 302)
+
+        settings_obj = PartnerMentorshipSettings.objects.get(partner=self.partner)
+        self.assertEqual(settings_obj.description, 'Mentoria 2026')
+        self.assertEqual(settings_obj.registration_open_date, date(2026, 4, 1))
+        self.assertEqual(settings_obj.registration_close_date, date(2026, 4, 30))
+        self.assertEqual(settings_obj.territory, territory)
