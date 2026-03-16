@@ -3,7 +3,7 @@ from django.contrib.auth.decorators import login_required as django_login_requir
 from django.shortcuts import render, redirect
 from django.contrib.auth import logout
 from django.contrib import messages
-from django.http import HttpResponseForbidden, HttpResponse
+from django.http import HttpResponseForbidden, HttpResponse, JsonResponse
 from orgs.models import Organization, Management
 from events.models import Events
 from django.urls import reverse
@@ -23,7 +23,8 @@ from social_django.utils import load_strategy, load_backend
 from users.models import AuthExtraInfo
 from CapX.useragent import get_user_agent
 from django.views.decorators.http import require_GET, require_POST
-from users.models import CustomUser, Profile, UserBadge, Badge, Language
+from django.utils.dateparse import parse_date
+from users.models import CustomUser, Profile, UserBadge, Badge, Language, Territory
 from skills.models import Skill
 from knox.models import AuthToken
 from cryptography.hazmat.primitives.asymmetric import rsa
@@ -75,6 +76,44 @@ def logout_view(request):
     messages.success(request, 'You have been logged out.')
     return redirect('portal:login')
 
+
+@require_GET
+@require_portal_access
+def qid_labels_view(request):
+    qids = Skill.objects.all().values_list('skill_wikidata_item', flat=True)
+    if not qids:
+        return JsonResponse({'labels': {}})
+    try:
+        values = ' '.join(f'"{q}"' for q in sorted(set(qids)))
+        query = (
+            """
+            PREFIX wbt: <https://metabase.wikibase.cloud/prop/direct/>
+            SELECT ?item ?itemLabel ?itemDescription ?value WHERE {
+                VALUES ?value { %s }
+                ?item wbt:P1 ?value.
+                SERVICE wikibase:label { bd:serviceParam wikibase:language "mul, en". }
+            }
+            """ % values
+        )
+        resp = requests.get(
+            'https://metabase.wikibase.cloud/query/sparql',
+            params={'query': query, 'format': 'json'},
+            headers={'User-Agent': get_user_agent('Portal')},
+            timeout=15,
+        )
+        resp.raise_for_status()
+        data = resp.json()
+        mapping = {}
+        for row in data.get('results', {}).get('bindings', []):
+            val = row.get('value', {}).get('value')
+            label = row.get('itemLabel', {}).get('value')
+            if val and label:
+                mapping[val] = label
+        return JsonResponse({'labels': mapping})
+    except Exception:
+        return JsonResponse({'labels': {}})
+
+
 @require_GET
 @require_portal_access
 def dashboard(request):
@@ -97,55 +136,6 @@ def dashboard(request):
         )
         .order_by('user__username')
     )
-
-    # Resolve Wikidata QIDs to English labels using Metabase SPARQL
-    def fetch_qid_labels(qids):
-        qids = [q for q in qids if q]
-        if not qids:
-            return {}
-        try:
-            values = ' '.join(f'"{q}"' for q in sorted(set(qids)))
-            query = (
-                """
-                PREFIX wbt: <https://metabase.wikibase.cloud/prop/direct/>
-                SELECT ?item ?itemLabel ?itemDescription ?value WHERE {
-                    VALUES ?value { %s }
-                    ?item wbt:P1 ?value.
-                    SERVICE wikibase:label { bd:serviceParam wikibase:language "en". }
-                }
-                """ % values
-            )
-            resp = requests.get(
-                'https://metabase.wikibase.cloud/query/sparql',
-                params={'query': query, 'format': 'json'},
-                headers={'User-Agent': get_user_agent('Portal')}
-            )
-            data = resp.json()
-            mapping = {}
-            for row in data.get('results', {}).get('bindings', []):
-                val = row.get('value', {}).get('value')
-                label = row.get('itemLabel', {}).get('value')
-                if val and label:
-                    mapping[val] = label
-            return mapping
-        except Exception:
-            return {}
-
-    qid_labels = fetch_qid_labels(list(profiles.values_list('wikidata_qid', flat=True)))
-
-    # Collect all skill QIDs across profiles and resolve labels
-    skill_qids = set()
-    for p in profiles:
-        for s in p.skills_known.all():
-            if s.skill_wikidata_item:
-                skill_qids.add(s.skill_wikidata_item)
-        for s in p.skills_available.all():
-            if s.skill_wikidata_item:
-                skill_qids.add(s.skill_wikidata_item)
-        for s in p.skills_wanted.all():
-            if s.skill_wikidata_item:
-                skill_qids.add(s.skill_wikidata_item)
-    skill_labels = fetch_qid_labels(list(skill_qids))
 
     # Prepare manager organization per user to avoid N+1
     managers_map = {}
@@ -179,9 +169,9 @@ def dashboard(request):
         aff_str = ', '.join([_org_en_name(org) for org in p.affiliation.all()]) if p.affiliation.exists() else ''
         terr_str = ', '.join([t.territory_name for t in p.territory.all()]) if p.territory.exists() else ''
         proj_str = ', '.join([wp.wikimedia_project_name for wp in p.wikimedia_project.all()]) if p.wikimedia_project.exists() else ''
-        skills_known_str = ', '.join([skill_labels.get(s.skill_wikidata_item, s.skill_wikidata_item) for s in p.skills_known.all()]) if p.skills_known.exists() else ''
-        skills_available_str = ', '.join([skill_labels.get(s.skill_wikidata_item, s.skill_wikidata_item) for s in p.skills_available.all()]) if p.skills_available.exists() else ''
-        skills_wanted_str = ', '.join([skill_labels.get(s.skill_wikidata_item, s.skill_wikidata_item) for s in p.skills_wanted.all()]) if p.skills_wanted.exists() else ''
+        skills_known_qids = [s.skill_wikidata_item for s in p.skills_known.all() if s.skill_wikidata_item]
+        skills_available_qids = [s.skill_wikidata_item for s in p.skills_available.all() if s.skill_wikidata_item]
+        skills_wanted_qids = [s.skill_wikidata_item for s in p.skills_wanted.all() if s.skill_wikidata_item]
 
         # Languages (name + proficiency)
         languages = [
@@ -198,16 +188,15 @@ def dashboard(request):
             'last_login': last_login,
             'last_update': p.last_update,
             'wikidata_qid': p.wikidata_qid,
-            'wikidata_label': qid_labels.get(p.wikidata_qid),
             'wiki_alt': p.wiki_alt,
             'territory': terr_str,
             'language': languages,
             'affiliation': aff_str,
             'wikimedia_project': proj_str,
             'team': p.team,
-            'skills_known': skills_known_str,
-            'skills_available': skills_available_str,
-            'skills_wanted': skills_wanted_str,
+            'skills_known_qids': skills_known_qids,
+            'skills_available_qids': skills_available_qids,
+            'skills_wanted_qids': skills_wanted_qids,
             'is_manager': managers_map.get(u.id, []),
             'badges': badges_map.get(u.id, []),
             'automated_lets_connect': p.automated_lets_connect,
@@ -321,7 +310,7 @@ def dashboard(request):
     )
     mentorship_settings = (
         PartnerMentorshipSettings.objects
-        .select_related('partner__organization', 'mentor_form', 'mentee_form')
+        .select_related('partner__organization', 'mentor_form', 'mentee_form', 'territory')
         .prefetch_related('skills', 'languages')
         .filter(partner__in=mentorship_enabled_partners, partner__organization__i18n_names__language_code='en')
         .order_by('partner__organization__i18n_names__name', '-updated_at')
@@ -329,6 +318,7 @@ def dashboard(request):
     )
     mentorship_available_skills = Skill.objects.order_by('skill_wikidata_item')
     mentorship_available_languages = Language.objects.order_by('language_name')
+    mentorship_available_territories = Territory.objects.order_by('territory_name')
 
     mentorship_mentor_responses = (
         PartnerMentorshipFormMentorResponse.objects
@@ -392,6 +382,9 @@ def dashboard(request):
         {
             'partner_id': settings_obj.partner.organization_id,
             'description': settings_obj.description,
+            'registration_open_date': settings_obj.registration_open_date.isoformat() if settings_obj.registration_open_date else '',
+            'registration_close_date': settings_obj.registration_close_date.isoformat() if settings_obj.registration_close_date else '',
+            'territory_id': settings_obj.territory_id,
             'mentor_form_id': settings_obj.mentor_form_id,
             'mentee_form_id': settings_obj.mentee_form_id,
             'skill_ids': list(settings_obj.skills.values_list('id', flat=True)),
@@ -418,6 +411,7 @@ def dashboard(request):
         'mentorship_settings': mentorship_settings,
         'mentorship_available_skills': mentorship_available_skills,
         'mentorship_available_languages': mentorship_available_languages,
+        'mentorship_available_territories': mentorship_available_territories,
         'mentorship_mentor_responses_data': mentor_responses_payload,
         'mentorship_mentee_responses_data': mentee_responses_payload,
         'mentorship_forms_mentor_data': mentor_forms_payload,
@@ -483,6 +477,9 @@ def _require_partner_scope(request, partner: Partner):
 def mentorship_settings_update(request):
     partner_id = request.POST.get('partner_id', '').strip()
     description = request.POST.get('description', '').strip()
+    registration_open_date_raw = request.POST.get('registration_open_date', '').strip()
+    registration_close_date_raw = request.POST.get('registration_close_date', '').strip()
+    territory_id = request.POST.get('territory_id', '').strip()
     mentor_form_id = request.POST.get('mentor_form_id', '').strip()
     mentee_form_id = request.POST.get('mentee_form_id', '').strip()
     skill_ids = [sid for sid in request.POST.getlist('skills') if sid]
@@ -505,6 +502,28 @@ def mentorship_settings_update(request):
     if not partner.mentorship:
         messages.error(request, 'Mentorship is not enabled for this partner.')
         return redirect(DASHBOARD_URL_NAME)
+
+    registration_open_date = None
+    if registration_open_date_raw:
+        registration_open_date = parse_date(registration_open_date_raw)
+        if registration_open_date is None:
+            messages.error(request, 'Registration opening date is invalid.')
+            return redirect(DASHBOARD_URL_NAME)
+
+    registration_close_date = None
+    if registration_close_date_raw:
+        registration_close_date = parse_date(registration_close_date_raw)
+        if registration_close_date is None:
+            messages.error(request, 'Registration closing date is invalid.')
+            return redirect(DASHBOARD_URL_NAME)
+
+    territory = None
+    if territory_id:
+        try:
+            territory = Territory.objects.get(id=territory_id)
+        except Territory.DoesNotExist:
+            messages.error(request, 'Selected territory is invalid.')
+            return redirect(DASHBOARD_URL_NAME)
 
     mentor_form = None
     if mentor_form_id:
@@ -537,6 +556,9 @@ def mentorship_settings_update(request):
 
     settings_obj, _ = PartnerMentorshipSettings.objects.get_or_create(partner=partner)
     settings_obj.description = description
+    settings_obj.registration_open_date = registration_open_date
+    settings_obj.registration_close_date = registration_close_date
+    settings_obj.territory = territory
     settings_obj.mentor_form = mentor_form
     settings_obj.mentee_form = mentee_form
     settings_obj.save()

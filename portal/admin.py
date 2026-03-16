@@ -2,6 +2,7 @@ from django.contrib import admin
 from .models import (
     Partner,
     PartnerMembership,
+    PartnerMentorshipSettings,
     PartnerMentorshipPublicKey,
     PartnerMentorshipFormMentor,
     PartnerMentorshipFormMentee,
@@ -19,6 +20,10 @@ class PartnerMembershipAdmin(admin.ModelAdmin):
     list_display = ('partner', 'user', 'created_at')
     search_fields = ('partner__organization__acronym', 'partner__organization__i18n_names__name', 'user__username')
 
+@admin.register(PartnerMentorshipSettings)
+class PartnerMentorshipSettingsAdmin(admin.ModelAdmin):
+    list_display = ('partner', 'territory', 'registration_open_date', 'registration_close_date', 'created_at')
+    search_fields = ('partner__organization__acronym', 'partner__organization__i18n_names__name')
 
 @admin.register(PartnerMentorshipPublicKey)
 class PartnerMentorshipPublicKeyAdmin(admin.ModelAdmin):
