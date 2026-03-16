@@ -33,6 +33,8 @@ class PartnerSerializer(serializers.ModelSerializer):
 
 class PartnerSettingsSerializer(serializers.ModelSerializer):
     organization = serializers.IntegerField(source='partner.organization.id', read_only=True)
+    territory = serializers.IntegerField(source='territory.id', read_only=True, allow_null=True)
+    territory_name = serializers.SerializerMethodField()
 
     class Meta:
         model = PartnerMentorshipSettings
@@ -40,6 +42,10 @@ class PartnerSettingsSerializer(serializers.ModelSerializer):
             'id',
             'organization',
             'description',
+            'registration_open_date',
+            'registration_close_date',
+            'territory',
+            'territory_name',
             'skills',
             'languages',
             'mentor_form',
@@ -48,6 +54,10 @@ class PartnerSettingsSerializer(serializers.ModelSerializer):
             'updated_at',
         ]
         read_only_fields = ['id', 'created_at', 'updated_at']
+
+    @extend_schema_field(OpenApiTypes.STR)
+    def get_territory_name(self, obj):
+        return obj.territory.territory_name if obj.territory_id else None
 
 
 class PartnerMentorshipFormMentorSerializer(serializers.ModelSerializer):

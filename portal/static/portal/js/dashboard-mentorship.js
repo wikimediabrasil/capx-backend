@@ -1,4 +1,47 @@
 (function() {
+  var skillNodes = Array.from(document.querySelectorAll('[data-skill-qid]'));
+  var qidNodes   = Array.from(document.querySelectorAll('[data-qid-label]'));
+  var allNodes   = skillNodes.concat(qidNodes);
+  if (!allNodes.length || typeof window.fetch !== 'function') return;
+
+  function applyLabels(labelByQid) {
+    skillNodes.forEach(function(node) {
+      var qid   = String(node.getAttribute('data-skill-qid') || '').trim();
+      var label = labelByQid[qid];
+      if (!qid || !label) return;
+      if (node.tagName === 'OPTION') {
+        node.textContent = label + ' (' + qid + ')';
+      } else {
+        node.textContent = label;
+        node.title = qid;
+      }
+    });
+    qidNodes.forEach(function(node) {
+      var qid   = String(node.getAttribute('data-qid-label') || '').trim();
+      var label = labelByQid[qid];
+      if (!qid || !label) return;
+      node.textContent = label;
+      node.title = qid;
+    });
+  }
+
+  window.fetch('/portal/qid-labels/', {
+    headers: { 'X-Requested-With': 'XMLHttpRequest' },
+    credentials: 'same-origin',
+  })
+    .then(function(response) {
+      if (!response.ok) throw new Error('Unable to load labels');
+      return response.json();
+    })
+    .then(function(payload) {
+      applyLabels((payload && payload.labels) || {});
+    })
+    .catch(function() {
+      // Keep QIDs as the fallback when labels are unavailable.
+    });
+})();
+
+(function() {
   var formElement = document.getElementById('mentorship-form-create');
   var builderHost = document.getElementById('mentorship-form-builder');
   var outputField = document.getElementById('mentorship-form-json');

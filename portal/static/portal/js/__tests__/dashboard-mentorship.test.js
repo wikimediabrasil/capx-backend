@@ -3,6 +3,11 @@
  */
 describe('dashboard-mentorship.js', () => {
   beforeEach(() => {
+    global.fetch = jest.fn().mockResolvedValue({
+      ok: true,
+      json: async () => ({ results: [] }),
+    });
+    window.fetch = global.fetch;
     document.body.innerHTML = `
       <form id="mentorship-form-create">
         <div id="mentorship-form-builder"></div>
@@ -26,6 +31,8 @@ describe('dashboard-mentorship.js', () => {
     jest.resetModules();
     document.body.innerHTML = '';
     delete global.jQuery;
+    delete global.fetch;
+    delete window.fetch;
   });
 
   test('loads without throwing when builder libs are absent', () => {
@@ -69,6 +76,50 @@ describe('dashboard-mentorship.js', () => {
     partnerField.dispatchEvent(new window.Event('change', { bubbles: true }));
     expect(keyField.value).toBe('k2');
     expect(keyField.options[0].hidden).toBe(true);
+  });
+
+  test('hydrates all QID labels with a single request to /portal/qid-labels/', async () => {
+    global.fetch = jest.fn().mockResolvedValue({
+      ok: true,
+      json: async () => ({
+        labels: { Q123: 'Facilitation', Q456: 'Wikidata Item' },
+      }),
+    });
+    window.fetch = global.fetch;
+    document.body.innerHTML = `
+      <form id="mentorship-form-create">
+        <div id="mentorship-form-builder"></div>
+        <textarea id="mentorship-form-json"></textarea>
+        <div id="mentorship-form-builder-status"></div>
+        <select id="mentorship-form-partner"></select>
+        <select id="mentorship-form-public-key"></select>
+      </form>
+      <select id="mentorship-csv-partner"></select>
+      <select id="mentorship-csv-type"></select>
+      <select id="mentorship-csv-form"></select>
+      <textarea id="mentorship-csv-private-key"></textarea>
+      <button id="mentorship-csv-download-btn"></button>
+      <div id="mentorship-csv-status"></div>
+      <select id="mentorship-settings-skills">
+        <option value="1" data-skill-qid="Q123">Q123</option>
+      </select>
+      <span data-skill-qid="Q123">Q123</span>
+      <span data-qid-label="Q456">Q456</span>
+    `;
+
+    require('../dashboard-mentorship.js');
+    await Promise.resolve();
+    await Promise.resolve();
+    await new Promise((resolve) => setTimeout(resolve, 0));
+
+    expect(global.fetch).toHaveBeenCalledWith(
+      '/portal/qid-labels/',
+      expect.objectContaining({ credentials: 'same-origin' })
+    );
+    expect(global.fetch).toHaveBeenCalledTimes(1);
+    expect(document.querySelector('#mentorship-settings-skills option').textContent).toBe('Facilitation (Q123)');
+    expect(document.querySelector('span[data-skill-qid="Q123"]').textContent).toBe('Facilitation');
+    expect(document.querySelector('span[data-qid-label="Q456"]').textContent).toBe('Wikidata Item');
   });
 
   test('uses formBuilder when jQuery is available and validates empty form', () => {

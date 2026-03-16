@@ -9,8 +9,8 @@ function setupDom() {
       <div class="card"><table id="users-table">
         <thead><tr><th>Username</th><th>Updated</th></tr></thead>
         <tbody>
-          <tr><td>Alice</td><td>2023-01-01</td></tr>
-          <tr><td>Bob</td><td>2024-01-01</td></tr>
+          <tr><td>Alice</td><td><span data-qid-label="Q1">Q1</span></td></tr>
+          <tr><td>Bob</td><td><span data-qid-label="Q2">Q2</span></td></tr>
         </tbody>
       </table></div>
       <input id="users-filter-input" />
@@ -20,16 +20,26 @@ function setupDom() {
   `;
   // Mock URL for CSV download
   global.URL.createObjectURL = () => 'blob:url';
+  global.URL.revokeObjectURL = jest.fn();
   global.Blob = window.Blob;
 }
 
 describe('dashboard-users.js', () => {
   beforeEach(() => {
     setupDom();
+    const origCreate = document.createElement.bind(document);
+    jest.spyOn(document, 'createElement').mockImplementation((tag) => {
+      const el = origCreate(tag);
+      if (tag === 'a') {
+        el.click = () => {};
+      }
+      return el;
+    });
   });
 
   afterEach(() => {
     jest.resetModules();
+    jest.restoreAllMocks();
     document.body.innerHTML = '';
   });
 
@@ -84,4 +94,6 @@ describe('dashboard-users.js', () => {
     btn.click();
     expect(info.textContent).toContain('Showing');
   });
+
 });
+
