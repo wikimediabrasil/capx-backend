@@ -10,6 +10,7 @@ class Bug(models.Model):
         ("error", "Error"),
         ("new_feature", "New Feature"),
         ("improvement", "Improvement"),
+        ("new_capacity", "New Capacity"),
         ("test_case", "Test Case")
     ]
     BUG_STATUSES = [
