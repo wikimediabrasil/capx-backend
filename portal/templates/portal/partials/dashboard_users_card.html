@@ -1,0 +1,102 @@
+<section class="card" data-accent="users">
+  <div class="card-head"><span class="icon-badge" aria-hidden="true">👤</span><div><h2 style="margin:0">Users</h2><p class="section-desc" style="margin:2px 0 0">Browse, filter, and export users. Use the column toggles to tailor the view.</p></div></div>
+  {% if users_table %}
+    <div class="table-toolbar" aria-label="Users table controls">
+      <input type="search" id="users-filter-input" placeholder="Type to filter rows..." aria-label="Filter users" />
+      <div id="users-col-toggles" class="col-toggles" aria-label="Show/Hide columns"></div>
+      <button type="button" id="users-csv-btn" class="btn-primary">Download CSV</button>
+      <div id="users-row-limit" class="muted" style="margin-left:auto; display:flex; gap:8px; align-items:center;">
+        <span id="users-row-limit-info"></span>
+        <button type="button" id="users-toggle-limit-btn" style="display:none;">Show all</button>
+      </div>
+    </div>
+    <table id="users-table">
+      <thead>
+        <tr>
+          <th>Username</th>
+          <th>Is staff</th>
+          <th>Is active</th>
+          <th>Date joined</th>
+          <th>Last update</th>
+          <th>Last login</th>
+          <th>Wikidata QID</th>
+          <th>Wiki alt</th>
+          <th>Territory</th>
+          <th>Language</th>
+          <th>Affiliation</th>
+          <th>Wikimedia project</th>
+          <th>Team</th>
+          <th>Skills known</th>
+          <th>Skills available</th>
+          <th>Skills wanted</th>
+          <th>Manager of organizations</th>
+          <th>Badges</th>
+          <th>Automated Lets Connect</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for row in users_table %}
+          <tr>
+            <td>{{ row.username }}</td>
+            <td>
+              <span class="pill {{ row.is_staff|yesno:'pill--success,pill--muted' }}">{{ row.is_staff|yesno:'Staff,No' }}</span>
+            </td>
+            <td>
+              <span class="pill {{ row.is_active|yesno:'pill--success,pill--danger' }}">{{ row.is_active|yesno:'Active,Inactive' }}</span>
+            </td>
+            <td>{{ row.date_joined|date:"Y-m-d H:i:s" }}</td>
+            <td>{{ row.last_update|date:"Y-m-d H:i:s" }}</td>
+            <td>{{ row.last_login|date:"Y-m-d H:i:s" }}</td>
+            <td>{% if row.wikidata_qid %}<span data-qid-label="{{ row.wikidata_qid }}">{{ row.wikidata_qid }}</span>{% endif %}</td>
+            <td>{{ row.wiki_alt }}</td>
+            <td>{{ row.territory }}</td>
+            <td>
+              {% if row.language %}
+                {% for lang in row.language %}
+                  <span class="chip">{{ lang.name }} ({{ lang.proficiency }})</span>
+                {% endfor %}
+              {% endif %}
+            </td>
+            <td>{{ row.affiliation }}</td>
+            <td>{{ row.wikimedia_project }}</td>
+            <td>{{ row.team }}</td>
+            <td>
+              {% for qid in row.skills_known_qids %}
+                <span class="chip" data-qid-label="{{ qid }}">{{ qid }}</span>
+              {% endfor %}
+            </td>
+            <td>
+              {% for qid in row.skills_available_qids %}
+                <span class="chip" data-qid-label="{{ qid }}">{{ qid }}</span>
+              {% endfor %}
+            </td>
+            <td>
+              {% for qid in row.skills_wanted_qids %}
+                <span class="chip" data-qid-label="{{ qid }}">{{ qid }}</span>
+              {% endfor %}
+            </td>
+            <td>
+              {% if row.is_manager %}
+                {% for org_id in row.is_manager %}
+                  <span class="chip">{{ org_id }}</span>
+                {% endfor %}
+              {% endif %}
+            </td>
+            <td>
+              {% if row.badges %}
+                {% for badge_id in row.badges %}
+                  <span class="chip">{{ badge_id }}</span>
+                {% endfor %}
+              {% endif %}
+            </td>
+            <td>
+              <span class="pill {{ row.automated_lets_connect|yesno:'pill--success,pill--muted' }}">{{ row.automated_lets_connect|yesno:'Enabled,Disabled' }}</span>
+            </td>
+          </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  {% else %}
+    <p class="muted">No users found.</p>
+  {% endif %}
+</section>

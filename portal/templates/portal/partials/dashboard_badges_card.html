@@ -1,0 +1,107 @@
+<section class="card" data-accent="badges">
+  <div class="card-head"><span class="icon-badge" aria-hidden="true">🏷️</span><div><h2 style="margin:0">Badges</h2><p class="section-desc" style="margin:2px 0 0">Partner badges are scoped to a partner. Only staff or that partner’s members can manage them.</p></div></div>
+  <div class="tabs" role="tablist" aria-label="Badges tabs">
+    <button type="button" role="tab" aria-selected="true" aria-controls="panel-badges-manage" id="tab-badges-manage">Manage badges</button>
+    <button type="button" role="tab" aria-selected="false" aria-controls="panel-badges-assign" id="tab-badges-assign">Assignments</button>
+  </div>
+  <div id="panel-badges-manage" role="tabpanel" aria-labelledby="tab-badges-manage">
+    <table id="badges-table">
+      <thead>
+        <tr>
+          <th>Badge</th>
+          <th>Partner</th>
+          <th>Description</th>
+          <th>Actions</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for b in partner_badges %}
+          <tr data-badge-row data-badge-id="{{ b.id }}">
+            <td><strong>{{ b.name }}</strong></td>
+            <td>{{ b.partner_name }}</td>
+            <td>{{ b.description }}</td>
+            <td style="white-space:nowrap">
+              <button type="button" data-action="edit-badge" data-badge-id="{{ b.id }}" class="btn-primary" style="padding:6px 10px; font-size:0.85rem;">Edit</button>
+              <button type="button" data-action="manage-assign" data-badge-id="{{ b.id }}" class="" style="padding:6px 10px; font-size:0.85rem; border:1px solid var(--border); border-radius:10px; background:#fff;">Manage assignments</button>
+              <form method="post" action="/portal/partner_badge/delete/" style="display:inline-block;">
+                {% csrf_token %}
+                <input type="hidden" name="badge_id" value="{{ b.id }}" />
+                <button type="submit" class="btn-danger" style="padding:6px 10px; font-size:0.85rem;">Delete</button>
+              </form>
+            </td>
+          </tr>
+          <tr data-badge-edit-row data-for="{{ b.id }}" hidden>
+            <td colspan="4">
+              <form method="post" action="/portal/partner_badge/update/" aria-label="Update badge {{ b.name }}" style="grid-template-columns: 1fr auto;">
+                {% csrf_token %}
+                <input type="hidden" name="badge_id" value="{{ b.id }}" />
+                <label for="badge-name-{{ b.id }}">Name</label>
+                <input id="badge-name-{{ b.id }}" name="name" value="{{ b.name }}" />
+                <label for="badge-pic-{{ b.id }}">Picture URL</label>
+                <input id="badge-pic-{{ b.id }}" name="picture" value="{{ b.picture }}" />
+                <label for="badge-desc-{{ b.id }}">Description</label>
+                <input id="badge-desc-{{ b.id }}" name="description" value="{{ b.description }}" />
+                <div class="form-note">Partner: {{ b.partner_name }} (fixed)</div>
+                <button type="submit" class="btn-primary">Save changes</button>
+              </form>
+            </td>
+          </tr>
+        {% empty %}
+          <tr><td colspan="4" class="muted">No partner badges yet.</td></tr>
+        {% endfor %}
+      </tbody>
+    </table>
+    <hr style="border:none; border-top:1px solid var(--border); margin:12px 0;" />
+    <h3>Create new badge</h3>
+    <form method="post" action="/portal/partner_badge/create/" aria-label="Create partner badge">
+      {% csrf_token %}
+      <label for="partner-badge-create-name">Badge name</label>
+      <input id="partner-badge-create-name" name="name" placeholder="New badge name" required />
+      <label for="partner-badge-create-pic">Picture URL</label>
+      <input id="partner-badge-create-pic" name="picture" placeholder="https://example.com/badge.png" required />
+      <label for="partner-badge-create-desc">Description</label>
+      <input id="partner-badge-create-desc" name="description" placeholder="Optional description" />
+      <label for="partner-badge-create-partner">Select partner</label>
+      <select id="partner-badge-create-partner" name="partner_id" required>
+        {% for p in partners_for_ui %}
+          <option value="{{ p.organization_id }}">{{ p.name }}</option>
+        {% endfor %}
+      </select>
+      <button type="submit" class="btn-primary">Create partner badge</button>
+    </form>
+  </div>
+  <div id="panel-badges-assign" role="tabpanel" aria-labelledby="tab-badges-assign" hidden>
+    <div class="table-toolbar" style="margin-top:0">
+      <label for="assignments-badge-select" class="muted" style="align-self:center;">Badge</label>
+      <select id="assignments-badge-select">
+        {% for b in partner_badges %}
+          <option value="{{ b.id }}">{{ b.name }} ({{ b.partner_name }})</option>
+        {% endfor %}
+      </select>
+    </div>
+    <div class="grid" style="grid-template-columns: 1fr 1fr; gap:12px; align-items:start;">
+      <div>
+        <h3 style="margin-top:0">Awarded users</h3>
+        <ul id="awarded-users-list" style="list-style:none; padding-left:0; margin-top:8px;"></ul>
+        <form id="badge-remove-shared-form" method="post" action="/portal/partner_badge/remove/" style="display:none;">
+          {% csrf_token %}
+          <input type="hidden" name="username" id="badge-remove-username" />
+          <input type="hidden" name="badge_id" id="badge-remove-badge-id" />
+        </form>
+      </div>
+      <div>
+        <h3 style="margin-top:0">Assign to user</h3>
+        <form method="post" action="/portal/partner_badge/assign/" aria-label="Assign partner badge">
+          {% csrf_token %}
+          <label for="partner-badge-assign-user">User to assign</label>
+          <input id="partner-badge-assign-user" name="username" placeholder="Username(s), comma-separated" required />
+          <input type="hidden" name="badge_id" id="assign-badge-hidden" />
+          <button type="submit" class="btn-primary">Assign badge</button>
+        </form>
+        <div class="form-note">The selection above controls which badge is assigned.</div>
+        <div class="form-note">Tip: enter multiple usernames separated by commas (e.g., Alice,Bob,Carol).</div>
+      </div>
+    </div>
+    {{ partner_badges_awarded|json_script:"partner-badges-awarded-data" }}
+  </div>
+</section>

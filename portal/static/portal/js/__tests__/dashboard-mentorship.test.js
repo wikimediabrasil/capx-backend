@@ -1,6 +1,49 @@
 /**
  * Basic coverage for dashboard-mentorship.js fallback paths (no jQuery present).
  */
+function renderMentorshipDom(extraHtml = '') {
+  document.body.innerHTML = `
+    <select id="mentorship-partner-global">
+      <option value="p1">P1</option>
+      <option value="p2">P2</option>
+    </select>
+
+    <form id="mentorship-form-create">
+      <div id="mentorship-form-builder"></div>
+      <textarea id="mentorship-form-json"></textarea>
+      <div id="mentorship-form-builder-status"></div>
+      <input id="mentorship-form-partner" />
+      <select id="mentorship-form-type">
+        <option value="mentor" selected>mentor</option>
+        <option value="mentee">mentee</option>
+      </select>
+      <select id="mentorship-form-public-key">
+        <option data-partner-id="p1" value="k1">K1</option>
+        <option data-partner-id="p2" value="k2">K2</option>
+      </select>
+    </form>
+
+    <form id="mentorship-form-update">
+      <input id="mentorship-form-update-partner" />
+      <input id="mentorship-form-update-type" />
+      <select id="mentorship-form-update-id"></select>
+      <input id="mentorship-form-update-json" />
+      <button type="button" id="mentorship-form-load-btn"></button>
+      <button type="submit" id="mentorship-form-update-btn"></button>
+    </form>
+
+    <select id="mentorship-csv-type"><option value="mentor" selected>mentor</option></select>
+    <select id="mentorship-csv-form"></select>
+    <textarea id="mentorship-csv-private-key"></textarea>
+    <button id="mentorship-csv-download-btn"></button>
+    <div id="mentorship-csv-status"></div>
+    <div id="mentorship-csv-summary"></div>
+    <div id="mentorship-csv-respondents"></div>
+
+    ${extraHtml}
+  `;
+}
+
 describe('dashboard-mentorship.js', () => {
   beforeEach(() => {
     global.fetch = jest.fn().mockResolvedValue({
@@ -8,21 +51,7 @@ describe('dashboard-mentorship.js', () => {
       json: async () => ({ results: [] }),
     });
     window.fetch = global.fetch;
-    document.body.innerHTML = `
-      <form id="mentorship-form-create">
-        <div id="mentorship-form-builder"></div>
-        <textarea id="mentorship-form-json"></textarea>
-        <div id="mentorship-form-builder-status"></div>
-        <select id="mentorship-form-partner"></select>
-        <select id="mentorship-form-public-key"></select>
-      </form>
-      <select id="mentorship-csv-partner"></select>
-      <select id="mentorship-csv-type"></select>
-      <select id="mentorship-csv-form"></select>
-      <textarea id="mentorship-csv-private-key"></textarea>
-      <button id="mentorship-csv-download-btn"></button>
-      <div id="mentorship-csv-status"></div>
-    `;
+    renderMentorshipDom();
     // Ensure no jQuery present to hit fallback branch
     global.jQuery = undefined;
   });
@@ -47,29 +76,9 @@ describe('dashboard-mentorship.js', () => {
     const jq = jest.fn(() => ({ formBuilder: jest.fn(() => ({ actions: { getData: () => '[{"name":"x"}]' } })) }));
     jq.fn = { formBuilder: true };
     global.jQuery = jq;
-    document.body.innerHTML = `
-      <form id="mentorship-form-create">
-        <div id="mentorship-form-builder"></div>
-        <textarea id="mentorship-form-json"></textarea>
-        <div id="mentorship-form-builder-status"></div>
-        <select id="mentorship-form-partner">
-          <option value="p1">P1</option>
-          <option value="p2">P2</option>
-        </select>
-        <select id="mentorship-form-public-key">
-          <option data-partner-id="p1" value="k1">K1</option>
-          <option data-partner-id="p2" value="k2">K2</option>
-        </select>
-      </form>
-      <select id="mentorship-csv-partner"></select>
-      <select id="mentorship-csv-type"></select>
-      <select id="mentorship-csv-form"></select>
-      <textarea id="mentorship-csv-private-key"></textarea>
-      <button id="mentorship-csv-download-btn"></button>
-      <div id="mentorship-csv-status"></div>
-    `;
+    renderMentorshipDom();
     require('../dashboard-mentorship.js');
-    const partnerField = document.getElementById('mentorship-form-partner');
+    const partnerField = document.getElementById('mentorship-partner-global');
     const keyField = document.getElementById('mentorship-form-public-key');
     // Change to partner p2 should hide other option
     partnerField.value = 'p2';
@@ -86,26 +95,13 @@ describe('dashboard-mentorship.js', () => {
       }),
     });
     window.fetch = global.fetch;
-    document.body.innerHTML = `
-      <form id="mentorship-form-create">
-        <div id="mentorship-form-builder"></div>
-        <textarea id="mentorship-form-json"></textarea>
-        <div id="mentorship-form-builder-status"></div>
-        <select id="mentorship-form-partner"></select>
-        <select id="mentorship-form-public-key"></select>
-      </form>
-      <select id="mentorship-csv-partner"></select>
-      <select id="mentorship-csv-type"></select>
-      <select id="mentorship-csv-form"></select>
-      <textarea id="mentorship-csv-private-key"></textarea>
-      <button id="mentorship-csv-download-btn"></button>
-      <div id="mentorship-csv-status"></div>
+    renderMentorshipDom(`
       <select id="mentorship-settings-skills">
         <option value="1" data-skill-qid="Q123">Q123</option>
       </select>
       <span data-skill-qid="Q123">Q123</span>
       <span data-qid-label="Q456">Q456</span>
-    `;
+    `);
 
     require('../dashboard-mentorship.js');
     await Promise.resolve();
@@ -128,21 +124,7 @@ describe('dashboard-mentorship.js', () => {
     const jq = jest.fn(() => ({ formBuilder: jest.fn(() => fbInstance) }));
     jq.fn = { formBuilder: true };
     global.jQuery = jq;
-    document.body.innerHTML = `
-      <form id="mentorship-form-create">
-        <div id="mentorship-form-builder"></div>
-        <textarea id="mentorship-form-json"></textarea>
-        <div id="mentorship-form-builder-status"></div>
-        <select id="mentorship-form-partner"><option value="p1">P1</option></select>
-        <select id="mentorship-form-public-key"><option data-partner-id="p1" value="k1">K1</option></select>
-      </form>
-      <select id="mentorship-csv-partner"></select>
-      <select id="mentorship-csv-type"></select>
-      <select id="mentorship-csv-form"></select>
-      <textarea id="mentorship-csv-private-key"></textarea>
-      <button id="mentorship-csv-download-btn"></button>
-      <div id="mentorship-csv-status"></div>
-    `;
+    renderMentorshipDom();
     require('../dashboard-mentorship.js');
     const form = document.getElementById('mentorship-form-create');
     const status = document.getElementById('mentorship-form-builder-status');
@@ -151,14 +133,7 @@ describe('dashboard-mentorship.js', () => {
   });
 
   test('csv download shows message when WebCrypto missing', () => {
-    document.body.innerHTML = `
-      <select id="mentorship-csv-partner"></select>
-      <select id="mentorship-csv-type"></select>
-      <select id="mentorship-csv-form"></select>
-      <textarea id="mentorship-csv-private-key"></textarea>
-      <button id="mentorship-csv-download-btn"></button>
-      <div id="mentorship-csv-status"></div>
-    `;
+    renderMentorshipDom();
     // Ensure the rest of the DOM required by the first IIFE is absent so it returns early
     global.crypto = undefined;
     require('../dashboard-mentorship.js');
@@ -176,18 +151,14 @@ describe('dashboard-mentorship.js', () => {
     const responses = [
       { form_id: 1, username: 'alice', created_at: '2024-01-02', data: { __encrypted__: true, key: 'AA==', nonce: 'AA==', ciphertext: 'AA==' } },
     ];
-    document.body.innerHTML = `
-      <select id="mentorship-csv-partner"><option value="p1">P1</option></select>
-      <select id="mentorship-csv-type"><option value="mentor">mentor</option></select>
-      <select id="mentorship-csv-form"><option value="1">1</option></select>
-      <textarea id="mentorship-csv-private-key">-----BEGIN PRIVATE KEY-----abc-----END PRIVATE KEY-----</textarea>
-      <button id="mentorship-csv-download-btn"></button>
-      <div id="mentorship-csv-status"></div>
+    renderMentorshipDom(`
       <script id="mentorship-forms-mentor-data" type="application/json">${JSON.stringify(forms)}</script>
       <script id="mentorship-forms-mentee-data" type="application/json">[]</script>
       <script id="mentorship-responses-mentor-data" type="application/json">${JSON.stringify(responses)}</script>
       <script id="mentorship-responses-mentee-data" type="application/json">[]</script>
-    `;
+    `);
+    document.getElementById('mentorship-csv-form').innerHTML = '<option value="1">1</option>';
+    document.getElementById('mentorship-csv-private-key').value = '-----BEGIN PRIVATE KEY-----abc-----END PRIVATE KEY-----';
     const subtle = {
       importKey: jest.fn().mockResolvedValue({}),
       decrypt: jest.fn().mockResolvedValue(new TextEncoder().encode('{"field":"value"}')),

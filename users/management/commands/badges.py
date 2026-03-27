@@ -91,7 +91,10 @@ class Command(BaseCommand):
     def evaluate_logic(self, logic, user):
 
         target = logic.get('target')
-        value = int(logic.get('value'))
+        value = logic.get('value')
+        if value is None:
+            return 0
+        value = int(value)
 
         if target == 'sent_messages':
             sent = Message.objects.filter(sender=user).count()

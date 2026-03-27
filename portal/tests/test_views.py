@@ -2,11 +2,14 @@ from django.test import TestCase, Client
 from django.urls import reverse
 from django.contrib.auth import get_user_model
 from datetime import date
+import json
 from unittest.mock import MagicMock, patch
 from users.models import Badge, UserBadge
 from users.models import Territory
 from orgs.models import Organization, OrganizationName
 from portal.models import Partner, PartnerMembership, PartnerMentorshipSettings
+from portal.models import PartnerMentorshipPublicKey
+from portal.models import PartnerMentorshipFormMentor, PartnerMentorshipFormMentorResponse
 import secrets
 
 
@@ -46,7 +49,7 @@ class PortalViewsTests(TestCase):
         url = reverse("portal:login")
         resp = self.client.get(url)
         self.assertEqual(resp.status_code, 302)
-        self.assertEqual(resp.url, reverse("portal:dashboard"))
+        self.assertEqual(resp.url, reverse("portal:dashboard_users"))
 
     def test_login_view_shows_message_for_non_portal_user(self):
         self.client.force_login(user=self.user2)
@@ -71,7 +74,8 @@ class PortalViewsTests(TestCase):
         self.client.logout()
         self.client.force_login(user=self.admin)
         resp = self.client.get(reverse("portal:dashboard"))
-        self.assertEqual(resp.status_code, 200)
+        self.assertEqual(resp.status_code, 302)
+        self.assertEqual(resp.url, reverse("portal:dashboard_users"))
 
     def test_oauth_callback_preserves_query_string(self):
         qs = "oauth_token=abc&oauth_verifier=def"
@@ -166,6 +170,15 @@ class PortalViewsTests(TestCase):
     def test_mentorship_settings_update_saves_dates_and_territory(self):
         self.partner.mentorship = True
         self.partner.save(update_fields=['mentorship'])
+        PartnerMentorshipPublicKey.objects.create(
+            partner=self.partner,
+            public_key=(
+                "-----BEGIN PUBLIC KEY-----\n"
+                "MFwwDQYJKoZIhvcNAQEBBQADSwAwSAJBAL8v79n+W8pBr6K/3QfP+S8jO6jqFK+R\n"
+                "A9T5JfQ6U2M5j6KkGQ0+Q2nYlq1M2rls2t7o3rdrA9Y8C5jBzQwzKDsCAwEAAQ==\n"
+                "-----END PUBLIC KEY-----"
+            ),
+        )
         territory = Territory.objects.create(territory_name='Brazil')
 
         self.client.force_login(user=self.admin)
@@ -187,3 +200,61 @@ class PortalViewsTests(TestCase):
         self.assertEqual(settings_obj.registration_open_date, date(2026, 4, 1))
         self.assertEqual(settings_obj.registration_close_date, date(2026, 4, 30))
         self.assertEqual(settings_obj.territory, territory)
+
+    def test_mentorship_form_update_allows_typo_fix_but_blocks_structure_change_after_responses(self):
+        self.partner.mentorship = True
+        self.partner.save(update_fields=['mentorship'])
+
+        from cryptography.hazmat.primitives.asymmetric import rsa
+        from cryptography.hazmat.primitives import serialization
+
+        private_key = rsa.generate_private_key(public_exponent=65537, key_size=2048)
+        public_pem = private_key.public_key().public_bytes(
+            encoding=serialization.Encoding.PEM,
+            format=serialization.PublicFormat.SubjectPublicKeyInfo,
+        ).decode('utf-8')
+
+        key = PartnerMentorshipPublicKey.objects.create(partner=self.partner, public_key=public_pem)
+        form = PartnerMentorshipFormMentor.objects.create(
+            partner=self.partner,
+            public_key=key,
+            json=[{'type': 'text', 'label': 'Initial label', 'name': 'field1'}],
+        )
+
+        PartnerMentorshipFormMentorResponse.objects.create(
+            partner=self.partner,
+            form=form,
+            user=self.user1,
+            data='{"field1": "answer"}',
+        )
+
+        self.client.force_login(self.admin)
+
+        # Non-structural change (label typo fix) should be allowed
+        ok_resp = self.client.post(
+            reverse('portal:mentorship_form_update'),
+            data={
+                'partner_id': str(self.partner.organization_id),
+                'form_id': str(form.id),
+                'form_type': 'mentor',
+                'form_json': json.dumps([{'type': 'text', 'label': 'Initial label fixed', 'name': 'field1'}]),
+            },
+        )
+        self.assertEqual(ok_resp.status_code, 302)
+        form.refresh_from_db()
+        self.assertEqual(form.json[0]['label'], 'Initial label fixed')
+
+        # Structural change (field name) should be blocked when responses already exist
+        bad_resp = self.client.post(
+            reverse('portal:mentorship_form_update'),
+            data={
+                'partner_id': str(self.partner.organization_id),
+                'form_id': str(form.id),
+                'form_type': 'mentor',
+                'form_json': json.dumps([{'type': 'text', 'label': 'Changed', 'name': 'field_renamed'}]),
+            },
+            follow=True,
+        )
+        self.assertEqual(bad_resp.status_code, 200)
+        form.refresh_from_db()
+        self.assertEqual(form.json[0]['name'], 'field1')
