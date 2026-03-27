@@ -8,6 +8,8 @@ venv/
 Lib/
 Scripts/
 *.sqlite3
+*.sql
+*.ps1
 *.pkl
 *.coverage
 htmlcov/

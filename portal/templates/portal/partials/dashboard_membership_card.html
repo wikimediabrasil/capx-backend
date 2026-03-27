@@ -1,0 +1,36 @@
+<section class="card" data-accent="membership">
+  <div class="card-head"><span class="icon-badge" aria-hidden="true">🤝</span><div><h2 style="margin:0">Manage membership (partners)</h2><p class="section-desc" style="margin:2px 0 0">Add or remove users from your partner. Members automatically gain portal access.</p></div></div>
+  <div class="tabs" role="tablist" aria-label="Membership actions">
+    <button type="button" role="tab" aria-selected="true" aria-controls="panel-membership-add" id="tab-membership-add">Add member</button>
+    <button type="button" role="tab" aria-selected="false" aria-controls="panel-membership-remove" id="tab-membership-remove">Remove member</button>
+  </div>
+  <div id="panel-membership-add" role="tabpanel" aria-labelledby="tab-membership-add">
+    <form method="post" action="/portal/partner/membership/add/" aria-label="Add membership">
+      {% csrf_token %}
+      <label for="partner-membership-add-user">User to add</label>
+      <input id="partner-membership-add-user" name="username" placeholder="Username" required />
+      <label for="partner-membership-add-partner">Select partner</label>
+      <select id="partner-membership-add-partner" name="partner_id" required>
+        {% for p in partners_for_ui %}
+          <option value="{{ p.organization_id }}">{{ p.name }}</option>
+        {% endfor %}
+      </select>
+      <button type="submit" class="btn-primary">Add membership</button>
+    </form>
+  </div>
+  <div id="panel-membership-remove" role="tabpanel" aria-labelledby="tab-membership-remove" hidden>
+    <form method="post" action="/portal/partner/membership/remove/" aria-label="Remove membership">
+      {% csrf_token %}
+      <label for="partner-membership-remove-user">User to remove</label>
+      <input id="partner-membership-remove-user" name="username" placeholder="Username" required />
+      <label for="partner-membership-remove-partner">Select partner</label>
+      <select id="partner-membership-remove-partner" name="partner_id" required>
+        {% for p in partners_for_ui %}
+          <option value="{{ p.organization_id }}">{{ p.name }}</option>
+        {% endfor %}
+      </select>
+      <div class="danger-hint" role="note">Removing a member immediately revokes their portal access for this partner.</div>
+      <button type="submit" class="btn-danger">Remove membership</button>
+    </form>
+  </div>
+</section>

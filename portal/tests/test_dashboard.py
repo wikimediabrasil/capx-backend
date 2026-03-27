@@ -47,7 +47,7 @@ class DashboardE2E(StaticLiveServerTestCase):
             "value": session_cookie.value,
             "url": self.live_server_url,
         }])
-        self.page.goto(f"{self.live_server_url}{reverse('portal:dashboard')}#users")
+        self.page.goto(f"{self.live_server_url}{reverse('portal:dashboard_users')}")
         self.page.wait_for_selector("#users-csv-btn")
 
         with self.page.expect_download() as dl_info:
@@ -79,7 +79,7 @@ class DashboardE2E(StaticLiveServerTestCase):
             "value": session_cookie.value,
             "url": self.live_server_url,
         }])
-        self.page.goto(f"{self.live_server_url}{reverse('portal:dashboard')}#mentorship")
+        self.page.goto(f"{self.live_server_url}{reverse('portal:dashboard_mentorship')}")
 
         # Click on button tab-mentorship-keys
         try:
@@ -117,8 +117,8 @@ class DashboardE2E(StaticLiveServerTestCase):
         self.page.click(".formbuilder-icon-text")
         self.page.click(".formbuilder-icon-date")
 
-        # On select #mentorship-form-partner, choose the first option
-        self.page.select_option("#mentorship-form-partner", str(partner.organization_id))
+        # Select partner in the global mentorship selector
+        self.page.select_option("#mentorship-partner-global", str(partner.organization_id))
 
         generated_public_key_id = self.page.eval_on_selector(
             "#mentorship-form-public-key",
@@ -192,7 +192,7 @@ class DashboardE2E(StaticLiveServerTestCase):
             "value": session_cookie.value,
             "url": self.live_server_url,
         }])
-        self.page.goto(f"{self.live_server_url}{reverse('portal:dashboard')}#mentorship")
+        self.page.goto(f"{self.live_server_url}{reverse('portal:dashboard_mentorship')}")
 
         # Click on button tab-mentorship-csv
         try:

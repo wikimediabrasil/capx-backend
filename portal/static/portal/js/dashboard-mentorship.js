@@ -25,6 +25,16 @@
     });
   }
 
+  function sortSkillOptionsAlphabetically() {
+    var skillsSelect = document.getElementById('mentorship-settings-skills');
+    if (!skillsSelect) return;
+    var options = Array.from(skillsSelect.options);
+    options.sort(function(a, b) {
+      return (a.textContent || '').localeCompare((b.textContent || ''), undefined, { sensitivity: 'base' });
+    });
+    options.forEach(function(option) { skillsSelect.appendChild(option); });
+  }
+
   window.fetch('/portal/qid-labels/', {
     headers: { 'X-Requested-With': 'XMLHttpRequest' },
     credentials: 'same-origin',
@@ -35,6 +45,7 @@
     })
     .then(function(payload) {
       applyLabels((payload && payload.labels) || {});
+      sortSkillOptionsAlphabetically();
     })
     .catch(function() {
       // Keep QIDs as the fallback when labels are unavailable.
@@ -42,16 +53,64 @@
 })();
 
 (function() {
+  var globalPartnerField = document.getElementById('mentorship-partner-global');
   var formElement = document.getElementById('mentorship-form-create');
+  var updateFormElement = document.getElementById('mentorship-form-update');
+  var updatePartnerField = document.getElementById('mentorship-form-update-partner');
+  var updateTypeField = document.getElementById('mentorship-form-update-type');
+  var updateFormIdField = document.getElementById('mentorship-form-update-id');
+  var updateJsonField = document.getElementById('mentorship-form-update-json');
+  var loadBtn = document.getElementById('mentorship-form-load-btn');
+  var cancelEditBtn = document.getElementById('mentorship-form-cancel-edit-btn');
+  var createSaveBtn = document.getElementById('mentorship-form-save-btn');
+  var updateSaveBtn = document.getElementById('mentorship-form-update-btn');
+  var editModeNote = document.getElementById('mentorship-form-edit-mode-note');
   var builderHost = document.getElementById('mentorship-form-builder');
   var outputField = document.getElementById('mentorship-form-json');
   var statusEl = document.getElementById('mentorship-form-builder-status');
   var partnerField = document.getElementById('mentorship-form-partner');
+  var formTypeField = document.getElementById('mentorship-form-type');
   var keyField = document.getElementById('mentorship-form-public-key');
-  if (!formElement || !builderHost || !outputField || !statusEl || !partnerField || !keyField) return;
+  if (!formElement || !updateFormElement || !builderHost || !outputField || !statusEl || !partnerField || !formTypeField || !keyField || !globalPartnerField || !updatePartnerField || !updateTypeField || !updateFormIdField || !updateJsonField || !loadBtn) return;
+
+  var isEditingExistingForm = false;
+
+  function setEditMode(active) {
+    isEditingExistingForm = !!active;
+
+    formTypeField.disabled = isEditingExistingForm;
+    keyField.disabled = isEditingExistingForm;
+
+    if (createSaveBtn) {
+      createSaveBtn.style.display = isEditingExistingForm ? 'none' : '';
+      createSaveBtn.disabled = isEditingExistingForm;
+    }
+    if (updateSaveBtn) {
+      updateSaveBtn.style.display = isEditingExistingForm ? '' : 'none';
+      updateSaveBtn.disabled = !isEditingExistingForm;
+    }
+    if (cancelEditBtn) {
+      cancelEditBtn.style.display = isEditingExistingForm ? '' : 'none';
+    }
+    if (editModeNote) {
+      editModeNote.style.display = isEditingExistingForm ? '' : 'none';
+    }
+  }
+
+  function parseJsonScript(id) {
+    var el = document.getElementById(id);
+    if (!el) return [];
+    try { return JSON.parse(el.textContent || '[]'); } catch (e) { return []; }
+  }
+
+  var mentorForms = parseJsonScript('mentorship-forms-mentor-data');
+  var menteeForms = parseJsonScript('mentorship-forms-mentee-data');
 
   function filterPublicKeysByPartner() {
-    var selectedPartner = String(partnerField.value || '');
+    var selectedPartner = String(globalPartnerField.value || '');
+    partnerField.value = selectedPartner;
+    updatePartnerField.value = selectedPartner;
+    updateTypeField.value = String(formTypeField.value || 'mentor');
     var firstVisible = null;
     Array.from(keyField.options).forEach(function(option) {
       var visible = String(option.dataset.partnerId || '') === selectedPartner;
@@ -68,6 +127,72 @@
     if (!firstVisible) {
       statusEl.textContent = 'Create a public key for this partner before saving a form.';
     }
+    repopulateEditForms();
+  }
+
+  function currentFormsForType() {
+    return String(formTypeField.value || '') === 'mentee' ? menteeForms : mentorForms;
+  }
+
+  function repopulateEditForms() {
+    var selectedPartner = String(globalPartnerField.value || '');
+    var selectedType = String(formTypeField.value || 'mentor');
+    var forms = currentFormsForType().filter(function(form) {
+      return String(form.partner_id) === selectedPartner;
+    });
+
+    var previousValue = String(updateFormIdField.value || '');
+    updateFormIdField.innerHTML = '';
+    forms.forEach(function(form) {
+      var opt = document.createElement('option');
+      opt.value = String(form.id);
+      opt.textContent = 'ID ' + form.id + ' · ' + (form.created_at || '');
+      opt.dataset.formType = selectedType;
+      updateFormIdField.appendChild(opt);
+    });
+
+    if (!forms.length) {
+      var emptyOpt = document.createElement('option');
+      emptyOpt.value = '';
+      emptyOpt.textContent = 'No forms for this partner/type';
+      updateFormIdField.appendChild(emptyOpt);
+      updateFormIdField.value = '';
+      return;
+    }
+
+    if (previousValue && Array.from(updateFormIdField.options).some(function(option) { return option.value === previousValue; })) {
+      updateFormIdField.value = previousValue;
+    }
+  }
+
+  function loadSelectedFormIntoBuilder() {
+    var selectedFormId = String(updateFormIdField.value || '');
+    if (!selectedFormId) {
+      statusEl.textContent = 'Select a form to load into the builder.';
+      return;
+    }
+    var formDef = currentFormsForType().find(function(form) {
+      return String(form.id) === selectedFormId;
+    });
+    if (!formDef) {
+      statusEl.textContent = 'Selected form was not found.';
+      return;
+    }
+    if (!formBuilderInstance || !formBuilderInstance.actions || typeof formBuilderInstance.actions.setData !== 'function') {
+      statusEl.textContent = 'Loading existing forms is unavailable in this browser.';
+      return;
+    }
+    try {
+      var selectedOption = updateFormIdField.selectedOptions && updateFormIdField.selectedOptions[0];
+      var selectedFormType = String((selectedOption && selectedOption.dataset.formType) || formTypeField.value || 'mentor');
+      formBuilderInstance.actions.setData(JSON.stringify(formDef.json || []));
+      formTypeField.value = selectedFormType;
+      updateTypeField.value = selectedFormType;
+      setEditMode(true);
+      statusEl.textContent = 'Form loaded. Edit and save updates when ready.';
+    } catch (error) {
+      statusEl.textContent = 'Unable to load selected form into builder.';
+    }
   }
 
   var jq = globalThis.jQuery;
@@ -79,10 +204,18 @@
 
   var formBuilderInstance = jq(builderHost).formBuilder({
     disableFields: ['autocomplete', 'hidden', 'file', 'button'],
+    disabledAttrs: ['access', 'className'],
+    disableHTMLLabels: true,
     showActionButtons: false,
+    editOnAdd: true,
   });
 
   formElement.addEventListener('submit', function(event) {
+    if (isEditingExistingForm) {
+      statusEl.textContent = 'Finish or cancel current edit before creating a new form.';
+      event.preventDefault();
+      return;
+    }
     try {
       var dataJson = formBuilderInstance.actions.getData('json');
       if (!dataJson || dataJson === '[]') {
@@ -97,17 +230,62 @@
     }
   });
 
-  partnerField.addEventListener('change', filterPublicKeysByPartner);
+  updateFormElement.addEventListener('submit', function(event) {
+    if (!isEditingExistingForm) {
+      statusEl.textContent = 'Load an existing form before saving updates.';
+      event.preventDefault();
+      return;
+    }
+    try {
+      if (!updateFormIdField.value) {
+        statusEl.textContent = 'Select a form to update.';
+        event.preventDefault();
+        return;
+      }
+      var dataJson = formBuilderInstance.actions.getData('json');
+      if (!dataJson || dataJson === '[]') {
+        statusEl.textContent = 'Add at least one field to the form before saving updates.';
+        event.preventDefault();
+        return;
+      }
+      updatePartnerField.value = String(globalPartnerField.value || '');
+      updateTypeField.value = String(formTypeField.value || 'mentor');
+      updateJsonField.value = dataJson;
+    } catch (error) {
+      statusEl.textContent = 'Unable to export JSON from visual builder.';
+      event.preventDefault();
+    }
+  });
+
+  formTypeField.addEventListener('change', function() {
+    updateTypeField.value = String(formTypeField.value || 'mentor');
+    setEditMode(false);
+    filterPublicKeysByPartner();
+  });
+  globalPartnerField.addEventListener('change', function() {
+    setEditMode(false);
+    filterPublicKeysByPartner();
+  });
+  loadBtn.addEventListener('click', loadSelectedFormIntoBuilder);
+  if (cancelEditBtn) {
+    cancelEditBtn.addEventListener('click', function() {
+      setEditMode(false);
+      statusEl.textContent = 'Edit mode cancelled. You can create a new form now.';
+    });
+  }
+  setEditMode(false);
   filterPublicKeysByPartner();
 })();
 
 (function() {
-  var partnerSelect = document.getElementById('mentorship-csv-partner');
+  var partnerSelect = document.getElementById('mentorship-partner-global');
   var typeSelect = document.getElementById('mentorship-csv-type');
   var formSelect = document.getElementById('mentorship-csv-form');
   var privateKeyInput = document.getElementById('mentorship-csv-private-key');
   var downloadBtn = document.getElementById('mentorship-csv-download-btn');
   var statusEl = document.getElementById('mentorship-csv-status');
+  var summaryEl = document.getElementById('mentorship-csv-summary');
+  var respondentsEl = document.getElementById('mentorship-csv-respondents');
   if (!partnerSelect || !typeSelect || !formSelect || !privateKeyInput || !downloadBtn || !statusEl) return;
 
   function parseJsonScript(id) {
@@ -120,6 +298,27 @@
   var menteeForms = parseJsonScript('mentorship-forms-mentee-data');
   var mentorResponses = parseJsonScript('mentorship-responses-mentor-data');
   var menteeResponses = parseJsonScript('mentorship-responses-mentee-data');
+
+  var userProfileColumns = [
+    { key: 'is_staff', label: 'user_is_staff' },
+    { key: 'is_active', label: 'user_is_active' },
+    { key: 'date_joined', label: 'user_date_joined' },
+    { key: 'last_update', label: 'user_last_update' },
+    { key: 'last_login', label: 'user_last_login' },
+    { key: 'wikidata_qid', label: 'user_wikidata_qid' },
+    { key: 'wiki_alt', label: 'user_wiki_alt' },
+    { key: 'territory', label: 'user_territory' },
+    { key: 'language', label: 'user_language' },
+    { key: 'affiliation', label: 'user_affiliation' },
+    { key: 'wikimedia_project', label: 'user_wikimedia_project' },
+    { key: 'team', label: 'user_team' },
+    { key: 'skills_known_qids', label: 'user_skills_known_qids' },
+    { key: 'skills_available_qids', label: 'user_skills_available_qids' },
+    { key: 'skills_wanted_qids', label: 'user_skills_wanted_qids' },
+    { key: 'is_manager', label: 'user_is_manager' },
+    { key: 'badges', label: 'user_badges' },
+    { key: 'automated_lets_connect', label: 'user_automated_lets_connect' },
+  ];
 
   function currentForms() {
     return typeSelect.value === 'mentor' ? mentorForms : menteeForms;
@@ -162,6 +361,26 @@
     return value == null ? '' : String(value);
   }
 
+  function stringifyUserLanguage(value) {
+    if (!Array.isArray(value)) return stringifyCellValue(value);
+    return value.map(function(langItem) {
+      if (!langItem || typeof langItem !== 'object') return stringifyCellValue(langItem);
+      var name = langItem.name || '';
+      var prof = langItem.proficiency || '';
+      if (!name && !prof) return '';
+      if (!name) return prof;
+      if (!prof) return name;
+      return name + ' (' + prof + ')';
+    }).filter(Boolean).join('; ');
+  }
+
+  function getUserProfileCell(row, key) {
+    var profile = (row && row.user_profile && typeof row.user_profile === 'object') ? row.user_profile : {};
+    var value = profile[key];
+    if (key === 'language') return stringifyUserLanguage(value);
+    return stringifyCellValue(value);
+  }
+
   function buildSchemaFieldMap(formDefinition) {
     var schema = (formDefinition && formDefinition.json) || [];
     var map = {};
@@ -190,6 +409,30 @@
       emptyOpt.value = '';
       emptyOpt.textContent = 'No forms for this partner/type';
       formSelect.appendChild(emptyOpt);
+    }
+    refreshResponseSummary();
+  }
+
+  function refreshResponseSummary() {
+    if (!summaryEl && !respondentsEl) return;
+    var selectedFormId = String(formSelect.value || '');
+    if (!selectedFormId) {
+      if (summaryEl) summaryEl.textContent = 'No form selected.';
+      if (respondentsEl) respondentsEl.textContent = '';
+      return;
+    }
+    var rows = currentResponses().filter(function(r) { return String(r.form_id) === selectedFormId; });
+    if (summaryEl) {
+      summaryEl.textContent = 'Responses available: ' + rows.length;
+    }
+    if (respondentsEl) {
+      if (!rows.length) {
+        respondentsEl.textContent = 'No respondents yet for this form.';
+        return;
+      }
+      var users = rows.map(function(r) { return String(r.username || '').trim(); }).filter(Boolean);
+      var uniqueUsers = Array.from(new Set(users)).sort(function(a, b) { return a.localeCompare(b); });
+      respondentsEl.textContent = 'Respondents: ' + uniqueUsers.join(', ');
     }
   }
 
@@ -308,6 +551,9 @@
       }
 
       var header = ['username', 'created_at'];
+      userProfileColumns.forEach(function(col) {
+        header.push(col.label);
+      });
       dynamicKeys.forEach(function(key) {
         header.push(schemaFieldMap[key] || key);
       });
@@ -320,6 +566,10 @@
           escapeCSV(currentRow.username),
           escapeCSV(currentRow.created_at),
         ];
+
+        userProfileColumns.forEach(function(col) {
+          lineParts.push(escapeCSV(getUserProfileCell(currentRow, col.key)));
+        });
 
         dynamicKeys.forEach(function(key) {
           var value = currentObject[key];
@@ -339,6 +589,7 @@
 
   partnerSelect.addEventListener('change', repopulateForms);
   typeSelect.addEventListener('change', repopulateForms);
+  formSelect.addEventListener('change', refreshResponseSummary);
   downloadBtn.addEventListener('click', function() { handleDownload(); });
   repopulateForms();
 })();
