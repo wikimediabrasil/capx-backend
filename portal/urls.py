@@ -27,6 +27,7 @@ urlpatterns = [
     path('partner/membership/remove/', views.partner_membership_remove, name='partner_membership_remove'),
     path('partner/mentorship/settings/update/', views.mentorship_settings_update, name='mentorship_settings_update'),
     path('partner/mentorship/form/create/', views.mentorship_form_create, name='mentorship_form_create'),
+    path('partner/mentorship/form/update/', views.mentorship_form_update, name='mentorship_form_update'),
     path('partner/mentorship/public-key/add/', views.mentorship_public_key_add, name='mentorship_public_key_add'),
     path('partner/mentorship/public-key/generate/', views.mentorship_public_key_generate, name='mentorship_public_key_generate'),
 ]

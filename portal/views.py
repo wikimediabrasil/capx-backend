@@ -710,6 +710,101 @@ def mentorship_form_create(request):
     return redirect("portal:dashboard_mentorship")
 
 
+def _extract_form_signature(form_json):
+    """
+    Extract a simplified "signature" of the form structure as a list of (name, type) tuples.
+    This allows us to compare the structure of two forms without being affected by non-structural changes 
+    like label edits or field order changes. If the input is not a valid list of dicts with 'name' and 'type', 
+    return None to indicate we can't reliably compare.
+    """
+    if not isinstance(form_json, list):
+        return None
+
+    signature = []
+    for field in form_json:
+        if not isinstance(field, dict):
+            return None
+        field_type = str(field.get('type', '')).strip()
+        name = str(field.get('name', '')).strip()
+        if not field_type:
+            return None
+        signature.append((name, field_type))
+    return signature
+
+
+@require_POST
+@require_portal_access
+def mentorship_form_update(request):
+    partner_id = request.POST.get('partner_id', '').strip()
+    form_id = request.POST.get('form_id', '').strip()
+    form_type = request.POST.get('form_type', '').strip().lower()
+    form_json_raw = request.POST.get('form_json', '').strip()
+
+    if not partner_id or not form_id or not form_type or not form_json_raw:
+        messages.error(request, 'Partner, form, form type, and JSON are required.')
+        return redirect("portal:dashboard_mentorship")
+
+    try:
+        partner = Partner.objects.get(organization_id=partner_id)
+    except Partner.DoesNotExist:
+        messages.error(request, 'Partner not found.')
+        return redirect("portal:dashboard_mentorship")
+
+    scope_check = _require_partner_scope(request, partner)
+    if scope_check:
+        return scope_check
+
+    if not partner.mentorship:
+        messages.error(request, 'Mentorship is not enabled for this partner.')
+        return redirect("portal:dashboard_mentorship")
+
+    if not PartnerMentorshipPublicKey.objects.filter(partner=partner).exists():
+        messages.error(request, 'Create at least one public key for this partner before editing mentorship forms.')
+        return redirect("portal:dashboard_mentorship")
+
+    try:
+        parsed_json = json.loads(form_json_raw)
+    except json.JSONDecodeError:
+        messages.error(request, 'Invalid JSON for the mentorship form.')
+        return redirect("portal:dashboard_mentorship")
+
+    if form_type == 'mentor':
+        form_model = PartnerMentorshipFormMentor
+        responses_model = PartnerMentorshipFormMentorResponse
+    elif form_type == 'mentee':
+        form_model = PartnerMentorshipFormMentee
+        responses_model = PartnerMentorshipFormMenteeResponse
+    else:
+        messages.error(request, 'Invalid form type.')
+        return redirect("portal:dashboard_mentorship")
+
+    try:
+        form_obj = form_model.objects.get(id=form_id, partner=partner)
+    except form_model.DoesNotExist:
+        messages.error(request, 'Selected form is invalid for this partner.')
+        return redirect("portal:dashboard_mentorship")
+
+    has_responses = responses_model.objects.filter(form=form_obj).exists()
+    if has_responses:
+        current_signature = _extract_form_signature(form_obj.json)
+        incoming_signature = _extract_form_signature(parsed_json)
+        if current_signature is None or incoming_signature is None:
+            messages.error(request, 'Unable to validate form structure. Keep existing fields and types unchanged.')
+            return redirect("portal:dashboard_mentorship")
+
+        if set(current_signature) != set(incoming_signature):
+            messages.error(
+                request,
+                'This form already has responses. You can only make non-structural edits (e.g., labels/typos), not change field names/types.',
+            )
+            return redirect("portal:dashboard_mentorship")
+
+    form_obj.json = parsed_json
+    form_obj.save(update_fields=['json'])
+    messages.success(request, f'Mentorship {form_type} form updated for {partner.name}.')
+    return redirect("portal:dashboard_mentorship")
+
+
 @require_POST
 @require_portal_access
 def mentorship_public_key_add(request):

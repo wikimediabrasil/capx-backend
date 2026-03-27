@@ -55,16 +55,34 @@
 (function() {
   var globalPartnerField = document.getElementById('mentorship-partner-global');
   var formElement = document.getElementById('mentorship-form-create');
+  var updateFormElement = document.getElementById('mentorship-form-update');
+  var updatePartnerField = document.getElementById('mentorship-form-update-partner');
+  var updateTypeField = document.getElementById('mentorship-form-update-type');
+  var updateFormIdField = document.getElementById('mentorship-form-update-id');
+  var updateJsonField = document.getElementById('mentorship-form-update-json');
+  var loadBtn = document.getElementById('mentorship-form-load-btn');
   var builderHost = document.getElementById('mentorship-form-builder');
   var outputField = document.getElementById('mentorship-form-json');
   var statusEl = document.getElementById('mentorship-form-builder-status');
   var partnerField = document.getElementById('mentorship-form-partner');
+  var formTypeField = document.getElementById('mentorship-form-type');
   var keyField = document.getElementById('mentorship-form-public-key');
-  if (!formElement || !builderHost || !outputField || !statusEl || !partnerField || !keyField || !globalPartnerField) return;
+  if (!formElement || !updateFormElement || !builderHost || !outputField || !statusEl || !partnerField || !formTypeField || !keyField || !globalPartnerField || !updatePartnerField || !updateTypeField || !updateFormIdField || !updateJsonField || !loadBtn) return;
+
+  function parseJsonScript(id) {
+    var el = document.getElementById(id);
+    if (!el) return [];
+    try { return JSON.parse(el.textContent || '[]'); } catch (e) { return []; }
+  }
+
+  var mentorForms = parseJsonScript('mentorship-forms-mentor-data');
+  var menteeForms = parseJsonScript('mentorship-forms-mentee-data');
 
   function filterPublicKeysByPartner() {
     var selectedPartner = String(globalPartnerField.value || '');
     partnerField.value = selectedPartner;
+    updatePartnerField.value = selectedPartner;
+    updateTypeField.value = String(formTypeField.value || 'mentor');
     var firstVisible = null;
     Array.from(keyField.options).forEach(function(option) {
       var visible = String(option.dataset.partnerId || '') === selectedPartner;
@@ -80,6 +98,58 @@
     }
     if (!firstVisible) {
       statusEl.textContent = 'Create a public key for this partner before saving a form.';
+    }
+    repopulateEditForms();
+  }
+
+  function currentFormsForType() {
+    return String(formTypeField.value || '') === 'mentee' ? menteeForms : mentorForms;
+  }
+
+  function repopulateEditForms() {
+    var selectedPartner = String(globalPartnerField.value || '');
+    var forms = currentFormsForType().filter(function(form) {
+      return String(form.partner_id) === selectedPartner;
+    });
+
+    updateFormIdField.innerHTML = '';
+    forms.forEach(function(form) {
+      var opt = document.createElement('option');
+      opt.value = String(form.id);
+      opt.textContent = 'ID ' + form.id + ' · ' + (form.created_at || '');
+      updateFormIdField.appendChild(opt);
+    });
+
+    if (!forms.length) {
+      var emptyOpt = document.createElement('option');
+      emptyOpt.value = '';
+      emptyOpt.textContent = 'No forms for this partner/type';
+      updateFormIdField.appendChild(emptyOpt);
+    }
+  }
+
+  function loadSelectedFormIntoBuilder() {
+    var selectedFormId = String(updateFormIdField.value || '');
+    if (!selectedFormId) {
+      statusEl.textContent = 'Select a form to load into the builder.';
+      return;
+    }
+    var formDef = currentFormsForType().find(function(form) {
+      return String(form.id) === selectedFormId;
+    });
+    if (!formDef) {
+      statusEl.textContent = 'Selected form was not found.';
+      return;
+    }
+    if (!formBuilderInstance || !formBuilderInstance.actions || typeof formBuilderInstance.actions.setData !== 'function') {
+      statusEl.textContent = 'Loading existing forms is unavailable in this browser.';
+      return;
+    }
+    try {
+      formBuilderInstance.actions.setData(JSON.stringify(formDef.json || []));
+      statusEl.textContent = 'Form loaded. Edit and save updates when ready.';
+    } catch (error) {
+      statusEl.textContent = 'Unable to load selected form into builder.';
     }
   }
 
@@ -113,7 +183,34 @@
     }
   });
 
+  updateFormElement.addEventListener('submit', function(event) {
+    try {
+      if (!updateFormIdField.value) {
+        statusEl.textContent = 'Select a form to update.';
+        event.preventDefault();
+        return;
+      }
+      var dataJson = formBuilderInstance.actions.getData('json');
+      if (!dataJson || dataJson === '[]') {
+        statusEl.textContent = 'Add at least one field to the form before saving updates.';
+        event.preventDefault();
+        return;
+      }
+      updatePartnerField.value = String(globalPartnerField.value || '');
+      updateTypeField.value = String(formTypeField.value || 'mentor');
+      updateJsonField.value = dataJson;
+    } catch (error) {
+      statusEl.textContent = 'Unable to export JSON from visual builder.';
+      event.preventDefault();
+    }
+  });
+
+  formTypeField.addEventListener('change', function() {
+    updateTypeField.value = String(formTypeField.value || 'mentor');
+    filterPublicKeysByPartner();
+  });
   globalPartnerField.addEventListener('change', filterPublicKeysByPartner);
+  loadBtn.addEventListener('click', loadSelectedFormIntoBuilder);
   filterPublicKeysByPartner();
 })();
 
