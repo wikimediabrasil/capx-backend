@@ -46,7 +46,7 @@ class PortalViewsTests(TestCase):
         url = reverse("portal:login")
         resp = self.client.get(url)
         self.assertEqual(resp.status_code, 302)
-        self.assertEqual(resp.url, reverse("portal:dashboard"))
+        self.assertEqual(resp.url, reverse("portal:dashboard_users"))
 
     def test_login_view_shows_message_for_non_portal_user(self):
         self.client.force_login(user=self.user2)
@@ -71,7 +71,8 @@ class PortalViewsTests(TestCase):
         self.client.logout()
         self.client.force_login(user=self.admin)
         resp = self.client.get(reverse("portal:dashboard"))
-        self.assertEqual(resp.status_code, 200)
+        self.assertEqual(resp.status_code, 302)
+        self.assertEqual(resp.url, reverse("portal:dashboard_users"))
 
     def test_oauth_callback_preserves_query_string(self):
         qs = "oauth_token=abc&oauth_verifier=def"

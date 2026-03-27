@@ -47,7 +47,7 @@ class DashboardE2E(StaticLiveServerTestCase):
             "value": session_cookie.value,
             "url": self.live_server_url,
         }])
-        self.page.goto(f"{self.live_server_url}{reverse('portal:dashboard')}#users")
+        self.page.goto(f"{self.live_server_url}{reverse('portal:dashboard_users')}")
         self.page.wait_for_selector("#users-csv-btn")
 
         with self.page.expect_download() as dl_info:
@@ -79,7 +79,7 @@ class DashboardE2E(StaticLiveServerTestCase):
             "value": session_cookie.value,
             "url": self.live_server_url,
         }])
-        self.page.goto(f"{self.live_server_url}{reverse('portal:dashboard')}#mentorship")
+        self.page.goto(f"{self.live_server_url}{reverse('portal:dashboard_mentorship')}")
 
         # Click on button tab-mentorship-keys
         try:
@@ -192,7 +192,7 @@ class DashboardE2E(StaticLiveServerTestCase):
             "value": session_cookie.value,
             "url": self.live_server_url,
         }])
-        self.page.goto(f"{self.live_server_url}{reverse('portal:dashboard')}#mentorship")
+        self.page.goto(f"{self.live_server_url}{reverse('portal:dashboard_mentorship')}")
 
         # Click on button tab-mentorship-csv
         try:

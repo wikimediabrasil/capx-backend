@@ -1,0 +1,22 @@
+{% extends 'portal/dashboard_base.html' %}
+{% load static %}
+
+{% block portal_content %}
+  {% if mentorship_enabled_partners %}
+    {% include 'portal/partials/dashboard_mentorship_card.html' %}
+  {% else %}
+    <section class="card" data-accent="mentorship">
+      <div class="card-head"><span class="icon-badge" aria-hidden="true">🧭</span><div><h2 style="margin:0">Mentorship</h2><p class="section-desc" style="margin:2px 0 0">No mentorship-enabled partners are available for your account.</p></div></div>
+      <p class="muted">Enable mentorship on at least one partner to manage forms, keys, and exports.</p>
+    </section>
+  {% endif %}
+{% endblock %}
+
+{% block portal_scripts %}
+  <script src="https://tools-static.wmflabs.org/cdnjs/ajax/libs/jquery/3.7.1/jquery.min.js"></script>
+  <script src="https://tools-static.wmflabs.org/cdnjs/ajax/libs/jqueryui/1.14.1/jquery-ui.min.js"></script>
+  <script src="https://tools-static.wmflabs.org/cdnjs/ajax/libs/jQuery-formBuilder/3.21.1/form-render.min.js"></script>
+  <script src="https://tools-static.wmflabs.org/cdnjs/ajax/libs/jQuery-formBuilder/3.21.1/form-builder.min.js"></script>
+  <script src="{% static 'portal/js/dashboard-tabs-nav.js' %}"></script>
+  <script src="{% static 'portal/js/dashboard-mentorship.js' %}"></script>
+{% endblock %}

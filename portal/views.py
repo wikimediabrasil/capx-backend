@@ -32,7 +32,7 @@ from cryptography.hazmat.primitives import serialization
 import json
 import requests
 
-DASHBOARD_URL_NAME = 'portal:dashboard'
+DASHBOARD_URL_NAME = 'portal:dashboard_users'
 
 # A login-required decorator that ignores settings.LOGIN_URL and always
 # redirects to the portal login page.
@@ -114,15 +114,40 @@ def qid_labels_view(request):
         return JsonResponse({'labels': {}})
 
 
-@require_GET
-@require_portal_access
-def dashboard(request):
-    # Show orgs the user manages and recent events for those orgs
-    orgs = Organization.objects.filter(managers=request.user).distinct()
-    events = Events.objects.filter(organization__in=orgs).order_by('-time_begin')[:50]
+def _portal_has_mentorship_partners(request):
+    if is_portal_admin(request.user):
+        return Partner.objects.filter(mentorship=True).exists()
+    return Partner.objects.filter(mentorship=True, memberships__user=request.user).exists()
 
-    # Build users table to reflect ProfileSerializer/model fields used by the template
-    profiles = (
+
+def _base_context(request, active_section: str):
+    return {
+        'user': request.user,
+        'active_section': active_section,
+        'has_mentorship_partners': _portal_has_mentorship_partners(request),
+    }
+
+
+def _partners_for_ui(request):
+    if is_portal_admin(request.user):
+        return (
+            Partner.objects
+            .select_related('organization')
+            .filter(organization__i18n_names__language_code='en')
+            .order_by('organization__i18n_names__name')
+            .distinct()
+        )
+    return (
+        Partner.objects
+        .select_related('organization')
+        .filter(memberships__user=request.user, organization__i18n_names__language_code='en')
+        .order_by('organization__i18n_names__name')
+        .distinct()
+    )
+
+
+def _build_users_table(user_ids=None):
+    profiles_qs = (
         Profile.objects.select_related('user')
         .prefetch_related(
             'affiliation',
@@ -136,56 +161,67 @@ def dashboard(request):
         )
         .order_by('user__username')
     )
+    if user_ids is not None:
+        profiles_qs = profiles_qs.filter(user_id__in=list(user_ids))
 
-    # Prepare manager organization per user to avoid N+1
+    profiles = list(profiles_qs)
+    if not profiles:
+        return []
+
+    scoped_user_ids = [p.user_id for p in profiles]
+
     managers_map = {}
-    for uid, oname in Management.objects.select_related('organization').filter(organization__i18n_names__language_code='en').values_list('user_id', 'organization__i18n_names__name'):
+    managers_qs = (
+        Management.objects
+        .select_related('organization')
+        .filter(user_id__in=scoped_user_ids, organization__i18n_names__language_code='en')
+        .values_list('user_id', 'organization__i18n_names__name')
+    )
+    for uid, oname in managers_qs:
         managers_map.setdefault(uid, []).append(oname)
 
-    # Prepare displayed badges per user
-    user_ids = list(profiles.values_list('user_id', flat=True))
     badges_map = {}
-    for uid, bname in UserBadge.objects.select_related('badge').filter(user_id__in=user_ids, is_displayed=True, progress=100).values_list('user_id', 'badge__name'):
+    badges_qs = (
+        UserBadge.objects
+        .select_related('badge')
+        .filter(user_id__in=scoped_user_ids, is_displayed=True, progress=100)
+        .values_list('user_id', 'badge__name')
+    )
+    for uid, bname in badges_qs:
         badges_map.setdefault(uid, []).append(bname)
 
+    last_login_map = {}
+    token_qs = AuthToken.objects.filter(user_id__in=scoped_user_ids).order_by('user_id', '-created').values_list('user_id', 'created')
+    for uid, created in token_qs:
+        if uid not in last_login_map:
+            last_login_map[uid] = created
+
     def _org_en_name(org: Organization):
-        # Find pre-fetched English name without additional queries
-        for n in getattr(org, 'i18n_names_all', None) or org.i18n_names.all():
-            if n.language_code == 'en':
-                return n.name
-        # Fallback: try filtering (should be cached by prefetch)
-        en = org.i18n_names.filter(language_code='en').first()
-        return en.name if en else f"Organization {org.pk}"
+        for name_obj in org.i18n_names.all():
+            if name_obj.language_code == 'en':
+                return name_obj.name
+        return f"Organization {org.pk}"
 
     users_table = []
     for p in profiles:
         u = p.user
-
-        # Last login via Knox token
-        last_token = AuthToken.objects.filter(user=u).order_by('-created').first()
-        last_login = last_token.created if last_token else None
-
-        # String representations for multi-relations
         aff_str = ', '.join([_org_en_name(org) for org in p.affiliation.all()]) if p.affiliation.exists() else ''
         terr_str = ', '.join([t.territory_name for t in p.territory.all()]) if p.territory.exists() else ''
         proj_str = ', '.join([wp.wikimedia_project_name for wp in p.wikimedia_project.all()]) if p.wikimedia_project.exists() else ''
         skills_known_qids = [s.skill_wikidata_item for s in p.skills_known.all() if s.skill_wikidata_item]
         skills_available_qids = [s.skill_wikidata_item for s in p.skills_available.all() if s.skill_wikidata_item]
         skills_wanted_qids = [s.skill_wikidata_item for s in p.skills_wanted.all() if s.skill_wikidata_item]
-
-        # Languages (name + proficiency)
         languages = [
             {'name': getattr(lp.language, 'language_name', None) or str(lp.language), 'proficiency': lp.proficiency or '-'}
             for lp in p.languageproficiency_set.all()
         ]
 
         users_table.append({
-            # Top-level user fields
             'username': u.username,
             'is_staff': u.is_staff,
             'is_active': u.is_active,
             'date_joined': u.date_joined,
-            'last_login': last_login,
+            'last_login': last_login_map.get(u.id),
             'last_update': p.last_update,
             'wikidata_qid': p.wikidata_qid,
             'wiki_alt': p.wiki_alt,
@@ -201,54 +237,46 @@ def dashboard(request):
             'badges': badges_map.get(u.id, []),
             'automated_lets_connect': p.automated_lets_connect,
         })
-    # Determine partners current user belongs to (for scoping)
-    user_partners = Partner.objects.filter(memberships__user=request.user).distinct()
-    # Partner badges available for assignment in portal, scoped by membership unless staff
+
+    return users_table
+
+
+@require_GET
+@require_portal_access
+def dashboard(request):
+    return redirect('portal:dashboard_users')
+
+
+@require_GET
+@require_portal_access
+def dashboard_users(request):
+    context = _base_context(request, 'users')
+    context['users_table'] = _build_users_table()
+    return render(request, 'portal/dashboard_users.html', context)
+
+
+@require_GET
+@require_portal_access
+def dashboard_membership(request):
+    context = _base_context(request, 'membership')
+    context['partners_for_ui'] = _partners_for_ui(request)
+    return render(request, 'portal/dashboard_membership.html', context)
+
+
+@require_GET
+@require_portal_access
+def dashboard_badges(request):
+    context = _base_context(request, 'badges')
+    partners_for_ui = _partners_for_ui(request)
+
     if is_portal_admin(request.user):
         partner_badges = Badge.objects.filter(type='partner').order_by('name')
-        partners_for_ui = (
-            Partner.objects
-            .select_related('organization')
-            .filter(organization__i18n_names__language_code='en')
-            .order_by('organization__i18n_names__name')
-            .distinct()
-        )
-        partner_members = (
-            PartnerMembership.objects
-            .select_related('partner__organization', 'user')
-            .filter(partner__organization__i18n_names__language_code='en')
-            .order_by('partner__organization__i18n_names__name', 'user__username')
-            .distinct()
-        )
-        partner_org_candidates = (
-            Organization.objects
-            .exclude(id__in=Partner.objects.values_list('organization_id', flat=True))
-            .filter(i18n_names__language_code='en')
-            .order_by('i18n_names__name')
-            .distinct()
-        )
     else:
         partner_badges = Badge.objects.filter(
             type='partner',
-            logic__partner__in=user_partners.values_list('organization_id', flat=True)
+            logic__partner__in=partners_for_ui.values_list('organization_id', flat=True)
         ).order_by('name')
-        partners_for_ui = (
-            user_partners
-            .select_related('organization')
-            .filter(organization__i18n_names__language_code='en')
-            .order_by('organization__i18n_names__name')
-            .distinct()
-        )
-        partner_members = (
-            PartnerMembership.objects
-            .filter(user=request.user, partner__in=partners_for_ui, partner__organization__i18n_names__language_code='en')
-            .select_related('partner__organization')
-            .order_by('partner__organization__i18n_names__name', 'user__username')
-            .distinct()
-        )
-        partner_org_candidates = Organization.objects.none()
 
-    # Attach partner_name to each partner badge, using organization id stored in logic['partner']
     try:
         pids = list({(b.logic or {}).get('partner') for b in partner_badges if (b.logic or {}).get('partner')})
     except Exception:
@@ -256,37 +284,42 @@ def dashboard(request):
     if pids:
         name_map = dict(
             Partner.objects
-            .filter(organization_id__in=pids)
-            .filter(organization__i18n_names__language_code='en')
-            .select_related('organization')
+            .filter(organization_id__in=pids, organization__i18n_names__language_code='en')
             .values_list('organization_id', 'organization__i18n_names__name')
         )
     else:
         name_map = {}
-    for b in partner_badges:
-        pid = (b.logic or {}).get('partner')
-        setattr(b, 'partner_name', name_map.get(pid))
+    for badge in partner_badges:
+        pid = (badge.logic or {}).get('partner')
+        setattr(badge, 'partner_name', name_map.get(pid))
 
-    # Build awarded users map for partner badges to power the UI list
     awarded_map = {}
-    if partner_badges:
-        bid_list = list(partner_badges.values_list('id', flat=True))
-        qs = (
+    badge_ids = list(partner_badges.values_list('id', flat=True))
+    if badge_ids:
+        awarded_qs = (
             UserBadge.objects
-            .select_related('user')
-            .filter(badge_id__in=bid_list)
+            .filter(badge_id__in=badge_ids)
             .order_by('user__username')
             .values_list('badge_id', 'user__username')
         )
-        for bid, uname in qs:
+        for bid, uname in awarded_qs:
             awarded_map.setdefault(bid, []).append(uname)
 
-    mentorship_enabled_partners = (
-        partners_for_ui
-        .filter(mentorship=True)
-        .distinct()
-        .order_by('organization__i18n_names__name')
-    )
+    context.update({
+        'partners_for_ui': partners_for_ui,
+        'partner_badges': partner_badges,
+        'partner_badges_awarded': awarded_map,
+    })
+    return render(request, 'portal/dashboard_badges.html', context)
+
+
+@require_GET
+@require_portal_access
+def dashboard_mentorship(request):
+    context = _base_context(request, 'mentorship')
+    partners_for_ui = _partners_for_ui(request)
+    mentorship_enabled_partners = partners_for_ui.filter(mentorship=True).distinct().order_by('organization__i18n_names__name')
+
     mentorship_forms_mentor = (
         PartnerMentorshipFormMentor.objects
         .select_related('partner__organization')
@@ -316,6 +349,7 @@ def dashboard(request):
         .order_by('partner__organization__i18n_names__name', '-updated_at')
         .distinct()
     )
+
     mentorship_available_skills = Skill.objects.order_by('skill_wikidata_item')
     mentorship_available_languages = Language.objects.order_by('language_name')
     mentorship_available_territories = Territory.objects.order_by('territory_name')
@@ -335,11 +369,15 @@ def dashboard(request):
         .distinct()
     )
 
+    partner_name_map = dict(
+        mentorship_enabled_partners.values_list('organization_id', 'organization__i18n_names__name')
+    )
+
     mentor_forms_payload = [
         {
             'id': form.id,
             'partner_id': form.partner.organization_id,
-            'partner_name': form.partner.organization.i18n_names.filter(language_code='en').first().name,
+            'partner_name': partner_name_map.get(form.partner.organization_id),
             'created_at': form.created_at.isoformat(),
             'json': form.json,
         }
@@ -349,12 +387,21 @@ def dashboard(request):
         {
             'id': form.id,
             'partner_id': form.partner.organization_id,
-            'partner_name': form.partner.organization.i18n_names.filter(language_code='en').first().name,
+            'partner_name': partner_name_map.get(form.partner.organization_id),
             'created_at': form.created_at.isoformat(),
             'json': form.json,
         }
         for form in mentorship_forms_mentee
     ]
+
+    response_user_ids = set(mentorship_mentor_responses.values_list('user_id', flat=True))
+    response_user_ids.update(mentorship_mentee_responses.values_list('user_id', flat=True))
+    users_table_subset = _build_users_table(response_user_ids)
+    users_table_by_username = {
+        row.get('username'): row
+        for row in users_table_subset
+        if row.get('username')
+    }
 
     mentor_responses_payload = [
         {
@@ -362,6 +409,7 @@ def dashboard(request):
             'partner_id': response.partner.organization_id,
             'form_id': response.form_id,
             'username': response.user.username,
+            'user_profile': users_table_by_username.get(response.user.username, {}),
             'created_at': response.created_at.isoformat(),
             'data': response.data,
         }
@@ -373,11 +421,13 @@ def dashboard(request):
             'partner_id': response.partner.organization_id,
             'form_id': response.form_id,
             'username': response.user.username,
+            'user_profile': users_table_by_username.get(response.user.username, {}),
             'created_at': response.created_at.isoformat(),
             'data': response.data,
         }
         for response in mentorship_mentee_responses
     ]
+
     mentorship_settings_payload = [
         {
             'partner_id': settings_obj.partner.organization_id,
@@ -393,17 +443,7 @@ def dashboard(request):
         for settings_obj in mentorship_settings
     ]
 
-    context = {
-        'user': request.user,
-        'organizations': orgs,
-        'events': events,
-        'users_table': users_table,
-        'partner_badges': partner_badges,
-        'user_partners': user_partners,
-        'partners_for_ui': partners_for_ui,
-        'partner_members': partner_members,
-        'partner_org_candidates': partner_org_candidates,
-        'partner_badges_awarded': awarded_map,
+    context.update({
         'mentorship_enabled_partners': mentorship_enabled_partners,
         'mentorship_forms_mentor': mentorship_forms_mentor,
         'mentorship_forms_mentee': mentorship_forms_mentee,
@@ -417,8 +457,38 @@ def dashboard(request):
         'mentorship_forms_mentor_data': mentor_forms_payload,
         'mentorship_forms_mentee_data': mentee_forms_payload,
         'mentorship_settings_data': mentorship_settings_payload,
-    }
-    return render(request, 'portal/dashboard.html', context)
+    })
+    return render(request, 'portal/dashboard_mentorship.html', context)
+
+
+@require_GET
+@require_portal_access
+def dashboard_admin(request):
+    if not is_portal_admin(request.user):
+        return HttpResponseForbidden("Admin permissions are required.")
+
+    context = _base_context(request, 'admin')
+    partners_for_ui = _partners_for_ui(request)
+    partner_members = (
+        PartnerMembership.objects
+        .select_related('partner__organization', 'user')
+        .filter(partner__organization__i18n_names__language_code='en')
+        .order_by('partner__organization__i18n_names__name', 'user__username')
+        .distinct()
+    )
+    partner_org_candidates = (
+        Organization.objects
+        .exclude(id__in=Partner.objects.values_list('organization_id', flat=True))
+        .filter(i18n_names__language_code='en')
+        .order_by('i18n_names__name')
+        .distinct()
+    )
+    context.update({
+        'partners_for_ui': partners_for_ui,
+        'partner_members': partner_members,
+        'partner_org_candidates': partner_org_candidates,
+    })
+    return render(request, 'portal/dashboard_admin.html', context)
 
 @require_GET
 def oauth_begin(request):
@@ -503,19 +573,21 @@ def mentorship_settings_update(request):
         messages.error(request, 'Mentorship is not enabled for this partner.')
         return redirect(DASHBOARD_URL_NAME)
 
+    # After this point, we have a valid partner and permissions; validate other fields before saving anything
+
     registration_open_date = None
     if registration_open_date_raw:
         registration_open_date = parse_date(registration_open_date_raw)
         if registration_open_date is None:
             messages.error(request, 'Registration opening date is invalid.')
-            return redirect(DASHBOARD_URL_NAME)
+            return redirect("portal:dashboard_mentorship")
 
     registration_close_date = None
     if registration_close_date_raw:
         registration_close_date = parse_date(registration_close_date_raw)
         if registration_close_date is None:
             messages.error(request, 'Registration closing date is invalid.')
-            return redirect(DASHBOARD_URL_NAME)
+            return redirect("portal:dashboard_mentorship")
 
     territory = None
     if territory_id:
@@ -523,7 +595,7 @@ def mentorship_settings_update(request):
             territory = Territory.objects.get(id=territory_id)
         except Territory.DoesNotExist:
             messages.error(request, 'Selected territory is invalid.')
-            return redirect(DASHBOARD_URL_NAME)
+            return redirect("portal:dashboard_mentorship")
 
     mentor_form = None
     if mentor_form_id:
@@ -531,7 +603,7 @@ def mentorship_settings_update(request):
             mentor_form = PartnerMentorshipFormMentor.objects.get(id=mentor_form_id, partner=partner)
         except PartnerMentorshipFormMentor.DoesNotExist:
             messages.error(request, 'Selected mentor form is invalid for this partner.')
-            return redirect(DASHBOARD_URL_NAME)
+            return redirect("portal:dashboard_mentorship")
 
     mentee_form = None
     if mentee_form_id:
@@ -539,7 +611,7 @@ def mentorship_settings_update(request):
             mentee_form = PartnerMentorshipFormMentee.objects.get(id=mentee_form_id, partner=partner)
         except PartnerMentorshipFormMentee.DoesNotExist:
             messages.error(request, 'Selected mentee form is invalid for this partner.')
-            return redirect(DASHBOARD_URL_NAME)
+            return redirect("portal:dashboard_mentorship")
 
     clean_skill_ids = sorted({int(sid) for sid in skill_ids if sid.isdigit()})
     clean_language_ids = sorted({int(lid) for lid in language_ids if lid.isdigit()})
@@ -547,12 +619,12 @@ def mentorship_settings_update(request):
     selected_skills = list(Skill.objects.filter(id__in=clean_skill_ids))
     if len(selected_skills) != len(clean_skill_ids):
         messages.error(request, 'One or more selected skills are invalid.')
-        return redirect(DASHBOARD_URL_NAME)
+        return redirect("portal:dashboard_mentorship")
 
     selected_languages = list(Language.objects.filter(id__in=clean_language_ids))
     if len(selected_languages) != len(clean_language_ids):
         messages.error(request, 'One or more selected languages are invalid.')
-        return redirect(DASHBOARD_URL_NAME)
+        return redirect("portal:dashboard_mentorship")
 
     settings_obj, _ = PartnerMentorshipSettings.objects.get_or_create(partner=partner)
     settings_obj.description = description
@@ -566,7 +638,7 @@ def mentorship_settings_update(request):
     settings_obj.languages.set(selected_languages)
 
     messages.success(request, f'Mentorship settings updated for {partner.name}.')
-    return redirect(DASHBOARD_URL_NAME)
+    return redirect("portal:dashboard_mentorship")
 
 
 @require_POST
@@ -595,17 +667,19 @@ def mentorship_form_create(request):
         messages.error(request, 'Mentorship is not enabled for this partner.')
         return redirect(DASHBOARD_URL_NAME)
 
+    # After this point, we have a valid partner and permissions; validate other fields before saving anything
+
     try:
         public_key = PartnerMentorshipPublicKey.objects.get(id=public_key_id, partner=partner)
     except PartnerMentorshipPublicKey.DoesNotExist:
         messages.error(request, 'Selected public key is invalid for this partner.')
-        return redirect(DASHBOARD_URL_NAME)
+        return redirect("portal:dashboard_mentorship")
 
     try:
         parsed_json = json.loads(form_json_raw)
     except json.JSONDecodeError:
         messages.error(request, 'Invalid JSON for the mentorship form.')
-        return redirect(DASHBOARD_URL_NAME)
+        return redirect("portal:dashboard_mentorship")
 
     if form_type == 'mentor':
         PartnerMentorshipFormMentor.objects.create(partner=partner, public_key=public_key, json=parsed_json)
@@ -613,10 +687,10 @@ def mentorship_form_create(request):
         PartnerMentorshipFormMentee.objects.create(partner=partner, public_key=public_key, json=parsed_json)
     else:
         messages.error(request, 'Invalid form type.')
-        return redirect(DASHBOARD_URL_NAME)
+        return redirect("portal:dashboard_mentorship")
 
     messages.success(request, f'Mentorship {form_type} form saved for {partner.name}.')
-    return redirect(DASHBOARD_URL_NAME)
+    return redirect("portal:dashboard_mentorship")
 
 
 @require_POST
@@ -639,19 +713,21 @@ def mentorship_public_key_add(request):
     if scope_check:
         return scope_check
 
+    # After this point, we have a valid partner and permissions; validate the public key before saving
+
     try:
         key_obj = serialization.load_pem_public_key(public_key_text.encode('utf-8'))
     except Exception:
         messages.error(request, 'Invalid public key. Use a PEM formatted key.')
-        return redirect(DASHBOARD_URL_NAME)
+        return redirect("portal:dashboard_mentorship")
 
     if not hasattr(key_obj, 'encrypt'):
         messages.error(request, 'Only RSA public keys are supported.')
-        return redirect(DASHBOARD_URL_NAME)
+        return redirect("portal:dashboard_mentorship")
 
     PartnerMentorshipPublicKey.objects.create(partner=partner, public_key=public_key_text)
     messages.success(request, f'Public key saved for {partner.name}.')
-    return redirect(DASHBOARD_URL_NAME)
+    return redirect("portal:dashboard_mentorship")
 
 
 @require_POST
@@ -675,14 +751,16 @@ def mentorship_public_key_generate(request):
     if scope_check:
         return scope_check
 
+    # After this point, we have a valid partner and permissions; validate delivery option before generating keys
+
     if delivery not in {'download', 'email', 'download_email'}:
         messages.error(request, 'Invalid delivery option.')
-        return redirect(DASHBOARD_URL_NAME)
+        return redirect("portal:dashboard_mentorship")
 
     requires_email = delivery in {'email', 'download_email'}
     if requires_email and not email_to:
         messages.error(request, 'Provide an email address to send the private key.')
-        return redirect(DASHBOARD_URL_NAME)
+        return redirect("portal:dashboard_mentorship")
 
     private_key = rsa.generate_private_key(public_exponent=65537, key_size=2048)
     public_pem = private_key.public_key().public_bytes(
@@ -714,11 +792,11 @@ def mentorship_public_key_generate(request):
         except Exception:
             key_record.delete()
             messages.error(request, 'Unable to send email. Key generation was reverted to avoid orphan public keys.')
-            return redirect(DASHBOARD_URL_NAME)
+            return redirect("portal:dashboard_mentorship")
 
         if delivery == 'email':
             messages.success(request, f'Private key sent to {email_to}.')
-            return redirect(DASHBOARD_URL_NAME)
+            return redirect("portal:dashboard_mentorship")
 
         messages.success(request, f'Private key sent to {email_to}. Download will start now.')
 
@@ -726,6 +804,8 @@ def mentorship_public_key_generate(request):
     response = HttpResponse(private_pem, content_type='application/x-pem-file')
     response['Content-Disposition'] = f'attachment; filename="{filename}"'
     return response
+
+    #TODO: trigger page refresh via JS after download to show the new public key in the list without needing to manually refresh
 
 @require_POST
 def partner_create(request):
@@ -737,13 +817,13 @@ def partner_create(request):
     description = request.POST.get('description', '').strip()
     if not organization_id:
         messages.error(request, 'Organization is required.')
-        return redirect(DASHBOARD_URL_NAME)
+        return redirect("portal:dashboard_admin")
 
     try:
         organization = Organization.objects.get(id=organization_id)
     except Organization.DoesNotExist:
         messages.error(request, 'Organization not found.')
-        return redirect(DASHBOARD_URL_NAME)
+        return redirect("portal:dashboard_admin")
 
     partner, created = Partner.objects.get_or_create(
         organization=organization,
@@ -759,7 +839,7 @@ def partner_create(request):
             partner.description = description
             partner.save(update_fields=['description'])
         messages.info(request, f'Organization "{organization}" is already a partner.')
-    return redirect(DASHBOARD_URL_NAME)
+    return redirect("portal:dashboard_admin")
 
 @require_POST
 def partner_delete(request):
@@ -768,15 +848,17 @@ def partner_delete(request):
     if forbidden:
         return forbidden
     partner_id = request.POST.get('partner_id', '').strip()
+
     try:
         partner = Partner.objects.get(organization_id=partner_id)
     except Partner.DoesNotExist:
         messages.error(request, 'Partner not found.')
-        return redirect(DASHBOARD_URL_NAME)
+        return redirect("portal:dashboard_admin")
+
     name = partner.name
     partner.delete()
     messages.success(request, f'Partner "{name}" deleted.')
-    return redirect(DASHBOARD_URL_NAME)
+    return redirect("portal:dashboard_admin")
 
 @require_POST
 @require_portal_access
@@ -787,22 +869,28 @@ def partner_membership_add(request):
     if not partner_id or not username:
         messages.error(request, 'Partner and username are required.')
         return redirect(DASHBOARD_URL_NAME)
+
     try:
         partner = Partner.objects.get(organization_id=partner_id)
     except Partner.DoesNotExist:
         messages.error(request, 'Partner not found.')
         return redirect(DASHBOARD_URL_NAME)
+
     scope_check = _require_partner_scope(request, partner)
     if scope_check:
         return scope_check
+
+    # After this point, we have a valid partner and permissions; validate the user before saving
+
     try:
         user = CustomUser.all_objects.get(username=username)
     except CustomUser.DoesNotExist:
         messages.error(request, f'User "{username}" not found.')
-        return redirect(DASHBOARD_URL_NAME)
+        return redirect("portal:dashboard_membership")
+
     PartnerMembership.objects.get_or_create(partner=partner, user=user)
     messages.success(request, f'Added {user.username} to {partner.name}.')
-    return redirect(DASHBOARD_URL_NAME)
+    return redirect("portal:dashboard_membership")
 
 @require_POST
 @require_portal_access
@@ -813,22 +901,27 @@ def partner_membership_remove(request):
     if not partner_id or not username:
         messages.error(request, 'Partner and username are required.')
         return redirect(DASHBOARD_URL_NAME)
+
     try:
         partner = Partner.objects.get(organization_id=partner_id)
     except Partner.DoesNotExist:
         messages.error(request, 'Partner not found.')
         return redirect(DASHBOARD_URL_NAME)
+
     scope_check = _require_partner_scope(request, partner)
     if scope_check:
         return scope_check
+
+    # After this point, we have a valid partner and permissions; validate the user before saving
+    
     try:
         user = CustomUser.all_objects.get(username=username)
     except CustomUser.DoesNotExist:
         messages.error(request, f'User "{username}" not found.')
-        return redirect(DASHBOARD_URL_NAME)
+        return redirect("portal:dashboard_membership")
     PartnerMembership.objects.filter(partner=partner, user=user).delete()
     messages.success(request, f'Removed {user.username} from {partner.name}.')
-    return redirect(DASHBOARD_URL_NAME)
+    return redirect("portal:dashboard_membership")
 
 @require_POST
 @require_portal_access
@@ -840,12 +933,13 @@ def partner_badge_create(request):
     partner_id = request.POST.get('partner_id', '').strip()
     if not (name and picture and partner_id):
         messages.error(request, 'Name, picture, and partner are required.')
-        return redirect(DASHBOARD_URL_NAME)
+        return redirect("portal:dashboard_badges")
+    
     try:
         partner = Partner.objects.get(organization_id=partner_id)
     except Partner.DoesNotExist:
         messages.error(request, 'Selected partner not found.')
-        return redirect(DASHBOARD_URL_NAME)
+        return redirect("portal:dashboard_badges")
 
     # Permission: staff can create for any partner; members only for their own partner
     if not is_portal_admin(request.user):
@@ -860,7 +954,7 @@ def partner_badge_create(request):
         type='partner',
     )
     messages.success(request, f'Created partner badge "{name}" for {partner.name}.')
-    return redirect(DASHBOARD_URL_NAME)
+    return redirect("portal:dashboard_badges")
 
 @require_POST
 @require_portal_access
@@ -870,12 +964,13 @@ def partner_badge_assign(request):
     badge_id = request.POST.get('badge_id', '').strip()
     if not username or not badge_id:
         messages.error(request, 'Username and badge are required.')
-        return redirect(DASHBOARD_URL_NAME)
+        return redirect("portal:dashboard_badges")
+        
     try:
         badge = Badge.objects.get(id=badge_id, type='partner')
     except Badge.DoesNotExist:
         messages.error(request, 'Selected badge not found or not a partner badge.')
-        return redirect(DASHBOARD_URL_NAME)
+        return redirect("portal:dashboard_badges")
 
     # Permission: staff can assign any; non-staff must belong to the badge's partner
     if not is_portal_admin(request.user):
@@ -888,7 +983,7 @@ def partner_badge_assign(request):
     tokens = [t.strip() for t in username.split(',') if t and t.strip()]
     if not tokens:
         messages.error(request, 'Please provide at least one username.')
-        return redirect(DASHBOARD_URL_NAME)
+        return redirect("portal:dashboard_badges")
 
     # De-duplicate while preserving order
     seen = set()
@@ -922,7 +1017,7 @@ def partner_badge_assign(request):
         messages.success(request, f'Assigned "{badge.name}" to: {_list_preview(assigned)}.')
     if missing:
         messages.error(request, f'Users not found: {_list_preview(missing)}.')
-    return redirect(DASHBOARD_URL_NAME)
+    return redirect("portal:dashboard_badges")
 
 @require_POST
 @require_portal_access
@@ -932,17 +1027,17 @@ def partner_badge_remove(request):
     badge_id = request.POST.get('badge_id', '').strip()
     if not username or not badge_id:
         messages.error(request, 'Username and badge are required.')
-        return redirect(DASHBOARD_URL_NAME)
+        return redirect("portal:dashboard_badges")
     try:
         target = CustomUser.all_objects.get(username=username)
     except CustomUser.DoesNotExist:
         messages.error(request, f'User "{username}" not found.')
-        return redirect(DASHBOARD_URL_NAME)
+        return redirect("portal:dashboard_badges")
     try:
         badge = Badge.objects.get(id=badge_id, type='partner')
     except Badge.DoesNotExist:
         messages.error(request, 'Selected badge not found or not a partner badge.')
-        return redirect(DASHBOARD_URL_NAME)
+        return redirect("portal:dashboard_badges")
 
     # Permission: staff can remove any; non-staff must belong to the badge's partner
     if not is_portal_admin(request.user):
@@ -952,7 +1047,7 @@ def partner_badge_remove(request):
 
     UserBadge.objects.filter(user=target, badge=badge).delete()
     messages.success(request, f'Removed "{badge.name}" from {target.username}.')
-    return redirect(DASHBOARD_URL_NAME)
+    return redirect("portal:dashboard_badges")
 
 @require_POST
 @require_portal_access
@@ -961,12 +1056,12 @@ def partner_badge_delete(request):
     badge_id = request.POST.get('badge_id', '').strip()
     if not badge_id:
         messages.error(request, 'Badge is required.')
-        return redirect(DASHBOARD_URL_NAME)
+        return redirect("portal:dashboard_badges")
     try:
         badge = Badge.objects.get(id=badge_id, type='partner')
     except Badge.DoesNotExist:
         messages.error(request, 'Selected badge not found or not a partner badge.')
-        return redirect(DASHBOARD_URL_NAME)
+        return redirect("portal:dashboard_badges")
 
     # Permission: staff can delete any; non-staff must belong to the badge's partner
     if not is_portal_admin(request.user):
@@ -977,7 +1072,7 @@ def partner_badge_delete(request):
     name = badge.name
     badge.delete()
     messages.success(request, f'Deleted partner badge "{name}".')
-    return redirect(DASHBOARD_URL_NAME)
+    return redirect("portal:dashboard_badges")
 
 @require_POST
 @require_portal_access
@@ -989,12 +1084,12 @@ def partner_badge_update(request):
     description = request.POST.get('description', '').strip()
     if not badge_id:
         messages.error(request, 'Badge is required.')
-        return redirect(DASHBOARD_URL_NAME)
+        return redirect("portal:dashboard_badges")
     try:
         badge = Badge.objects.get(id=badge_id, type='partner')
     except Badge.DoesNotExist:
         messages.error(request, 'Selected badge not found or not a partner badge.')
-        return redirect(DASHBOARD_URL_NAME)
+        return redirect("portal:dashboard_badges")
 
     # Permission: staff can edit any; non-staff must belong to the badge's partner
     partner = Partner.objects.get(organization_id=badge.logic.get('partner')) if badge.logic else None
@@ -1014,4 +1109,4 @@ def partner_badge_update(request):
         changed.append('description')
     badge.save()
     messages.success(request, f'Updated badge {badge.name} (changed: {", ".join(changed) or "no fields"}).')
-    return redirect(DASHBOARD_URL_NAME)
+    return redirect("portal:dashboard_badges")

@@ -1,0 +1,10 @@
+{% extends 'portal/dashboard_base.html' %}
+{% load static %}
+
+{% block portal_content %}
+  {% include 'portal/partials/dashboard_admin_cards.html' %}
+{% endblock %}
+
+{% block portal_scripts %}
+  <script src="{% static 'portal/js/dashboard-tabs-nav.js' %}"></script>
+{% endblock %}

@@ -1,0 +1,297 @@
+<section class="card" data-accent="mentorship">
+  <div class="card-head"><span class="icon-badge" aria-hidden="true">🧭</span><div><h2 style="margin:0">Mentorship</h2><p class="section-desc" style="margin:2px 0 0">Create mentorship forms, manage public keys, and export decrypted CSV responses client-side.</p></div></div>
+  <div class="tabs" role="tablist" aria-label="Mentorship tabs">
+    <button type="button" role="tab" aria-selected="true" aria-controls="panel-mentorship-settings" id="tab-mentorship-settings">Settings</button>
+    <button type="button" role="tab" aria-selected="false" aria-controls="panel-mentorship-forms" id="tab-mentorship-forms">Forms</button>
+    <button type="button" role="tab" aria-selected="false" aria-controls="panel-mentorship-keys" id="tab-mentorship-keys">Public keys</button>
+    <button type="button" role="tab" aria-selected="false" aria-controls="panel-mentorship-csv" id="tab-mentorship-csv">Responses CSV</button>
+  </div>
+
+  <div id="panel-mentorship-settings" role="tabpanel" aria-labelledby="tab-mentorship-settings">
+    <h3 style="margin-top:0">Mentorship settings by partner</h3>
+    <p class="muted" style="margin-top:0; margin-bottom:12px;">Configure the active forms and default filters used by each partner.</p>
+    <form method="post" action="/portal/partner/mentorship/settings/update/" aria-label="Update mentorship settings" style="grid-template-columns:1fr; max-width:100%;">
+      {% csrf_token %}
+      <label for="mentorship-settings-partner">Partner</label>
+      <select id="mentorship-settings-partner" name="partner_id" required style="max-width:520px;">
+        {% for p in mentorship_enabled_partners %}
+          <option value="{{ p.organization_id }}">{{ p.name }}</option>
+        {% endfor %}
+      </select>
+
+      <label for="mentorship-settings-description">Description</label>
+      <textarea id="mentorship-settings-description" name="description" placeholder="Optional public description for this partner mentorship program"></textarea>
+
+      <label for="mentorship-settings-registration-open-date">Registration opens on</label>
+      <input id="mentorship-settings-registration-open-date" name="registration_open_date" type="date" style="max-width:500px;" />
+
+      <label for="mentorship-settings-registration-close-date">Registration closes on</label>
+      <input id="mentorship-settings-registration-close-date" name="registration_close_date" type="date" style="max-width:500px;" />
+
+      <label for="mentorship-settings-territory">Territory</label>
+      <select id="mentorship-settings-territory" name="territory_id" style="max-width:520px;">
+        <option value="">Global</option>
+        {% for territory in mentorship_available_territories %}
+          <option value="{{ territory.id }}">{{ territory.territory_name }}</option>
+        {% endfor %}
+      </select>
+
+      <label for="mentorship-settings-mentor-form">Active mentor form</label>
+      <select id="mentorship-settings-mentor-form" name="mentor_form_id" style="max-width:520px;">
+        <option value="">None</option>
+        {% for form in mentorship_forms_mentor %}
+          <option value="{{ form.id }}" data-partner-id="{{ form.partner.organization_id }}">#{{ form.id }} - {{ form.partner.name }} ({{ form.created_at|date:"Y-m-d H:i" }})</option>
+        {% endfor %}
+      </select>
+
+      <label for="mentorship-settings-mentee-form">Active mentee form</label>
+      <select id="mentorship-settings-mentee-form" name="mentee_form_id" style="max-width:520px;">
+        <option value="">None</option>
+        {% for form in mentorship_forms_mentee %}
+          <option value="{{ form.id }}" data-partner-id="{{ form.partner.organization_id }}">#{{ form.id }} - {{ form.partner.name }} ({{ form.created_at|date:"Y-m-d H:i" }})</option>
+        {% endfor %}
+      </select>
+
+      <label for="mentorship-settings-skills">Skills (multiple)</label>
+      <select id="mentorship-settings-skills" name="skills" multiple size="8" style="max-width:520px;">
+        {% for skill in mentorship_available_skills %}
+          <option value="{{ skill.id }}" data-skill-qid="{{ skill.skill_wikidata_item }}">{{ skill.skill_wikidata_item }}</option>
+        {% endfor %}
+      </select>
+
+      <label for="mentorship-settings-languages">Languages (multiple)</label>
+      <select id="mentorship-settings-languages" name="languages" multiple size="8" style="max-width:520px;">
+        {% for language in mentorship_available_languages %}
+          <option value="{{ language.id }}">{{ language.language_name }} ({{ language.language_code }})</option>
+        {% endfor %}
+      </select>
+
+      <div class="muted" id="mentorship-settings-status">Select a partner to load and edit current settings.</div>
+      <button type="submit" class="btn-primary" style="width:max-content;">Save settings</button>
+    </form>
+
+    <h3>Current settings</h3>
+    <table>
+      <thead><tr><th>Partner</th><th>Territory</th><th>Registration opens</th><th>Registration closes</th><th>Mentor form</th><th>Mentee form</th><th>Skills</th><th>Languages</th><th>Updated at</th></tr></thead>
+      <tbody>
+        {% for row in mentorship_settings %}
+          <tr>
+            <td>{{ row.partner.name }}</td>
+            <td>{% if row.territory_id %}{{ row.territory.territory_name }}{% else %}<span class="muted">Global</span>{% endif %}</td>
+            <td>{% if row.registration_open_date %}{{ row.registration_open_date|date:"Y-m-d" }}{% else %}-{% endif %}</td>
+            <td>{% if row.registration_close_date %}{{ row.registration_close_date|date:"Y-m-d" }}{% else %}-{% endif %}</td>
+            <td>{% if row.mentor_form_id %}#{{ row.mentor_form_id }}{% else %}-{% endif %}</td>
+            <td>{% if row.mentee_form_id %}#{{ row.mentee_form_id }}{% else %}-{% endif %}</td>
+            <td>
+              {% for s in row.skills.all %}
+                <span class="chip" data-skill-qid="{{ s.skill_wikidata_item }}">{{ s.skill_wikidata_item }}</span>
+              {% empty %}
+                <span class="muted">None</span>
+              {% endfor %}
+            </td>
+            <td>
+              {% for l in row.languages.all %}
+                <span class="chip">{{ l.language_name }}</span>
+              {% empty %}
+                <span class="muted">None</span>
+              {% endfor %}
+            </td>
+            <td>{{ row.updated_at|date:"Y-m-d H:i:s" }}</td>
+          </tr>
+        {% empty %}
+          <tr><td colspan="9" class="muted">No mentorship settings saved yet.</td></tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+
+  <div id="panel-mentorship-forms" role="tabpanel" aria-labelledby="tab-mentorship-forms" hidden>
+    <h3 style="margin-top:0">Create form JSON</h3>
+    <div class="muted">Visual form builder</div>
+    <div id="mentorship-form-builder" class="form-builder-host" style="border: 1px solid var(--border); border-radius: 10px; background: #fff; padding: 8px; min-height: 340px;"></div>
+    <div id="mentorship-form-builder-status" class="muted">Use drag and drop to build the form. The JSON payload is generated automatically.</div>
+    <form id="mentorship-form-create" method="post" action="/portal/partner/mentorship/form/create/" aria-label="Create mentorship form" style="grid-template-columns: 1fr; max-width: 100%;">
+      {% csrf_token %}
+      <label for="mentorship-form-partner">Partner</label>
+      <select id="mentorship-form-partner" name="partner_id" required>
+        {% for p in mentorship_enabled_partners %}
+          <option value="{{ p.organization_id }}">{{ p.name }}</option>
+        {% endfor %}
+      </select>
+      <label for="mentorship-form-type">Form type</label>
+      <select id="mentorship-form-type" name="form_type" required>
+        <option value="mentor">Mentor</option>
+        <option value="mentee">Mentee</option>
+      </select>
+      <label for="mentorship-form-public-key">Public key</label>
+      <select id="mentorship-form-public-key" name="public_key_id" required>
+        {% for k in mentorship_public_keys %}
+          <option value="{{ k.id }}" data-partner-id="{{ k.partner.organization_id }}">Key #{{ k.id }} - {{ k.partner.name }}</option>
+        {% endfor %}
+      </select>
+      <input id="mentorship-form-json" name="form_json" type="hidden" />
+      <button type="submit" id="mentorship-form-save-btn" class="btn-primary" style="width:max-content;">Save form</button>
+    </form>
+  </div>
+
+  <div id="panel-mentorship-keys" role="tabpanel" aria-labelledby="tab-mentorship-keys" hidden>
+    <div class="muted" style="margin-bottom:10px; padding:10px 12px; border:1px solid var(--border); border-radius:10px; background:#f8fafc; color:#334155;">
+      <strong>How this works:</strong>
+      A public/private key pair is required to unlock mentorship questionnaire results.
+      This requirement is mandatory and supports the project privacy-by-design commitment.
+    </div>
+    <div class="danger-hint" role="note" style="margin-bottom:12px;">
+      <strong>Important before creating keys:</strong>
+      If the private key is lost, encrypted mentorship responses cannot be recovered.
+    </div>
+    <div class="grid" style="grid-template-columns: 1fr 1fr; align-items:start;">
+      <div>
+        <h3 style="margin-top:0">Insert existing public key</h3>
+        <form method="post" action="/portal/partner/mentorship/public-key/add/" aria-label="Insert mentorship public key" style="grid-template-columns:1fr; max-width:100%;">
+          {% csrf_token %}
+          <label for="mentorship-key-partner">Partner</label>
+          <select id="mentorship-key-partner" name="partner_id" required>
+            {% for p in mentorship_enabled_partners %}
+              <option value="{{ p.organization_id }}">{{ p.name }}</option>
+            {% endfor %}
+          </select>
+          <label for="mentorship-public-key">Public key (PEM)</label>
+          <textarea id="mentorship-public-key" name="public_key" placeholder="-----BEGIN PUBLIC KEY-----" required></textarea>
+          <button type="submit" class="btn-primary" style="width:max-content;">Save public key</button>
+        </form>
+      </div>
+      <div>
+        <h3 style="margin-top:0">Generate new key pair</h3>
+        <form method="post" action="/portal/partner/mentorship/public-key/generate/" aria-label="Generate mentorship key pair" style="grid-template-columns:1fr; max-width:100%;">
+          {% csrf_token %}
+          <label for="mentorship-generate-partner">Partner</label>
+          <select id="mentorship-generate-partner" name="partner_id" required>
+            {% for p in mentorship_enabled_partners %}
+              <option value="{{ p.organization_id }}">{{ p.name }}</option>
+            {% endfor %}
+          </select>
+          <label for="mentorship-key-delivery">Private key delivery</label>
+          <select id="mentorship-key-delivery" name="delivery" required>
+            <option value="download_email" selected>Download + send by email</option>
+            <option value="download">Download</option>
+            <option value="email">Send by email</option>
+          </select>
+          <label for="mentorship-key-email">Email (required when delivery includes email)</label>
+          <input id="mentorship-key-email" name="email_to" type="text" placeholder="name@example.org" />
+          <button type="submit" id="mentorship-key-generate-btn" class="btn-primary" style="width:max-content;">Generate and save key</button>
+        </form>
+      </div>
+    </div>
+  </div>
+
+  <div id="panel-mentorship-csv" role="tabpanel" aria-labelledby="tab-mentorship-csv" hidden>
+    <div class="grid" style="grid-template-columns: 1fr; gap:10px;">
+      <label for="mentorship-csv-partner">Partner</label>
+      <select id="mentorship-csv-partner" style="max-width:520px;">
+        {% for p in mentorship_enabled_partners %}
+          <option value="{{ p.organization_id }}">{{ p.name }}</option>
+        {% endfor %}
+      </select>
+
+      <label for="mentorship-csv-type">Response type</label>
+      <select id="mentorship-csv-type" style="max-width:520px;">
+        <option value="mentor">Mentor</option>
+        <option value="mentee">Mentee</option>
+      </select>
+
+      <label for="mentorship-csv-form">Form</label>
+      <select id="mentorship-csv-form" style="max-width:520px;"></select>
+
+      <label for="mentorship-csv-private-key">Private key (PEM)</label>
+      <textarea id="mentorship-csv-private-key" placeholder="-----BEGIN PRIVATE KEY-----" style="max-width:100%;"></textarea>
+
+      <div>
+        <button type="button" id="mentorship-csv-download-btn" class="btn-primary">Decrypt and download CSV</button>
+      </div>
+      <div id="mentorship-csv-status" class="muted"></div>
+    </div>
+  </div>
+
+  {{ mentorship_forms_mentor_data|json_script:"mentorship-forms-mentor-data" }}
+  {{ mentorship_forms_mentee_data|json_script:"mentorship-forms-mentee-data" }}
+  {{ mentorship_mentor_responses_data|json_script:"mentorship-responses-mentor-data" }}
+  {{ mentorship_mentee_responses_data|json_script:"mentorship-responses-mentee-data" }}
+  {{ mentorship_settings_data|json_script:"mentorship-settings-data" }}
+
+  <script>
+    (function() {
+      const dataNode = document.getElementById('mentorship-settings-data');
+      const partnerField = document.getElementById('mentorship-settings-partner');
+      const descriptionField = document.getElementById('mentorship-settings-description');
+      const registrationOpenDateField = document.getElementById('mentorship-settings-registration-open-date');
+      const registrationCloseDateField = document.getElementById('mentorship-settings-registration-close-date');
+      const territoryField = document.getElementById('mentorship-settings-territory');
+      const mentorFormField = document.getElementById('mentorship-settings-mentor-form');
+      const menteeFormField = document.getElementById('mentorship-settings-mentee-form');
+      const skillsField = document.getElementById('mentorship-settings-skills');
+      const languagesField = document.getElementById('mentorship-settings-languages');
+      const status = document.getElementById('mentorship-settings-status');
+
+      if (!dataNode || !partnerField) {
+        return;
+      }
+
+      const settingsByPartner = {};
+      try {
+        const payload = JSON.parse(dataNode.textContent || '[]');
+        payload.forEach(function(item) {
+          settingsByPartner[String(item.partner_id)] = item;
+        });
+      } catch (error) {
+        return;
+      }
+
+      function filterOptionsByPartner(selectField, partnerId) {
+        if (!selectField) {
+          return;
+        }
+        Array.from(selectField.options).forEach(function(option) {
+          const owner = option.getAttribute('data-partner-id');
+          const visible = !owner || owner === partnerId;
+          option.hidden = !visible;
+        });
+      }
+
+      function setMultiSelect(selectField, ids) {
+        if (!selectField) {
+          return;
+        }
+        const selected = new Set((ids || []).map(function(id) { return String(id); }));
+        Array.from(selectField.options).forEach(function(option) {
+          option.selected = selected.has(option.value);
+        });
+      }
+
+      function applyPartnerSettings() {
+        const partnerId = partnerField.value;
+        const current = settingsByPartner[partnerId] || null;
+
+        filterOptionsByPartner(mentorFormField, partnerId);
+        filterOptionsByPartner(menteeFormField, partnerId);
+
+        descriptionField.value = current ? (current.description || '') : '';
+        registrationOpenDateField.value = current ? (current.registration_open_date || '') : '';
+        registrationCloseDateField.value = current ? (current.registration_close_date || '') : '';
+        territoryField.value = current && current.territory_id ? String(current.territory_id) : '';
+        mentorFormField.value = current && current.mentor_form_id ? String(current.mentor_form_id) : '';
+        menteeFormField.value = current && current.mentee_form_id ? String(current.mentee_form_id) : '';
+        setMultiSelect(skillsField, current ? current.skill_ids : []);
+        setMultiSelect(languagesField, current ? current.language_ids : []);
+
+        if (status) {
+          status.textContent = current
+            ? 'Loaded existing settings for this partner. Save to apply changes.'
+            : 'No saved settings for this partner yet. Fill the fields and save.';
+        }
+      }
+
+      partnerField.addEventListener('change', applyPartnerSettings);
+      applyPartnerSettings();
+    })();
+  </script>
+</section>

@@ -121,6 +121,27 @@
   var mentorResponses = parseJsonScript('mentorship-responses-mentor-data');
   var menteeResponses = parseJsonScript('mentorship-responses-mentee-data');
 
+  var userProfileColumns = [
+    { key: 'is_staff', label: 'user_is_staff' },
+    { key: 'is_active', label: 'user_is_active' },
+    { key: 'date_joined', label: 'user_date_joined' },
+    { key: 'last_update', label: 'user_last_update' },
+    { key: 'last_login', label: 'user_last_login' },
+    { key: 'wikidata_qid', label: 'user_wikidata_qid' },
+    { key: 'wiki_alt', label: 'user_wiki_alt' },
+    { key: 'territory', label: 'user_territory' },
+    { key: 'language', label: 'user_language' },
+    { key: 'affiliation', label: 'user_affiliation' },
+    { key: 'wikimedia_project', label: 'user_wikimedia_project' },
+    { key: 'team', label: 'user_team' },
+    { key: 'skills_known_qids', label: 'user_skills_known_qids' },
+    { key: 'skills_available_qids', label: 'user_skills_available_qids' },
+    { key: 'skills_wanted_qids', label: 'user_skills_wanted_qids' },
+    { key: 'is_manager', label: 'user_is_manager' },
+    { key: 'badges', label: 'user_badges' },
+    { key: 'automated_lets_connect', label: 'user_automated_lets_connect' },
+  ];
+
   function currentForms() {
     return typeSelect.value === 'mentor' ? mentorForms : menteeForms;
   }
@@ -160,6 +181,26 @@
     if (Array.isArray(value)) return value.join('; ');
     if (value && typeof value === 'object') return JSON.stringify(value);
     return value == null ? '' : String(value);
+  }
+
+  function stringifyUserLanguage(value) {
+    if (!Array.isArray(value)) return stringifyCellValue(value);
+    return value.map(function(langItem) {
+      if (!langItem || typeof langItem !== 'object') return stringifyCellValue(langItem);
+      var name = langItem.name || '';
+      var prof = langItem.proficiency || '';
+      if (!name && !prof) return '';
+      if (!name) return prof;
+      if (!prof) return name;
+      return name + ' (' + prof + ')';
+    }).filter(Boolean).join('; ');
+  }
+
+  function getUserProfileCell(row, key) {
+    var profile = (row && row.user_profile && typeof row.user_profile === 'object') ? row.user_profile : {};
+    var value = profile[key];
+    if (key === 'language') return stringifyUserLanguage(value);
+    return stringifyCellValue(value);
   }
 
   function buildSchemaFieldMap(formDefinition) {
@@ -308,6 +349,9 @@
       }
 
       var header = ['username', 'created_at'];
+      userProfileColumns.forEach(function(col) {
+        header.push(col.label);
+      });
       dynamicKeys.forEach(function(key) {
         header.push(schemaFieldMap[key] || key);
       });
@@ -320,6 +364,10 @@
           escapeCSV(currentRow.username),
           escapeCSV(currentRow.created_at),
         ];
+
+        userProfileColumns.forEach(function(col) {
+          lineParts.push(escapeCSV(getUserProfileCell(currentRow, col.key)));
+        });
 
         dynamicKeys.forEach(function(key) {
           var value = currentObject[key];

@@ -1,0 +1,64 @@
+<section class="card" data-accent="admin">
+  <div class="card-head"><span class="icon-badge" aria-hidden="true">🛠️</span><div><h2 style="margin:0">Manage partners (staff)</h2><p class="section-desc" style="margin:2px 0 0">Create or delete partners. Deleting a partner removes its memberships and access.</p></div></div>
+  <div class="tabs" role="tablist" aria-label="Partner admin actions">
+    <button type="button" role="tab" aria-selected="true" aria-controls="panel-partner-create" id="tab-partner-create">Create partner</button>
+    <button type="button" role="tab" aria-selected="false" aria-controls="panel-partner-delete" id="tab-partner-delete">Delete partner</button>
+  </div>
+  <div id="panel-partner-create" role="tabpanel" aria-labelledby="tab-partner-create">
+    <form method="post" action="/portal/partner/create/" aria-label="Create partner">
+      {% csrf_token %}
+      <label for="partner-create-organization">Organization</label>
+      <select id="partner-create-organization" name="organization_id" required>
+        {% for org in partner_org_candidates %}
+          <option value="{{ org.id }}">{{ org }}</option>
+        {% empty %}
+          <option value="">No organizations available</option>
+        {% endfor %}
+      </select>
+      <label for="partner-create-desc">Description</label>
+      <input id="partner-create-desc" name="description" placeholder="Optional description" />
+      <button type="submit" class="btn-primary">Create partner</button>
+    </form>
+  </div>
+  <div id="panel-partner-delete" role="tabpanel" aria-labelledby="tab-partner-delete" hidden>
+    <form method="post" action="/portal/partner/delete/" aria-label="Delete partner">
+      {% csrf_token %}
+      <label for="partner-delete-id">Delete partner</label>
+      <select id="partner-delete-id" name="partner_id" required>
+        {% for p in partners_for_ui %}
+          <option value="{{ p.organization_id }}">{{ p.name }}</option>
+        {% endfor %}
+      </select>
+      <div class="danger-hint" role="note">This will delete the partner and all its memberships. This action cannot be undone.</div>
+      <button type="submit" class="btn-danger">Delete partner</button>
+    </form>
+  </div>
+</section>
+
+<section class="card" data-accent="access">
+  <div class="card-head"><span class="icon-badge" aria-hidden="true">🔐</span><div><h2 style="margin:0">Portal Access (staff)</h2><p class="section-desc" style="margin:2px 0 0">Derived from partner memberships. Use the filter to find users quickly.</p></div></div>
+  <div class="table-toolbar" style="margin-top:0">
+    <input type="search" id="portal-users-filter" placeholder="Filter authorized users..." aria-label="Filter portal users" />
+  </div>
+
+  <table id="portal-users-table">
+    <thead>
+      <tr>
+        <th>Username</th>
+        <th>Partner</th>
+        <th>Authorized at</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for pu in partner_members %}
+        <tr>
+          <td>{{ pu.user.username }}</td>
+          <td>{{ pu.partner.name }}</td>
+          <td>{{ pu.created_at|date:"Y-m-d H:i:s" }}</td>
+        </tr>
+      {% empty %}
+        <tr><td colspan="6" class="muted">No records.</td></tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</section>
