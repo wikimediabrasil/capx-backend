@@ -319,6 +319,9 @@ def dashboard_mentorship(request):
     context = _base_context(request, 'mentorship')
     partners_for_ui = _partners_for_ui(request)
     mentorship_enabled_partners = partners_for_ui.filter(mentorship=True).distinct().order_by('organization__i18n_names__name')
+    mentorship_partner_public_key_ids = set(
+        PartnerMentorshipPublicKey.objects.filter(partner__in=mentorship_enabled_partners).values_list('partner__organization_id', flat=True)
+    )
 
     mentorship_forms_mentor = (
         PartnerMentorshipFormMentor.objects
@@ -445,6 +448,7 @@ def dashboard_mentorship(request):
 
     context.update({
         'mentorship_enabled_partners': mentorship_enabled_partners,
+        'mentorship_partner_public_key_ids': sorted(mentorship_partner_public_key_ids),
         'mentorship_forms_mentor': mentorship_forms_mentor,
         'mentorship_forms_mentee': mentorship_forms_mentee,
         'mentorship_public_keys': mentorship_public_keys,
@@ -485,6 +489,15 @@ def dashboard_admin(request):
     )
     context.update({
         'partners_for_ui': partners_for_ui,
+        'partners_for_ui_data': [
+            {
+                'organization_id': partner.organization_id,
+                'name': partner.name,
+                'description': partner.description,
+                'mentorship': partner.mentorship,
+            }
+            for partner in partners_for_ui
+        ],
         'partner_members': partner_members,
         'partner_org_candidates': partner_org_candidates,
     })
@@ -574,6 +587,10 @@ def mentorship_settings_update(request):
         return redirect(DASHBOARD_URL_NAME)
 
     # After this point, we have a valid partner and permissions; validate other fields before saving anything
+    
+    if not PartnerMentorshipPublicKey.objects.filter(partner=partner).exists():
+        messages.error(request, 'Create at least one public key for this partner before editing mentorship settings.')
+        return redirect("portal:dashboard_mentorship")
 
     registration_open_date = None
     if registration_open_date_raw:
@@ -839,6 +856,34 @@ def partner_create(request):
             partner.description = description
             partner.save(update_fields=['description'])
         messages.info(request, f'Organization "{organization}" is already a partner.')
+    return redirect("portal:dashboard_admin")
+
+
+@require_POST
+def partner_update(request):
+    """Update partner editable fields (staff only)."""
+    forbidden = _require_portal_admin(request)
+    if forbidden:
+        return forbidden
+
+    partner_id = request.POST.get('partner_id', '').strip()
+    description = request.POST.get('description', '').strip()
+    mentorship_enabled = request.POST.get('mentorship_enabled') == 'on'
+
+    if not partner_id:
+        messages.error(request, 'Partner is required.')
+        return redirect("portal:dashboard_admin")
+
+    try:
+        partner = Partner.objects.get(organization_id=partner_id)
+    except Partner.DoesNotExist:
+        messages.error(request, 'Partner not found.')
+        return redirect("portal:dashboard_admin")
+
+    partner.description = description
+    partner.mentorship = mentorship_enabled
+    partner.save(update_fields=['description', 'mentorship', 'updated_at'])
+    messages.success(request, f'Partner "{partner.name}" updated.')
     return redirect("portal:dashboard_admin")
 
 @require_POST

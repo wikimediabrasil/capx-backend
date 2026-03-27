@@ -21,6 +21,7 @@ urlpatterns = [
     path('partner_badge/delete/', views.partner_badge_delete, name='partner_badge_delete'),
     path('partner_badge/update/', views.partner_badge_update, name='partner_badge_update'),
     path('partner/create/', views.partner_create, name='partner_create'),
+    path('partner/update/', views.partner_update, name='partner_update'),
     path('partner/delete/', views.partner_delete, name='partner_delete'),
     path('partner/membership/add/', views.partner_membership_add, name='partner_membership_add'),
     path('partner/membership/remove/', views.partner_membership_remove, name='partner_membership_remove'),

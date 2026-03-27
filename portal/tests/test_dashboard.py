@@ -117,8 +117,8 @@ class DashboardE2E(StaticLiveServerTestCase):
         self.page.click(".formbuilder-icon-text")
         self.page.click(".formbuilder-icon-date")
 
-        # On select #mentorship-form-partner, choose the first option
-        self.page.select_option("#mentorship-form-partner", str(partner.organization_id))
+        # Select partner in the global mentorship selector
+        self.page.select_option("#mentorship-partner-global", str(partner.organization_id))
 
         generated_public_key_id = self.page.eval_on_selector(
             "#mentorship-form-public-key",

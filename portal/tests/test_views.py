@@ -7,6 +7,7 @@ from users.models import Badge, UserBadge
 from users.models import Territory
 from orgs.models import Organization, OrganizationName
 from portal.models import Partner, PartnerMembership, PartnerMentorshipSettings
+from portal.models import PartnerMentorshipPublicKey
 import secrets
 
 
@@ -167,6 +168,15 @@ class PortalViewsTests(TestCase):
     def test_mentorship_settings_update_saves_dates_and_territory(self):
         self.partner.mentorship = True
         self.partner.save(update_fields=['mentorship'])
+        PartnerMentorshipPublicKey.objects.create(
+            partner=self.partner,
+            public_key=(
+                "-----BEGIN PUBLIC KEY-----\n"
+                "MFwwDQYJKoZIhvcNAQEBBQADSwAwSAJBAL8v79n+W8pBr6K/3QfP+S8jO6jqFK+R\n"
+                "A9T5JfQ6U2M5j6KkGQ0+Q2nYlq1M2rls2t7o3rdrA9Y8C5jBzQwzKDsCAwEAAQ==\n"
+                "-----END PUBLIC KEY-----"
+            ),
+        )
         territory = Territory.objects.create(territory_name='Brazil')
 
         self.client.force_login(user=self.admin)
