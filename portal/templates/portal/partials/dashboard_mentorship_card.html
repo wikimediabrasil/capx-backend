@@ -138,6 +138,9 @@
     <hr style="border:none; border-top:1px solid var(--border); margin:12px 0;" />
     <h3 style="margin-top:0">Edit existing form</h3>
     <p class="muted" style="margin-top:0;">If a form already has responses, only non-structural edits (labels/typos) are allowed.</p>
+    <p id="mentorship-form-edit-mode-note" class="muted" style="margin-top:0; margin-bottom:10px; display:none;">
+      Editing existing form: form type and public key are locked for this save.
+    </p>
     <form id="mentorship-form-update" method="post" action="/portal/partner/mentorship/form/update/" aria-label="Update mentorship form" style="grid-template-columns: 1fr; max-width: 100%;">
       {% csrf_token %}
       <input id="mentorship-form-update-partner" name="partner_id" type="hidden" />
@@ -147,7 +150,8 @@
       <input id="mentorship-form-update-json" name="form_json" type="hidden" />
       <div style="display:flex; gap:8px; flex-wrap:wrap;">
         <button type="button" id="mentorship-form-load-btn">Load into builder</button>
-        <button type="submit" id="mentorship-form-update-btn" class="btn-primary">Save updates</button>
+        <button type="button" id="mentorship-form-cancel-edit-btn" style="display:none;">Cancel editing</button>
+        <button type="submit" id="mentorship-form-update-btn" class="btn-primary" style="display:none;">Save updates</button>
       </div>
     </form>
   </div>

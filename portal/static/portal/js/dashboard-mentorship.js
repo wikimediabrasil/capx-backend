@@ -61,6 +61,10 @@
   var updateFormIdField = document.getElementById('mentorship-form-update-id');
   var updateJsonField = document.getElementById('mentorship-form-update-json');
   var loadBtn = document.getElementById('mentorship-form-load-btn');
+  var cancelEditBtn = document.getElementById('mentorship-form-cancel-edit-btn');
+  var createSaveBtn = document.getElementById('mentorship-form-save-btn');
+  var updateSaveBtn = document.getElementById('mentorship-form-update-btn');
+  var editModeNote = document.getElementById('mentorship-form-edit-mode-note');
   var builderHost = document.getElementById('mentorship-form-builder');
   var outputField = document.getElementById('mentorship-form-json');
   var statusEl = document.getElementById('mentorship-form-builder-status');
@@ -68,6 +72,30 @@
   var formTypeField = document.getElementById('mentorship-form-type');
   var keyField = document.getElementById('mentorship-form-public-key');
   if (!formElement || !updateFormElement || !builderHost || !outputField || !statusEl || !partnerField || !formTypeField || !keyField || !globalPartnerField || !updatePartnerField || !updateTypeField || !updateFormIdField || !updateJsonField || !loadBtn) return;
+
+  var isEditingExistingForm = false;
+
+  function setEditMode(active) {
+    isEditingExistingForm = !!active;
+
+    formTypeField.disabled = isEditingExistingForm;
+    keyField.disabled = isEditingExistingForm;
+
+    if (createSaveBtn) {
+      createSaveBtn.style.display = isEditingExistingForm ? 'none' : '';
+      createSaveBtn.disabled = isEditingExistingForm;
+    }
+    if (updateSaveBtn) {
+      updateSaveBtn.style.display = isEditingExistingForm ? '' : 'none';
+      updateSaveBtn.disabled = !isEditingExistingForm;
+    }
+    if (cancelEditBtn) {
+      cancelEditBtn.style.display = isEditingExistingForm ? '' : 'none';
+    }
+    if (editModeNote) {
+      editModeNote.style.display = isEditingExistingForm ? '' : 'none';
+    }
+  }
 
   function parseJsonScript(id) {
     var el = document.getElementById(id);
@@ -108,15 +136,18 @@
 
   function repopulateEditForms() {
     var selectedPartner = String(globalPartnerField.value || '');
+    var selectedType = String(formTypeField.value || 'mentor');
     var forms = currentFormsForType().filter(function(form) {
       return String(form.partner_id) === selectedPartner;
     });
 
+    var previousValue = String(updateFormIdField.value || '');
     updateFormIdField.innerHTML = '';
     forms.forEach(function(form) {
       var opt = document.createElement('option');
       opt.value = String(form.id);
       opt.textContent = 'ID ' + form.id + ' · ' + (form.created_at || '');
+      opt.dataset.formType = selectedType;
       updateFormIdField.appendChild(opt);
     });
 
@@ -125,6 +156,12 @@
       emptyOpt.value = '';
       emptyOpt.textContent = 'No forms for this partner/type';
       updateFormIdField.appendChild(emptyOpt);
+      updateFormIdField.value = '';
+      return;
+    }
+
+    if (previousValue && Array.from(updateFormIdField.options).some(function(option) { return option.value === previousValue; })) {
+      updateFormIdField.value = previousValue;
     }
   }
 
@@ -146,7 +183,12 @@
       return;
     }
     try {
+      var selectedOption = updateFormIdField.selectedOptions && updateFormIdField.selectedOptions[0];
+      var selectedFormType = String((selectedOption && selectedOption.dataset.formType) || formTypeField.value || 'mentor');
       formBuilderInstance.actions.setData(JSON.stringify(formDef.json || []));
+      formTypeField.value = selectedFormType;
+      updateTypeField.value = selectedFormType;
+      setEditMode(true);
       statusEl.textContent = 'Form loaded. Edit and save updates when ready.';
     } catch (error) {
       statusEl.textContent = 'Unable to load selected form into builder.';
@@ -169,6 +211,11 @@
   });
 
   formElement.addEventListener('submit', function(event) {
+    if (isEditingExistingForm) {
+      statusEl.textContent = 'Finish or cancel current edit before creating a new form.';
+      event.preventDefault();
+      return;
+    }
     try {
       var dataJson = formBuilderInstance.actions.getData('json');
       if (!dataJson || dataJson === '[]') {
@@ -184,6 +231,11 @@
   });
 
   updateFormElement.addEventListener('submit', function(event) {
+    if (!isEditingExistingForm) {
+      statusEl.textContent = 'Load an existing form before saving updates.';
+      event.preventDefault();
+      return;
+    }
     try {
       if (!updateFormIdField.value) {
         statusEl.textContent = 'Select a form to update.';
@@ -207,10 +259,21 @@
 
   formTypeField.addEventListener('change', function() {
     updateTypeField.value = String(formTypeField.value || 'mentor');
+    setEditMode(false);
     filterPublicKeysByPartner();
   });
-  globalPartnerField.addEventListener('change', filterPublicKeysByPartner);
+  globalPartnerField.addEventListener('change', function() {
+    setEditMode(false);
+    filterPublicKeysByPartner();
+  });
   loadBtn.addEventListener('click', loadSelectedFormIntoBuilder);
+  if (cancelEditBtn) {
+    cancelEditBtn.addEventListener('click', function() {
+      setEditMode(false);
+      statusEl.textContent = 'Edit mode cancelled. You can create a new form now.';
+    });
+  }
+  setEditMode(false);
   filterPublicKeysByPartner();
 })();
 
