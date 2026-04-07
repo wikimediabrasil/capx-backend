@@ -102,6 +102,24 @@ class PartnerMentorshipFormViewSetTestCase(TestCase):
         self.assertEqual(response.data['results'][0]['organization'], self.organization.id)
         self.assertEqual(response.data['results'][0]['json'], {"question": "mentee2?"})
 
+    def test_list_mentor_forms_hides_disabled_partner(self):
+        self.partner_other.mentorship = False
+        self.partner_other.save(update_fields=['mentorship'])
+
+        response = self.client.get('/mentorship_form_mentor/')
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(len(response.data['results']), 1)
+        self.assertEqual(response.data['results'][0]['organization'], self.organization.id)
+
+    def test_list_mentee_forms_hides_disabled_partner(self):
+        self.partner_other.mentorship = False
+        self.partner_other.save(update_fields=['mentorship'])
+
+        response = self.client.get('/mentorship_form_mentee/')
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(len(response.data['results']), 1)
+        self.assertEqual(response.data['results'][0]['organization'], self.organization.id)
+
     def test_submit_mentor_response(self):
         response = self.client.post(
             "/mentorship_form_mentor_response/",
@@ -135,6 +153,18 @@ class PartnerMentorshipFormViewSetTestCase(TestCase):
         decrypted_payload = json.loads(plaintext.decode("utf-8"))
 
         self.assertEqual(decrypted_payload["answer"], "I can mentor")        
+
+    def test_submit_mentor_response_rejects_disabled_partner(self):
+        self.partner.mentorship = False
+        self.partner.save(update_fields=['mentorship'])
+
+        response = self.client.post(
+            "/mentorship_form_mentor_response/",
+            data={"form": self.mentor_form.id, "data": '{"answer": "I can mentor"}'},
+            format="json",
+        )
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+        self.assertIn('form', response.data)
 
     def test_submit_mentee_response(self):
         response = self.client.post(
@@ -170,6 +200,18 @@ class PartnerMentorshipFormViewSetTestCase(TestCase):
 
         self.assertEqual(decrypted_payload["answer"], "I need mentorship")        
 
+    def test_submit_mentee_response_rejects_disabled_partner(self):
+        self.partner.mentorship = False
+        self.partner.save(update_fields=['mentorship'])
+
+        response = self.client.post(
+            "/mentorship_form_mentee_response/",
+            data={"form": self.mentee_form.id, "data": '{"answer": "I need mentorship"}'},
+            format="json",
+        )
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+        self.assertIn('form', response.data)
+
 
 class PartnerSettingsViewSetTestCase(TestCase):
     def setUp(self):
@@ -177,12 +219,22 @@ class PartnerSettingsViewSetTestCase(TestCase):
         self.organization = Organization.objects.create(acronym="TEST")
         self.organization.i18n_names.create(language_code="en", name="TEST")
         self.partner = Partner.objects.create(organization=self.organization, mentorship=True)
+        self.organization_disabled = Organization.objects.create(acronym="TSTD")
+        self.organization_disabled.i18n_names.create(language_code="en", name="TSTD")
+        self.partner_disabled = Partner.objects.create(organization=self.organization_disabled, mentorship=False)
         self.territory = Territory.objects.create(territory_name='Brazil')
         PartnerMentorshipSettings.objects.create(
             partner=self.partner,
             description='Mentoria regional',
             registration_open_date='2026-04-01',
             registration_close_date='2026-04-30',
+            territory=self.territory,
+        )
+        PartnerMentorshipSettings.objects.create(
+            partner=self.partner_disabled,
+            description='Should stay hidden in API',
+            registration_open_date='2026-05-01',
+            registration_close_date='2026-05-30',
             territory=self.territory,
         )
 
@@ -197,3 +249,7 @@ class PartnerSettingsViewSetTestCase(TestCase):
         self.assertEqual(payload['registration_close_date'], '2026-04-30')
         self.assertEqual(payload['territory'], self.territory.id)
         self.assertEqual(payload['territory_name'], 'Brazil')
+
+    def test_retrieve_partner_settings_hides_disabled_partner(self):
+        response = self.client.get(f'/partner_mentorship_settings/{self.organization_disabled.id}/')
+        self.assertEqual(response.status_code, status.HTTP_404_NOT_FOUND)

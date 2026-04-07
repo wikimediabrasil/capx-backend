@@ -47,7 +47,7 @@ class PartnerViewSet(viewsets.ReadOnlyModelViewSet):
     ),
 )
 class PartnerSettingsViewSet(viewsets.ReadOnlyModelViewSet):
-    queryset = PartnerMentorshipSettings.objects.select_related('partner__organization', 'territory').prefetch_related('skills', 'languages').order_by('-created_at')
+    queryset = PartnerMentorshipSettings.objects.select_related('partner__organization', 'territory').prefetch_related('skills', 'languages').filter(partner__mentorship=True).order_by('-created_at')
     serializer_class = PartnerSettingsSerializer
     lookup_field = 'partner__organization_id'
 
@@ -66,7 +66,7 @@ class PartnerMentorshipFormMentorViewSet(viewsets.ReadOnlyModelViewSet):
     serializer_class = PartnerMentorshipFormMentorSerializer
 
     def get_queryset(self):
-        queryset = PartnerMentorshipFormMentor.objects.select_related('partner__organization')
+        queryset = PartnerMentorshipFormMentor.objects.select_related('partner__organization').filter(partner__mentorship=True)
         partner_org_id = self.request.query_params.get('partner')
 
         if partner_org_id:
@@ -92,7 +92,7 @@ class PartnerMentorshipFormMenteeViewSet(viewsets.ReadOnlyModelViewSet):
     serializer_class = PartnerMentorshipFormMenteeSerializer
 
     def get_queryset(self):
-        queryset = PartnerMentorshipFormMentee.objects.select_related('partner__organization')
+        queryset = PartnerMentorshipFormMentee.objects.select_related('partner__organization').filter(partner__mentorship=True)
         partner_org_id = self.request.query_params.get('partner')
 
         if partner_org_id:
@@ -114,7 +114,7 @@ class PartnerMentorshipFormMentorResponseViewSet(mixins.CreateModelMixin, viewse
     queryset = PartnerMentorshipFormMentorResponse.objects.select_related(
         'form',
         'user',
-    ).order_by('-created_at')
+    ).filter(partner__mentorship=True).order_by('-created_at')
     serializer_class = PartnerMentorshipFormMentorResponseSerializer
     http_method_names = ['post']
     permission_classes = [permissions.IsAuthenticated]
@@ -129,7 +129,7 @@ class PartnerMentorshipFormMenteeResponseViewSet(mixins.CreateModelMixin, viewse
     queryset = PartnerMentorshipFormMenteeResponse.objects.select_related(
         'form',
         'user',
-    ).order_by('-created_at')
+    ).filter(partner__mentorship=True).order_by('-created_at')
     serializer_class = PartnerMentorshipFormMenteeResponseSerializer
     http_method_names = ['post']
     permission_classes = [permissions.IsAuthenticated]
