@@ -1,11 +1,15 @@
-from django.contrib import admin
+import logging
+
+from django.contrib import admin, messages
 from django import forms
-from django.core.exceptions import ValidationError
 from django.db.models import Case, When, F, Value, IntegerField
 from django.utils.html import format_html
 
 from skills.models import Skill, Hashtag
 from translate.services import MetabaseClient
+
+
+logger = logging.getLogger(__name__)
 
 
 class SkillChoiceField(forms.ModelChoiceField):
@@ -158,20 +162,48 @@ class SkillAdmin(admin.ModelAdmin):
 		return qs
 
 	def save_model(self, request, obj, form, change):
-		# On create, push label/description to Metabase and link to Wikidata QID
-		if not change:
-			title = form.cleaned_data.get("title")
-			description = form.cleaned_data.get("description")
-			lang = form.cleaned_data.get("lang") or "en"
-			qid = obj.skill_wikidata_item
-			client = MetabaseClient()
-			try:
-				client.login_bot()
-				mb_id = client.create_item(label=title, description=description, lang=lang, wikidata_qid=qid, editor_username=request.user.username)
-				self.message_user(request, f"Created Metabase item {mb_id} and linked to {qid}.")
-			except Exception as e:
-				raise ValidationError({"__all__": f"Failed to create item on Metabase: {e}"})
+		# Keep update behavior unchanged for now.
+		if change:
+			super().save_model(request, obj, form, change)
+			return
+
+		title = form.cleaned_data.get("title")
+		description = form.cleaned_data.get("description")
+		lang = form.cleaned_data.get("lang") or "en"
+		qid = obj.skill_wikidata_item
+
+		# Save locally first so we have a primary key for P91.
 		super().save_model(request, obj, form, change)
+
+		client = MetabaseClient()
+		try:
+			client.login_bot()
+			created = client.create_item(
+				label=title,
+				description=description,
+				lang=lang,
+				wikidata_qid=qid,
+				editor_username=request.user.username,
+				skill_pk=obj.pk,
+			)
+			self.message_user(
+				request,
+				(
+					f"Created Metabase capacity {created['capacity_id']} "
+					f"with index term {created['index_term_id']} for {qid}."
+				),
+			)
+		except Exception as e:
+			logger.exception("Failed to create Metabase items for skill %s", qid)
+			try:
+				obj.delete()
+			except Exception:
+				logger.exception("Failed to rollback local skill %s after Metabase error", qid)
+			self.message_user(
+				request,
+				f"Failed to create item on Metabase: {e}. Local skill creation was reverted.",
+				level=messages.ERROR,
+			)
 
 
 @admin.register(Hashtag)
