@@ -247,23 +247,24 @@ class TestMetabaseClient(TestCase):
         client = MetabaseClient()
         client._session = MagicMock()
         client._token = "token"
-        client._session.post.return_value.json.return_value = {
-            "success": True,
-            "entity": {"id": "Q999"}
-        }
-        client._session.post.return_value.raise_for_status = Mock()
+        client._find_index_term_by_wikidata_qid = Mock(return_value="Q111")
+        client._create_wikibase_item = Mock(return_value="Q999")
+        client._create_claim = Mock()
         
-        result = client.create_item("Test Skill", "A test skill", "en", "Q123", "admin")
+        result = client.create_item("Test Skill", "A test skill", "en", "Q123", "admin", skill_pk=77)
         
-        assert result == "Q999"
-        client._session.post.assert_called_once()
+        assert result == {"index_term_id": "Q111", "capacity_id": "Q999"}
+        client._create_wikibase_item.assert_called_once()
+        assert client._create_claim.call_count == 3
+        claim_props = [call.kwargs["prop"] for call in client._create_claim.call_args_list]
+        assert claim_props == ["P5", "P67", "P91"]
 
     def test_save_item_error(self):
         client = MetabaseClient()
         client._session = MagicMock()
         client._token = "token"
-        client._session.post.return_value.json.return_value = {"success": False, "error": "Error message"}
-        client._session.post.return_value.raise_for_status = Mock()
+        client._find_index_term_by_wikidata_qid = Mock(return_value="Q111")
+        client._create_wikibase_item = Mock(side_effect=RuntimeError("Error message"))
         with self.assertRaisesRegex(RuntimeError, r"Error message"):
             client.create_item("Test Skill", "A test skill", "en", "Q123", "admin")
 
@@ -271,11 +272,27 @@ class TestMetabaseClient(TestCase):
         client = MetabaseClient()
         client._session = MagicMock()
         client._token = "token"
-        client._session.post.return_value.json.return_value = {"success": True, "entity": {}}
-        client._session.post.return_value.raise_for_status = Mock()
+        client._find_index_term_by_wikidata_qid = Mock(return_value="Q111")
+        client._create_wikibase_item = Mock(side_effect=RuntimeError("did not return entity id"))
 
         with self.assertRaisesRegex(RuntimeError, r"did not return entity id"):
             client.create_item("Test Skill", "A test skill", "en", "Q123", "admin")
+
+    def test_create_item_creates_index_term_when_missing(self):
+        client = MetabaseClient()
+        client._session = MagicMock()
+        client._token = "token"
+        client._find_index_term_by_wikidata_qid = Mock(return_value=None)
+        client._fetch_wikidata_terms = Mock(return_value={"label": "WD Label", "description": "WD Desc"})
+        client._create_wikibase_item = Mock(side_effect=["Q222", "Q999"])
+        client._create_claim = Mock()
+
+        result = client.create_item("UI Label", "UI Desc", "en", "Q123", "admin", skill_pk=5)
+
+        assert result == {"index_term_id": "Q222", "capacity_id": "Q999"}
+        assert client._create_wikibase_item.call_count == 2
+        claim_props = [call.kwargs["prop"] for call in client._create_claim.call_args_list]
+        assert claim_props == ["P5", "P1", "P5", "P67", "P91"]
     
     def test_parse_entity_id_valid(self):
         client = MetabaseClient()

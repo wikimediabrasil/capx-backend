@@ -2,6 +2,7 @@ import json
 import os
 from datetime import datetime
 from typing import Dict, Optional
+from urllib.parse import urlparse
 
 import requests
 from django.conf import settings
@@ -93,6 +94,118 @@ class MetabaseClient:
         if not csrf:
             raise RuntimeError("Failed to obtain CSRF token.")
         return s, csrf
+
+    def _parse_entity_id(self, uri: str | None):
+        try:
+            path = urlparse(uri).path
+        except Exception:
+            return None
+        if not path:
+            return None
+        parts = path.strip("/").split("/")
+        if parts and parts[-1].startswith("Q"):
+            return parts[-1]
+        return None
+
+    def _post_action(self, data: dict, timeout: int = 60):
+        if not self._session or not self._token:
+            raise RuntimeError("MetabaseClient not logged in")
+        payload = {
+            **data,
+            "format": "json",
+            "token": self._token,
+            "assert": "user",
+            "maxlag": "5",
+        }
+        r = self._session.post(METABASE_API_ENDPOINT, data=payload, timeout=timeout)
+        r.raise_for_status()
+        j = r.json()
+        if "error" in j or j.get("success") is False:
+            raise RuntimeError(f"Metabase API error for action {data.get('action')}: {j}")
+        return j
+
+    def _item_datavalue(self, qid: str):
+        if not qid or not qid.startswith("Q"):
+            raise ValueError(f"Invalid item id: {qid}")
+        return {
+            "entity-type": "item",
+            "numeric-id": int(qid[1:]),
+            "id": qid,
+        }
+
+    def _create_wikibase_item(self, label: str | None, description: str | None, lang: str, summary: str):
+        data_obj = {}
+        if label:
+            data_obj["labels"] = {lang: {"language": lang, "value": label}}
+        if description:
+            data_obj["descriptions"] = {lang: {"language": lang, "value": description}}
+
+        payload = {
+            "action": "wbeditentity",
+            "new": "item",
+            "data": json.dumps(data_obj, ensure_ascii=False),
+            "summary": summary,
+        }
+        result = self._post_action(payload)
+        entity_id = (result.get("entity") or {}).get("id")
+        if not entity_id:
+            raise RuntimeError("Metabase create item did not return entity id")
+        return entity_id
+
+    def _create_claim(self, entity_id: str, prop: str, value, summary: str):
+        payload = {
+            "action": "wbcreateclaim",
+            "entity": entity_id,
+            "property": prop,
+            "snaktype": "value",
+            "value": json.dumps(value, ensure_ascii=False),
+            "summary": summary,
+        }
+        self._post_action(payload)
+
+    def _find_index_term_by_wikidata_qid(self, wikidata_qid: str):
+        query = f"""PREFIX wbt:<https://metabase.wikibase.cloud/prop/direct/>
+            SELECT ?item WHERE {{
+                VALUES ?value {{ \"{wikidata_qid}\" }}
+                ?item wbt:P1 ?value.
+            }}
+            LIMIT 1"""
+        headers = {"Accept": "application/sparql-results+json", "User-Agent": USER_AGENT}
+        r = requests.get(METABASE_SPARQL_ENDPOINT, params={"query": query}, headers=headers, timeout=60)
+        r.raise_for_status()
+        data = r.json()
+        for binding in data.get("results", {}).get("bindings", []):
+            entity_id = self._parse_entity_id(binding.get("item", {}).get("value"))
+            if entity_id:
+                return entity_id
+        return None
+
+    def _fetch_wikidata_terms(self, wikidata_qid: str, lang: str):
+        url = f"https://www.wikidata.org/wiki/Special:EntityData/{wikidata_qid}.json"
+        headers = {"User-Agent": USER_AGENT}
+        try:
+            r = requests.get(url, headers=headers, timeout=30)
+            r.raise_for_status()
+        except requests.RequestException:
+            return {}
+
+        entity = (r.json().get("entities") or {}).get(wikidata_qid) or {}
+        labels = entity.get("labels") or {}
+        descriptions = entity.get("descriptions") or {}
+        preferred_langs = [lang, "en"] if lang != "en" else ["en"]
+
+        label = None
+        description = None
+        for preferred in preferred_langs:
+            if not label:
+                label = ((labels.get(preferred) or {}).get("value"))
+            if not description:
+                description = ((descriptions.get(preferred) or {}).get("value"))
+
+        return {
+            "label": label,
+            "description": description,
+        }
 
     # --- Fetch
     def fetch_map_and_terms(self, qids):
@@ -192,76 +305,84 @@ class MetabaseClient:
         if "error" in j or j.get("success") is False:
             raise RuntimeError(f"Metabase API error for {metabase_id}/{lang} {field}: {j}")
 
-    def create_item(self, label: str, description: str | None = None, lang: str = "en", wikidata_qid: str | None = None, editor_username: str = "admin") -> str:
-        """Create a new item in Metabase (Wikibase) with initial label/description and optional linkage to a Wikidata QID.
+    def create_item(
+        self,
+        label: str,
+        description: str | None = None,
+        lang: str = "en",
+        wikidata_qid: str | None = None,
+        editor_username: str = "admin",
+        skill_pk: int | None = None,
+    ) -> Dict[str, str]:
+        """Create or reuse index term and create the related CapX capacity item.
 
-        Returns the created Metabase item id (e.g., "Q12345").
+        Returns a dictionary with both created/resolved ids:
+        {
+            "index_term_id": "Q123",
+            "capacity_id": "Q456",
+        }
         """
         if not self._session or not self._token:
             raise RuntimeError("MetabaseClient not logged in")
-        # Build entity payload
-        data_obj: dict = {
-            "labels": {lang: {"language": lang, "value": label}},
-            "descriptions": {},
-            "statements": [
-                {
-                    "type": "statement",
-                    "rank": "normal",
-                    "mainsnak": {
-                        "snaktype": "value",
-                        "property": "P5",  # instance of → Skill (Q34531)
-                        "datavalue": {
-                            "type": "wikibase-entityid",
-                            "value": {"entity-type": "item", "id": "Q34531"},
-                        },
-                    },
-                }
-            ],
-        }
-        if description:
-            data_obj["descriptions"][lang] = {"language": lang, "value": description}
-        if wikidata_qid:
-            # Link to associated Wikidata item ID via property P67 (external identifier)
-            data_obj["statements"].append(
-                {
-                    "type": "statement",
-                    "rank": "normal",
-                    "mainsnak": {
-                        "snaktype": "value",
-                        "property": "P67",
-                        "datavalue": {"type": "string", "value": wikidata_qid},
-                    },
-                }
+        if not wikidata_qid:
+            raise RuntimeError("wikidata_qid is required to create Metabase items")
+
+        index_term_id = self._find_index_term_by_wikidata_qid(wikidata_qid)
+        if not index_term_id:
+            wikidata_terms = self._fetch_wikidata_terms(wikidata_qid, lang)
+            index_label = wikidata_terms.get("label") or label or wikidata_qid
+            index_description = wikidata_terms.get("description") or description
+
+            index_term_id = self._create_wikibase_item(
+                label=index_label,
+                description=index_description,
+                lang=lang,
+                summary=f"CapX skill create: index term for {wikidata_qid} by {editor_username}",
+            )
+            self._create_claim(
+                entity_id=index_term_id,
+                prop="P5",
+                value=self._item_datavalue("Q12"),
+                summary=f"CapX skill create: set P5=Q12 for {index_term_id} by {editor_username}",
+            )
+            self._create_claim(
+                entity_id=index_term_id,
+                prop="P1",
+                value=wikidata_qid,
+                summary=f"CapX skill create: set P1={wikidata_qid} for {index_term_id} by {editor_username}",
             )
 
-        payload = {
-            "action": "wbeditentity",
-            "new": "item",
-            "data": json.dumps(data_obj),
-            "token": self._token,
-            "summary": f"CapX admin: create skill item by {editor_username}",
-            "format": "json",
-            "assert": "user",
-            "maxlag": "5",
-        }
-        r = self._session.post(METABASE_API_ENDPOINT, data=payload, timeout=60)
-        r.raise_for_status()
-        j = r.json()
-        if j.get("success") is False or "error" in j:
-            raise RuntimeError(f"Metabase API error creating item: {j}")
-        entity = j.get("entity", {}) or {}
-        item_id = entity.get("id")
-        if not item_id:
-            raise RuntimeError(f"Metabase API did not return entity id: {j}")
-        return item_id
+        capacity_id = self._create_wikibase_item(
+            label=label,
+            description=description,
+            lang=lang,
+            summary=f"CapX skill create: capacity for {wikidata_qid} by {editor_username}",
+        )
+        self._create_claim(
+            entity_id=capacity_id,
+            prop="P5",
+            value=self._item_datavalue("Q34531"),
+            summary=f"CapX skill create: set P5=Q34531 for {capacity_id} by {editor_username}",
+        )
+        self._create_claim(
+            entity_id=capacity_id,
+            prop="P67",
+            value=self._item_datavalue(index_term_id),
+            summary=f"CapX skill create: set P67={index_term_id} for {capacity_id} by {editor_username}",
+        )
+        if skill_pk is not None:
+            self._create_claim(
+                entity_id=capacity_id,
+                prop="P91",
+                value=str(skill_pk),
+                summary=f"CapX skill create: set P91={skill_pk} for {capacity_id} by {editor_username}",
+            )
 
-    # --- Helpers
-    def _parse_entity_id(self, uri: str) -> Optional[str]:
-        try:
-            path = uri.split("/entity/")[-1]
-            return path if path.startswith("Q") else None
-        except Exception:
-            return None
+        return {
+            "index_term_id": index_term_id,
+            "capacity_id": capacity_id,
+        }
+        
 
 
 def build_capacity_list(terms_by_qid: Dict[str, Dict[str, Dict[str, str]]], lang: str, fallback: str = 'en'):
