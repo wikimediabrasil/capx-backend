@@ -72,10 +72,6 @@ class PartnerMentorshipFormMentorViewSet(viewsets.ReadOnlyModelViewSet):
         if partner_org_id:
             queryset = queryset.filter(partner__organization_id=partner_org_id)
 
-        if self.action == 'list':
-            latest_ids = queryset.order_by().values('partner_id').annotate(latest_id=Max('id')).values('latest_id')
-            return queryset.filter(id__in=Subquery(latest_ids)).order_by('-created_at', '-id')
-
         return queryset.order_by('-created_at', '-id')
 
 @extend_schema_view(
@@ -97,10 +93,6 @@ class PartnerMentorshipFormMenteeViewSet(viewsets.ReadOnlyModelViewSet):
 
         if partner_org_id:
             queryset = queryset.filter(partner__organization_id=partner_org_id)
-
-        if self.action == 'list':
-            latest_ids = queryset.order_by().values('partner_id').annotate(latest_id=Max('id')).values('latest_id')
-            return queryset.filter(id__in=Subquery(latest_ids)).order_by('-created_at', '-id')
 
         return queryset.order_by('-created_at', '-id')
 
