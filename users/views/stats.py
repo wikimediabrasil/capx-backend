@@ -72,6 +72,15 @@ class StatisticsView(APIView):
         recent_user_ids = AuthToken.objects.filter(created__gte=last_30_days).values_list('user_id', flat=True).distinct()
         active_users = Profile.objects.filter(user__id__in=recent_user_ids, user__is_active=True).count()
 
+        # Calculate the number of users that has set the territory, language or capacities
+        users_with_territory = Profile.objects.filter(user__is_active=True, territory__isnull=False).distinct().count()
+        users_with_language = Profile.objects.filter(user__is_active=True, languageproficiency__isnull=False).distinct().count()
+        users_with_capacities = Profile.objects.filter(user__is_active=True).filter(
+            models.Q(skills_known__isnull=False) |
+            models.Q(skills_available__isnull=False) |
+            models.Q(skills_wanted__isnull=False)
+        ).distinct().count()
+
         # Calculate total capacities and new capacities this month
         total_capacities = Skill.objects.count()
         new_capacities = Skill.objects.filter(
@@ -148,6 +157,9 @@ class StatisticsView(APIView):
             "total_users": total_users,
             "new_users": new_users,
             "active_users": active_users,
+            "users_with_territory": users_with_territory,
+            "users_with_language": users_with_language,
+            "users_with_capacities": users_with_capacities,
             "total_capacities": total_capacities,
             "new_capacities": new_capacities,
             "total_messages": total_messages,
