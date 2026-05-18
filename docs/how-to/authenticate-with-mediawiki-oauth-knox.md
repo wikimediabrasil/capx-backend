@@ -8,7 +8,7 @@ Developers integrating user-authenticated actions (bug reports, project manageme
 
 ## Prerequisites
 
-- Base URL (example: `https://capx.toolforge.org`).
+- Base URL (example: `https://capx-backend.toolforge.org`).
 - A valid social auth provider supported by your deployment (commonly `mediawiki`).
 
 ## Step 1: Start OAuth handshake
@@ -16,7 +16,7 @@ Developers integrating user-authenticated actions (bug reports, project manageme
 Request temporary OAuth credentials:
 
 ```bash
-curl -X POST "https://capx.toolforge.org/api/login/social/knox/" \
+curl -X POST "https://capx-backend.toolforge.org/api/login/social/knox/" \
   -H "Content-Type: application/json" \
   -d '{
     "provider": "mediawiki"
@@ -42,7 +42,7 @@ After approval, collect:
 Complete the user auth step:
 
 ```bash
-curl -X POST "https://capx.toolforge.org/api/login/social/knox_user/" \
+curl -X POST "https://capx-backend.toolforge.org/api/login/social/knox_user/" \
   -H "Content-Type: application/json" \
   -d '{
     "provider": "mediawiki",
@@ -62,7 +62,7 @@ Expected result:
 Example: create a bug report.
 
 ```bash
-curl -X POST "https://capx.toolforge.org/bugs/" \
+curl -X POST "https://capx-backend.toolforge.org/bugs/" \
   -H "Authorization: Token <capx_token>" \
   -H "Content-Type: application/json" \
   -d '{
@@ -78,7 +78,7 @@ Expected result:
 ## Optional: Check temporary token metadata
 
 ```bash
-curl -X POST "https://capx.toolforge.org/api/login/social/check/" \
+curl -X POST "https://capx-backend.toolforge.org/api/login/social/check/" \
   -H "Content-Type: application/json" \
   -d '{"oauth_token": "<temporary_oauth_token>"}'
 ```

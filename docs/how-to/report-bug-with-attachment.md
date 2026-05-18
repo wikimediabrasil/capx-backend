@@ -9,13 +9,13 @@ Authenticated users and integrators building issue reporting tooling.
 ## Prerequisites
 
 - Auth token in `Authorization: Token <token>`.
-- Base URL (example: `https://capx.toolforge.org`).
+- Base URL (example: `https://capx-backend.toolforge.org`).
 - File to upload (screenshot, log, or reproduction asset).
 
 ## Step 1: Create a bug report
 
 ```bash
-curl -X POST "https://capx.toolforge.org/bugs/" \
+curl -X POST "https://capx-backend.toolforge.org/bugs/" \
   -H "Authorization: Token <token>" \
   -H "Content-Type: application/json" \
   -d '{
@@ -32,7 +32,7 @@ Expected result:
 ## Step 2: Upload an attachment for that bug
 
 ```bash
-curl -X POST "https://capx.toolforge.org/attachment/?bug=<bug_id>" \
+curl -X POST "https://capx-backend.toolforge.org/attachment/?bug=<bug_id>" \
   -H "Authorization: Token <token>" \
   -F "file=@screenshot.png"
 ```
@@ -45,10 +45,10 @@ Expected result:
 ## Step 3: Verify your reports
 
 ```bash
-curl -X GET "https://capx.toolforge.org/bugs/" \
+curl -X GET "https://capx-backend.toolforge.org/bugs/" \
   -H "Authorization: Token <token>"
 
-curl -X GET "https://capx.toolforge.org/attachment/" \
+curl -X GET "https://capx-backend.toolforge.org/attachment/" \
   -H "Authorization: Token <token>"
 ```
 

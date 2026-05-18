@@ -10,12 +10,12 @@ Organization managers and staff integrating project collaboration flows.
 
 - Auth token in `Authorization: Token <token>`.
 - At least one valid organization ID.
-- Base URL (example: `https://capx.toolforge.org`).
+- Base URL (example: `https://capx-backend.toolforge.org`).
 
 ## Step 1: Create a project
 
 ```bash
-curl -X POST "https://capx.toolforge.org/projects/" \
+curl -X POST "https://capx-backend.toolforge.org/projects/" \
   -H "Authorization: Token <token>" \
   -H "Content-Type: application/json" \
   -d '{
@@ -33,7 +33,7 @@ Expected result:
 ## Step 2: Add another organization as project member
 
 ```bash
-curl -X POST "https://capx.toolforge.org/project_members/" \
+curl -X POST "https://capx-backend.toolforge.org/project_members/" \
   -H "Authorization: Token <token>" \
   -H "Content-Type: application/json" \
   -d '{
@@ -49,7 +49,7 @@ Expected result:
 ## Step 3: Accept project membership invitation
 
 ```bash
-curl -X POST "https://capx.toolforge.org/project_member_acceptance/" \
+curl -X POST "https://capx-backend.toolforge.org/project_member_acceptance/" \
   -H "Authorization: Token <token>" \
   -H "Content-Type: application/json" \
   -d '{

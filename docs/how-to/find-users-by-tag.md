@@ -8,7 +8,7 @@ Developers building search, discovery, recommendation, or matching experiences.
 
 ## Prerequisites
 
-- Base URL (example: `https://capx.toolforge.org`).
+- Base URL (example: `https://capx-backend.toolforge.org`).
 - A valid tag type and tag ID.
 
 Supported tag types:
@@ -26,9 +26,9 @@ Supported tag types:
 Use quick lists to fetch IDs you can pass as `tag_id`:
 
 ```bash
-curl -X GET "https://capx.toolforge.org/list/skills/"
-curl -X GET "https://capx.toolforge.org/list/language/"
-curl -X GET "https://capx.toolforge.org/list/territory/"
+curl -X GET "https://capx-backend.toolforge.org/list/skills/"
+curl -X GET "https://capx-backend.toolforge.org/list/language/"
+curl -X GET "https://capx-backend.toolforge.org/list/territory/"
 ```
 
 ## Step 2: Query users for one tag
@@ -36,7 +36,7 @@ curl -X GET "https://capx.toolforge.org/list/territory/"
 Example: users with a skill available (ID `1`).
 
 ```bash
-curl -X GET "https://capx.toolforge.org/tags/skill_available/1/" \
+curl -X GET "https://capx-backend.toolforge.org/tags/skill_available/1/" \
   -H "Accept: application/json"
 ```
 

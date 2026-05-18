@@ -5,24 +5,24 @@ This tutorial helps you make a first successful request and understand how to mo
 ## Prerequisites
 
 - A running CapX backend instance.
-- Base URL (for production: `https://capx.toolforge.org`).
+- Base URL (for production: `https://capx-backend.toolforge.org`).
 
 ## Step 1: Open the API reference
 
 Open Swagger UI in your browser:
 
-- `https://capx.toolforge.org/`
+- `https://capx-backend.toolforge.org/`
 
 The raw schema is available at:
 
-- `https://capx.toolforge.org/schema/`
+- `https://capx-backend.toolforge.org/schema/`
 
 ## Step 2: Make a public GET request
 
 Start with a public endpoint that does not require authentication:
 
 ```bash
-curl -X GET "https://capx.toolforge.org/list/skills/" \
+curl -X GET "https://capx-backend.toolforge.org/list/skills/" \
   -H "Accept: application/json"
 ```
 
@@ -36,7 +36,7 @@ Expected result:
 Use tag search to list profiles by a specific tag type and tag ID:
 
 ```bash
-curl -X GET "https://capx.toolforge.org/tags/skill_available/1/" \
+curl -X GET "https://capx-backend.toolforge.org/tags/wikimedia_project/1/" \
   -H "Accept: application/json"
 ```
 
