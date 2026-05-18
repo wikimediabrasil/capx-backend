@@ -107,6 +107,11 @@ LOGIN_REDIRECT_URL = 'homepage'
 
 SOCIAL_AUTH_URL_NAMESPACE = 'social'
 SOCIAL_AUTH_PROTECTED_USER_FIELDS=["groups"]
+OAUTH_EXTRA_ALLOWED_HOSTS = tuple(
+    host.strip().lower()
+    for host in os.environ.get('OAUTH_EXTRA_ALLOWED_HOSTS', 'capx.toolforge.org,capx-test.toolforge.org').split(',')
+    if host.strip()
+)
 
 # Password validation
 # https://docs.djangoproject.com/en/4.2/ref/settings/#auth-password-validators

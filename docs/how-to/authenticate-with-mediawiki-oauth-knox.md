@@ -19,9 +19,21 @@ Request temporary OAuth credentials:
 curl -X POST "https://capx-backend.toolforge.org/api/login/social/knox/" \
   -H "Content-Type: application/json" \
   -d '{
-    "provider": "mediawiki"
+    "provider": "mediawiki",
+    "extra": "localhost:3001"
   }'
 ```
+
+The `extra` field is optional and is used as a post-callback redirect. Think of it as the app host where login should continue after the OAuth callback.
+
+CapX stores this value temporarily with the OAuth request token and returns it from `/api/login/social/check/` so the callback page can continue the flow in the right app.
+
+This is a host routing mechanism for trusted apps, not a general-purpose OAuth server redirect parameter.
+
+For security, `extra` must be either:
+
+- A host in the backend allowlist (`OAUTH_EXTRA_ALLOWED_HOSTS`, for example `capx.toolforge.org` or `capx-test.toolforge.org`). It can be expanded over time for new trusted apps.
+- `localhost` / `127.0.0.1` with or without a port (`localhost:3000`, `localhost:3001`, `127.0.0.1:3002`, etc.).
 
 Expected result:
 
@@ -31,6 +43,11 @@ Expected result:
 ## Step 2: Complete provider authorization
 
 Redirect the user to the provider authorization URL using the returned temporary token.
+
+Example URL format for MediaWiki OAuth:
+
+```https://meta.wikimedia.org/w/index.php?title=Special:OAuth/authorize&oauth_token=<temporary_oauth_token>
+```
 
 After approval, collect:
 
