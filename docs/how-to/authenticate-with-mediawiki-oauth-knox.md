@@ -46,7 +46,8 @@ Redirect the user to the provider authorization URL using the returned temporary
 
 Example URL format for MediaWiki OAuth:
 
-```https://meta.wikimedia.org/w/index.php?title=Special:OAuth/authorize&oauth_token=<temporary_oauth_token>
+```url
+https://meta.wikimedia.org/w/index.php?title=Special:OAuth/authorize&oauth_token=<temporary_oauth_token>
 ```
 
 After approval, collect:
