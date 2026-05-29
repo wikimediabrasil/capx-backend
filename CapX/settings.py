@@ -40,7 +40,6 @@ INSTALLED_APPS = [
     'social_django',
     'rest_framework',
     'rest_framework.authtoken',
-    'rest_social_auth',
     'knox',
     'django_filters',
     'drf_spectacular',

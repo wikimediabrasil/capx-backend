@@ -1,4 +1,4 @@
-django>=5.1.9,<5.2
+django>=6.0,<6.1
 social-auth-app-django
 whitenoise
 pymysql
@@ -9,7 +9,6 @@ djangorestframework
 markdown
 django-filter
 django-rest-knox
-rest-social-auth
 drf-spectacular
 drf-spectacular-sidecar
 requests-oauthlib
