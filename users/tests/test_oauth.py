@@ -17,12 +17,34 @@ class AuthViewTestCase(TestCase):
     def test_post_with_extra_info(self, mock_unauthorized_token):
         data = {
             'provider': 'mediawiki',
-            'extra': 'some_extra_info'
+            'extra': 'capx-test.toolforge.org'
         }
         response = self.client.post('/api/login/social/knox/', data, format='json')
         self.assertEqual(response.status_code, status.HTTP_200_OK)
         self.assertTrue(AuthExtraInfo.objects.filter(token=response.data['oauth_token']).exists())
-        self.assertEqual(AuthExtraInfo.objects.get(token=response.data['oauth_token']).extra, 'some_extra_info')
+        self.assertEqual(AuthExtraInfo.objects.get(token=response.data['oauth_token']).extra, 'capx-test.toolforge.org')
+
+    @patch('social_core.backends.mediawiki.MediaWiki.unauthorized_token', return_value="oauth_token=testtoken&oauth_token_secret=testsecret&oauth_callback_confirmed=true")
+    def test_post_with_localhost_port_extra(self, mock_unauthorized_token):
+        data = {
+            'provider': 'mediawiki',
+            'extra': 'localhost:3002'
+        }
+        response = self.client.post('/api/login/social/knox/', data, format='json')
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertTrue(AuthExtraInfo.objects.filter(token=response.data['oauth_token']).exists())
+        self.assertEqual(AuthExtraInfo.objects.get(token=response.data['oauth_token']).extra, 'localhost:3002')
+
+    @patch('social_core.backends.mediawiki.MediaWiki.unauthorized_token', return_value="oauth_token=testtoken&oauth_token_secret=testsecret&oauth_callback_confirmed=true")
+    def test_post_with_disallowed_extra_host(self, mock_unauthorized_token):
+        data = {
+            'provider': 'mediawiki',
+            'extra': 'evil.example.org'
+        }
+        response = self.client.post('/api/login/social/knox/', data, format='json')
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+        self.assertIn('error', response.data)
+        self.assertFalse(AuthExtraInfo.objects.filter(token='testtoken').exists())
 
     @patch('social_core.backends.mediawiki.MediaWiki.unauthorized_token', return_value="oauth_token=testtoken&oauth_token_secret=testsecret&oauth_callback_confirmed=true")
     def test_post_without_extra_info(self, mock_unauthorized_token):
