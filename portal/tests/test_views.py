@@ -43,6 +43,16 @@ class PortalViewsTests(TestCase):
             type="partner",
         )
 
+    def _generate_public_pem(self):
+        from cryptography.hazmat.primitives import serialization
+        from cryptography.hazmat.primitives.asymmetric import rsa
+
+        private_key = rsa.generate_private_key(public_exponent=65537, key_size=2048)
+        return private_key.public_key().public_bytes(
+            encoding=serialization.Encoding.PEM,
+            format=serialization.PublicFormat.SubjectPublicKeyInfo,
+        ).decode('utf-8')
+
     def test_login_view_redirects_for_portal_member(self):
         # user1 is a partner member -> should redirect to dashboard
         self.client.force_login(user=self.user1)
@@ -258,3 +268,63 @@ class PortalViewsTests(TestCase):
         self.assertEqual(bad_resp.status_code, 200)
         form.refresh_from_db()
         self.assertEqual(form.json[0]['name'], 'field1')
+
+    def test_mentorship_public_key_add_requires_rotation_policy(self):
+        self.client.force_login(self.admin)
+        public_pem = self._generate_public_pem()
+
+        response = self.client.post(
+            reverse('portal:mentorship_public_key_add'),
+            data={
+                'partner_id': str(self.partner.organization_id),
+                'public_key': public_pem,
+            },
+            follow=True,
+        )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(PartnerMentorshipPublicKey.objects.filter(partner=self.partner).count(), 0)
+
+    def test_mentorship_public_key_generate_requires_rotation_policy(self):
+        self.client.force_login(self.admin)
+
+        response = self.client.post(
+            reverse('portal:mentorship_public_key_generate'),
+            data={
+                'partner_id': str(self.partner.organization_id),
+                'delivery': 'download',
+            },
+            follow=True,
+        )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(PartnerMentorshipPublicKey.objects.filter(partner=self.partner).count(), 0)
+
+    def test_mentorship_new_key_does_not_auto_rebind_existing_forms(self):
+        self.partner.mentorship = True
+        self.partner.save(update_fields=['mentorship'])
+        self.client.force_login(self.admin)
+
+        first_key = PartnerMentorshipPublicKey.objects.create(
+            partner=self.partner,
+            public_key=self._generate_public_pem(),
+        )
+        form = PartnerMentorshipFormMentor.objects.create(
+            partner=self.partner,
+            public_key=first_key,
+            json=[{'type': 'text', 'label': 'Q1', 'name': 'q1'}],
+        )
+
+        response = self.client.post(
+            reverse('portal:mentorship_public_key_add'),
+            data={
+                'partner_id': str(self.partner.organization_id),
+                'public_key': self._generate_public_pem(),
+                'rotation_policy': 'new_forms_only',
+            },
+        )
+
+        self.assertEqual(response.status_code, 302)
+        self.assertEqual(PartnerMentorshipPublicKey.objects.filter(partner=self.partner).count(), 2)
+        form.refresh_from_db()
+        self.assertEqual(form.public_key_id, first_key.id)

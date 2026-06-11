@@ -2,6 +2,7 @@ from django.db import models
 from django.conf import settings
 from django.core.exceptions import ValidationError
 import base64
+import hashlib
 import json
 import os
 from cryptography.hazmat.primitives import hashes, serialization
@@ -54,6 +55,14 @@ def encrypt_data(plaintext, public_key_text):
         "ciphertext": base64.b64encode(ciphertext).decode("ascii"),
     }
     return json.dumps(payload, separators=(",", ":"))
+
+
+def mentorship_public_key_fingerprint(public_key_text, length=12):
+    if not public_key_text:
+        return ""
+    normalized = "".join(str(public_key_text).split())
+    digest = hashlib.sha256(normalized.encode("utf-8")).hexdigest()
+    return digest[:length]
 
 
 class Partner(models.Model):
@@ -119,6 +128,10 @@ class PartnerMentorshipPublicKey(models.Model):
     public_key = models.TextField()
     created_at = models.DateTimeField(auto_now_add=True)
 
+    @property
+    def fingerprint(self):
+        return mentorship_public_key_fingerprint(self.public_key)
+
     def __str__(self):
         return f"{self.partner.name} Mentorship Public Key"
 
@@ -132,6 +145,15 @@ class PartnerMentorshipFormMentor(models.Model):
     def clean(self):
         if self.public_key_id and self.public_key and self.public_key.partner_id != self.partner_id:
             raise ValidationError("Public key must belong to the same partner")
+        if self.pk:
+            original = (
+                PartnerMentorshipFormMentor.objects
+                .filter(pk=self.pk)
+                .values('public_key_id')
+                .first()
+            )
+            if original and original['public_key_id'] != self.public_key_id and self.responses.exists():
+                raise ValidationError("Public key cannot be changed after responses are submitted")
 
     def save(self, *args, **kwargs):
         self.full_clean()
@@ -150,6 +172,15 @@ class PartnerMentorshipFormMentee(models.Model):
     def clean(self):
         if self.public_key_id and self.public_key and self.public_key.partner_id != self.partner_id:
             raise ValidationError("Public key must belong to the same partner")
+        if self.pk:
+            original = (
+                PartnerMentorshipFormMentee.objects
+                .filter(pk=self.pk)
+                .values('public_key_id')
+                .first()
+            )
+            if original and original['public_key_id'] != self.public_key_id and self.responses.exists():
+                raise ValidationError("Public key cannot be changed after responses are submitted")
 
     def save(self, *args, **kwargs):
         self.full_clean()
@@ -164,6 +195,8 @@ class PartnerMentorshipFormMentorResponse(models.Model):
     form = models.ForeignKey(PartnerMentorshipFormMentor, on_delete=models.CASCADE, related_name='responses')
     user = models.ForeignKey(CustomUser, on_delete=models.CASCADE, related_name='mentor_responses')
     data = models.TextField()
+    encrypted_with_public_key_id_snapshot = models.PositiveIntegerField(null=True, blank=True, editable=False)
+    encrypted_with_public_key_fingerprint = models.CharField(max_length=12, blank=True, default='', editable=False)
     created_at = models.DateTimeField(auto_now_add=True)
 
     def save(self, *args, **kwargs):
@@ -174,6 +207,9 @@ class PartnerMentorshipFormMentorResponse(models.Model):
 
         if not self.form.public_key_id:
             raise ValidationError("Mentor form does not have an active public key")
+
+        self.encrypted_with_public_key_id_snapshot = self.form.public_key_id
+        self.encrypted_with_public_key_fingerprint = mentorship_public_key_fingerprint(self.form.public_key.public_key)
 
         if not is_encrypted_data(self.data):
             self.data = encrypt_data(self.data, self.form.public_key.public_key)
@@ -189,16 +225,21 @@ class PartnerMentorshipFormMenteeResponse(models.Model):
     form = models.ForeignKey(PartnerMentorshipFormMentee, on_delete=models.CASCADE, related_name='responses')
     user = models.ForeignKey(CustomUser, on_delete=models.CASCADE, related_name='mentee_responses')
     data = models.JSONField()
+    encrypted_with_public_key_id_snapshot = models.PositiveIntegerField(null=True, blank=True, editable=False)
+    encrypted_with_public_key_fingerprint = models.CharField(max_length=12, blank=True, default='', editable=False)
     created_at = models.DateTimeField(auto_now_add=True)
 
     def save(self, *args, **kwargs):
         self.partner = self.form.partner  # Ensure partner is always set to form's partner
 
         if self.pk:
-            raise ValidationError("Public key must belong to the same partner")
+            raise ValidationError("Updating mentee responses is not allowed")
 
         if not self.form.public_key_id:
             raise ValidationError("Mentee form does not have an active public key")
+
+        self.encrypted_with_public_key_id_snapshot = self.form.public_key_id
+        self.encrypted_with_public_key_fingerprint = mentorship_public_key_fingerprint(self.form.public_key.public_key)
 
         if not is_encrypted_data(self.data):
             self.data = encrypt_data(self.data, self.form.public_key.public_key)

@@ -66,7 +66,7 @@ class PartnerMentorshipFormMentorViewSet(viewsets.ReadOnlyModelViewSet):
     serializer_class = PartnerMentorshipFormMentorSerializer
 
     def get_queryset(self):
-        queryset = PartnerMentorshipFormMentor.objects.select_related('partner__organization')
+        queryset = PartnerMentorshipFormMentor.objects.select_related('partner__organization', 'public_key')
         partner_org_id = self.request.query_params.get('partner')
 
         if partner_org_id:
@@ -88,7 +88,7 @@ class PartnerMentorshipFormMenteeViewSet(viewsets.ReadOnlyModelViewSet):
     serializer_class = PartnerMentorshipFormMenteeSerializer
 
     def get_queryset(self):
-        queryset = PartnerMentorshipFormMentee.objects.select_related('partner__organization')
+        queryset = PartnerMentorshipFormMentee.objects.select_related('partner__organization', 'public_key')
         partner_org_id = self.request.query_params.get('partner')
 
         if partner_org_id:
@@ -105,6 +105,7 @@ class PartnerMentorshipFormMenteeViewSet(viewsets.ReadOnlyModelViewSet):
 class PartnerMentorshipFormMentorResponseViewSet(mixins.CreateModelMixin, viewsets.GenericViewSet):
     queryset = PartnerMentorshipFormMentorResponse.objects.select_related(
         'form',
+        'form__public_key',
         'user',
     ).order_by('-created_at')
     serializer_class = PartnerMentorshipFormMentorResponseSerializer
@@ -120,6 +121,7 @@ class PartnerMentorshipFormMentorResponseViewSet(mixins.CreateModelMixin, viewse
 class PartnerMentorshipFormMenteeResponseViewSet(mixins.CreateModelMixin, viewsets.GenericViewSet):
     queryset = PartnerMentorshipFormMenteeResponse.objects.select_related(
         'form',
+        'form__public_key',
         'user',
     ).order_by('-created_at')
     serializer_class = PartnerMentorshipFormMenteeResponseSerializer

@@ -90,6 +90,7 @@ class DashboardE2E(StaticLiveServerTestCase):
 
         # On select #mentorship-key-delivery, choose option with value "download"
         self.page.select_option("#mentorship-key-delivery", "download")
+        self.page.select_option("#mentorship-key-rotation-policy-generate", "new_forms_only")
 
         # Submit form and expect a download to start
         with self.page.expect_download() as dl_info:

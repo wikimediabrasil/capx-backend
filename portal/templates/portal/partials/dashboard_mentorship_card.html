@@ -128,9 +128,10 @@
       <label for="mentorship-form-public-key">Public key</label>
       <select id="mentorship-form-public-key" name="public_key_id" required>
         {% for k in mentorship_public_keys %}
-          <option value="{{ k.id }}" data-partner-id="{{ k.partner.organization_id }}">Key #{{ k.id }} - {{ k.partner.name }}</option>
+          <option value="{{ k.id }}" data-partner-id="{{ k.partner.organization_id }}">Key #{{ k.id }} ({{ k.fingerprint }}, {{ k.created_at|date:"Y-m-d" }}) - {{ k.partner.name }}</option>
         {% endfor %}
       </select>
+      <p class="muted" style="margin-top:0; margin-bottom:8px;">A form keeps the selected key. Creating a new key never replaces keys in existing forms.</p>
       <input id="mentorship-form-json" name="form_json" type="hidden" />
       <button type="submit" id="mentorship-form-save-btn" class="btn-primary" style="width:max-content;">Save form</button>
     </form>
@@ -166,12 +167,21 @@
       <strong>Important before creating keys:</strong>
       If the private key is lost, encrypted mentorship responses cannot be recovered.
     </div>
+    <div class="muted" role="note" style="margin-bottom:12px; padding:10px 12px; border:1px dashed var(--border); border-radius:10px;">
+      Creating a new public key does not activate it automatically in existing forms.
+      Existing forms keep their current key and continue encrypting with that key until a new form is created.
+    </div>
     <div class="grid" style="grid-template-columns: 1fr 1fr; align-items:start;">
       <div>
         <h3 style="margin-top:0">Insert existing public key</h3>
         <form method="post" action="/portal/partner/mentorship/public-key/add/" aria-label="Insert mentorship public key" style="grid-template-columns:1fr; max-width:100%;">
           {% csrf_token %}
           <input id="mentorship-key-partner" name="partner_id" type="hidden" />
+          <label for="mentorship-key-rotation-policy-add">Rotation policy</label>
+          <select id="mentorship-key-rotation-policy-add" name="rotation_policy" required>
+            <option value="" selected disabled>Select a policy</option>
+            <option value="new_forms_only">Keep existing forms on their current key; new key is only for new forms</option>
+          </select>
           <label for="mentorship-public-key">Public key (PEM)</label>
           <textarea id="mentorship-public-key" name="public_key" placeholder="-----BEGIN PUBLIC KEY-----" required></textarea>
           <button type="submit" class="btn-primary" style="width:max-content;">Save public key</button>
@@ -182,6 +192,11 @@
         <form method="post" action="/portal/partner/mentorship/public-key/generate/" aria-label="Generate mentorship key pair" style="grid-template-columns:1fr; max-width:100%;">
           {% csrf_token %}
           <input id="mentorship-generate-partner" name="partner_id" type="hidden" />
+          <label for="mentorship-key-rotation-policy-generate">Rotation policy</label>
+          <select id="mentorship-key-rotation-policy-generate" name="rotation_policy" required>
+            <option value="" selected disabled>Select a policy</option>
+            <option value="new_forms_only">Keep existing forms on their current key; new key is only for new forms</option>
+          </select>
           <label for="mentorship-key-delivery">Private key delivery</label>
           <select id="mentorship-key-delivery" name="delivery" required>
             <option value="download_email" selected>Download + send by email</option>
@@ -206,6 +221,10 @@
 
       <label for="mentorship-csv-form">Form</label>
       <select id="mentorship-csv-form" style="max-width:520px;"></select>
+
+      <div id="mentorship-csv-required-key" class="muted" style="padding:10px 12px; border:1px solid var(--border); border-radius:10px; background:#f8fafc;">
+        Required private key: select a form to see the key details.
+      </div>
 
       <label for="mentorship-csv-private-key">Private key (PEM)</label>
       <textarea id="mentorship-csv-private-key" placeholder="-----BEGIN PRIVATE KEY-----" style="max-width:100%;"></textarea>
