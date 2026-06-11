@@ -51,6 +51,12 @@ describe('dashboard-mentorship.js', () => {
       json: async () => ({ results: [] }),
     });
     window.fetch = global.fetch;
+    if (!global.URL) {
+      global.URL = {};
+    }
+    global.URL.createObjectURL = jest.fn().mockReturnValue('blob:url');
+    global.URL.revokeObjectURL = jest.fn();
+    window.URL = global.URL;
     renderMentorshipDom();
     // Ensure no jQuery present to hit fallback branch
     global.jQuery = undefined;
@@ -169,6 +175,7 @@ describe('dashboard-mentorship.js', () => {
       window.URL = {};
     }
     window.URL.createObjectURL = jest.fn().mockReturnValue('blob:url');
+    window.URL.revokeObjectURL = jest.fn();
     const origCreate = document.createElement.bind(document);
     jest.spyOn(document, 'createElement').mockImplementation((tag) => {
       const el = origCreate(tag);
@@ -189,5 +196,89 @@ describe('dashboard-mentorship.js', () => {
     const status = document.getElementById('mentorship-csv-status');
     expect(status.textContent).toContain('response(s) decrypted');
     expect(subtle.decrypt).toHaveBeenCalled();
+  });
+
+  test('csv clears private key when selected form changes', async () => {
+    jest.resetModules();
+    const forms = [
+      { id: 1, partner_id: 'p1', created_at: '2024-01-01', public_key_id: 11, public_key_fingerprint: 'abc111', json: [] },
+      { id: 2, partner_id: 'p1', created_at: '2024-01-02', public_key_id: 22, public_key_fingerprint: 'def222', json: [] },
+    ];
+    renderMentorshipDom(`
+      <script id="mentorship-forms-mentor-data" type="application/json">${JSON.stringify(forms)}</script>
+      <script id="mentorship-forms-mentee-data" type="application/json">[]</script>
+      <script id="mentorship-responses-mentor-data" type="application/json">[]</script>
+      <script id="mentorship-responses-mentee-data" type="application/json">[]</script>
+      <div id="mentorship-csv-required-key"></div>
+    `);
+
+    require('../dashboard-mentorship.js');
+    const privateKeyInput = document.getElementById('mentorship-csv-private-key');
+    const formSelect = document.getElementById('mentorship-csv-form');
+    const status = document.getElementById('mentorship-csv-status');
+
+    privateKeyInput.value = '-----BEGIN PRIVATE KEY-----abc-----END PRIVATE KEY-----';
+    formSelect.value = '2';
+    formSelect.dispatchEvent(new window.Event('change', { bubbles: true }));
+
+    expect(privateKeyInput.value).toBe('');
+    expect(status.textContent).toContain('Private key cleared because form changed');
+  });
+
+  test('csv blocks export when selected form has mixed key lineage', async () => {
+    jest.resetModules();
+    const forms = [
+      { id: 1, partner_id: 'p1', created_at: '2024-01-01', public_key_id: 11, public_key_fingerprint: 'abc111', json: [{ name: 'field', label: 'Field' }] },
+    ];
+    const responses = [
+      {
+        form_id: 1,
+        username: 'alice',
+        created_at: '2024-01-02',
+        encrypted_with_public_key_id: 11,
+        encrypted_with_public_key_fingerprint: 'abc111',
+        data: { __encrypted__: true, key: 'AA==', nonce: 'AA==', ciphertext: 'AA==' },
+      },
+      {
+        form_id: 1,
+        username: 'bob',
+        created_at: '2024-01-03',
+        encrypted_with_public_key_id: 22,
+        encrypted_with_public_key_fingerprint: 'def222',
+        data: { __encrypted__: true, key: 'AA==', nonce: 'AA==', ciphertext: 'AA==' },
+      },
+    ];
+
+    renderMentorshipDom(`
+      <script id="mentorship-forms-mentor-data" type="application/json">${JSON.stringify(forms)}</script>
+      <script id="mentorship-forms-mentee-data" type="application/json">[]</script>
+      <script id="mentorship-responses-mentor-data" type="application/json">${JSON.stringify(responses)}</script>
+      <script id="mentorship-responses-mentee-data" type="application/json">[]</script>
+      <div id="mentorship-csv-required-key"></div>
+    `);
+
+    document.getElementById('mentorship-csv-private-key').value = '-----BEGIN PRIVATE KEY-----abc-----END PRIVATE KEY-----';
+
+    const subtle = {
+      importKey: jest.fn().mockResolvedValue({}),
+      decrypt: jest.fn().mockResolvedValue(new TextEncoder().encode('{"field":"value"}')),
+    };
+    Object.defineProperty(window, 'crypto', { value: { subtle }, configurable: true });
+    global.crypto = window.crypto;
+    if (!window.URL) {
+      window.URL = {};
+    }
+    window.URL.createObjectURL = jest.fn().mockReturnValue('blob:url');
+    window.URL.revokeObjectURL = jest.fn();
+
+    require('../dashboard-mentorship.js');
+
+    const btn = document.getElementById('mentorship-csv-download-btn');
+    await btn.click();
+    await new Promise((resolve) => setTimeout(resolve, 0));
+
+    const status = document.getElementById('mentorship-csv-status');
+    expect(status.textContent).toContain('Export blocked');
+    expect(subtle.decrypt).not.toHaveBeenCalled();
   });
 });

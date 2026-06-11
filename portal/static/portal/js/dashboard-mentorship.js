@@ -286,6 +286,7 @@
   var statusEl = document.getElementById('mentorship-csv-status');
   var summaryEl = document.getElementById('mentorship-csv-summary');
   var respondentsEl = document.getElementById('mentorship-csv-respondents');
+  var requiredKeyEl = document.getElementById('mentorship-csv-required-key');
   if (!partnerSelect || !typeSelect || !formSelect || !privateKeyInput || !downloadBtn || !statusEl) return;
 
   function parseJsonScript(id) {
@@ -326,6 +327,53 @@
 
   function currentResponses() {
     return typeSelect.value === 'mentor' ? mentorResponses : menteeResponses;
+  }
+
+  function formatKeyLabel(meta) {
+    if (!meta || (!meta.keyId && !meta.fingerprint)) {
+      return 'Unknown key';
+    }
+    var parts = [];
+    if (meta.keyId) parts.push('Key #' + meta.keyId);
+    if (meta.fingerprint) parts.push('fp ' + meta.fingerprint);
+    if (meta.createdAt) parts.push(String(meta.createdAt).slice(0, 10));
+    return parts.join(' | ');
+  }
+
+  function getFormKeyMeta(formDefinition) {
+    return {
+      keyId: formDefinition && formDefinition.public_key_id != null ? String(formDefinition.public_key_id) : '',
+      fingerprint: formDefinition && formDefinition.public_key_fingerprint ? String(formDefinition.public_key_fingerprint) : '',
+      createdAt: formDefinition && formDefinition.public_key_created_at ? String(formDefinition.public_key_created_at) : '',
+    };
+  }
+
+  function getRowKeyMeta(row, formDefinition) {
+    return {
+      keyId: row && row.encrypted_with_public_key_id != null
+        ? String(row.encrypted_with_public_key_id)
+        : row && row.public_key_id != null
+          ? String(row.public_key_id)
+          : (formDefinition && formDefinition.public_key_id != null ? String(formDefinition.public_key_id) : ''),
+      fingerprint: row && row.encrypted_with_public_key_fingerprint
+        ? String(row.encrypted_with_public_key_fingerprint)
+        : row && row.public_key_fingerprint
+          ? String(row.public_key_fingerprint)
+          : (formDefinition && formDefinition.public_key_fingerprint ? String(formDefinition.public_key_fingerprint) : ''),
+      createdAt: row && row.encrypted_with_public_key_created_at
+        ? String(row.encrypted_with_public_key_created_at)
+        : row && row.public_key_created_at
+          ? String(row.public_key_created_at)
+          : (formDefinition && formDefinition.public_key_created_at ? String(formDefinition.public_key_created_at) : ''),
+    };
+  }
+
+  function maybeResetPrivateKey(reason) {
+    if (!privateKeyInput.value || !privateKeyInput.value.trim()) return;
+    privateKeyInput.value = '';
+    if (statusEl && reason) {
+      statusEl.textContent = reason;
+    }
   }
 
   function getSelectedFormDefinition(formId) {
@@ -394,14 +442,15 @@
     return map;
   }
 
-  function repopulateForms() {
+  function repopulateForms(options) {
+    var opts = options || {};
     var pid = String(partnerSelect.value || '');
     var forms = currentForms().filter(function(f) { return String(f.partner_id) === pid; });
     formSelect.innerHTML = '';
     forms.forEach(function(f) {
       var opt = document.createElement('option');
       opt.value = String(f.id);
-      opt.textContent = 'ID ' + f.id + ' · ' + (f.created_at || '');
+      opt.textContent = 'ID ' + f.id + ' · ' + (f.created_at || '') + ' · ' + formatKeyLabel(getFormKeyMeta(f));
       formSelect.appendChild(opt);
     });
     if (!forms.length) {
@@ -410,20 +459,29 @@
       emptyOpt.textContent = 'No forms for this partner/type';
       formSelect.appendChild(emptyOpt);
     }
+    if (opts.resetPrivateKey) {
+      maybeResetPrivateKey(opts.resetReason || 'Private key cleared because context changed. Paste the key for the selected form.');
+    }
     refreshResponseSummary();
   }
 
   function refreshResponseSummary() {
-    if (!summaryEl && !respondentsEl) return;
+    if (!summaryEl && !respondentsEl && !requiredKeyEl) return;
     var selectedFormId = String(formSelect.value || '');
     if (!selectedFormId) {
       if (summaryEl) summaryEl.textContent = 'No form selected.';
       if (respondentsEl) respondentsEl.textContent = '';
+      if (requiredKeyEl) requiredKeyEl.textContent = 'Required private key: select a form to see the key details.';
       return;
     }
+    var selectedForm = getSelectedFormDefinition(selectedFormId);
+    var selectedFormMeta = getFormKeyMeta(selectedForm);
     var rows = currentResponses().filter(function(r) { return String(r.form_id) === selectedFormId; });
     if (summaryEl) {
       summaryEl.textContent = 'Responses available: ' + rows.length;
+    }
+    if (requiredKeyEl) {
+      requiredKeyEl.textContent = 'Required private key: ' + formatKeyLabel(selectedFormMeta) + '.';
     }
     if (respondentsEl) {
       if (!rows.length) {
@@ -529,6 +587,21 @@
       var privateKey = await importPrivateKey(privatePem);
       var rows = currentResponses().filter(function(r) { return String(r.form_id) === formId; });
       var selectedForm = getSelectedFormDefinition(formId);
+      var selectedFormMeta = getFormKeyMeta(selectedForm);
+      var baselineMeta = rows.length ? getRowKeyMeta(rows[0], selectedForm) : selectedFormMeta;
+
+      var hasMixedKeys = rows.some(function(row) {
+        var rowMeta = getRowKeyMeta(row, selectedForm);
+        if (baselineMeta.keyId && rowMeta.keyId && baselineMeta.keyId !== rowMeta.keyId) return true;
+        if (baselineMeta.fingerprint && rowMeta.fingerprint && baselineMeta.fingerprint !== rowMeta.fingerprint) return true;
+        return false;
+      });
+
+      if (hasMixedKeys) {
+        statusEl.textContent = 'Export blocked: responses for this form were encrypted with multiple keys. Split by key lineage before downloading CSV.';
+        return;
+      }
+
       var schemaFieldMap = buildSchemaFieldMap(selectedForm);
       var decryptedObjects = [];
       var dynamicKeys = Object.keys(schemaFieldMap);
@@ -550,7 +623,7 @@
         });
       }
 
-      var header = ['username', 'created_at'];
+      var header = ['username', 'created_at', 'encrypted_with_public_key_id', 'encrypted_with_public_key_fingerprint'];
       userProfileColumns.forEach(function(col) {
         header.push(col.label);
       });
@@ -562,9 +635,12 @@
       for (var j = 0; j < rows.length; j++) {
         var currentRow = rows[j];
         var currentObject = decryptedObjects[j] || {};
+        var rowKeyMeta = getRowKeyMeta(currentRow, selectedForm);
         var lineParts = [
           escapeCSV(currentRow.username),
           escapeCSV(currentRow.created_at),
+          escapeCSV(rowKeyMeta.keyId),
+          escapeCSV(rowKeyMeta.fingerprint),
         ];
 
         userProfileColumns.forEach(function(col) {
@@ -581,15 +657,28 @@
 
       var fileName = 'mentorship-' + typeSelect.value + '-form-' + formId + '.csv';
       downloadCSV(lines, fileName);
-      statusEl.textContent = rows.length + ' response(s) decrypted and exported.';
+      statusEl.textContent = rows.length + ' response(s) decrypted and exported with key ' + formatKeyLabel(baselineMeta) + '.';
     } catch (e) {
-      statusEl.textContent = 'Unable to decrypt responses with this private key.';
+      statusEl.textContent = 'Unable to decrypt responses with this private key. Confirm the key shown in "Required private key".';
     }
   }
 
-  partnerSelect.addEventListener('change', repopulateForms);
-  typeSelect.addEventListener('change', repopulateForms);
-  formSelect.addEventListener('change', refreshResponseSummary);
+  partnerSelect.addEventListener('change', function() {
+    repopulateForms({
+      resetPrivateKey: true,
+      resetReason: 'Private key cleared because partner changed. Paste the key for the selected partner/form.',
+    });
+  });
+  typeSelect.addEventListener('change', function() {
+    repopulateForms({
+      resetPrivateKey: true,
+      resetReason: 'Private key cleared because response type changed. Paste the key for the selected form.',
+    });
+  });
+  formSelect.addEventListener('change', function() {
+    maybeResetPrivateKey('Private key cleared because form changed. Paste the key required by this form.');
+    refreshResponseSummary();
+  });
   downloadBtn.addEventListener('click', function() { handleDownload(); });
   repopulateForms();
 })();

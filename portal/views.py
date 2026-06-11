@@ -33,6 +33,53 @@ import json
 import requests
 
 DASHBOARD_URL_NAME = 'portal:dashboard_users'
+KEY_ROTATION_POLICY_NEW_FORMS_ONLY = 'new_forms_only'
+
+
+def _format_public_key_label(public_key):
+    if not public_key:
+        return 'No key'
+    created_at = public_key.created_at.strftime('%Y-%m-%d') if public_key.created_at else '-'
+    return f"#{public_key.id} ({public_key.fingerprint}, {created_at})"
+
+
+def _extract_public_key_metadata(public_key):
+    if not public_key:
+        return {
+            'public_key_id': None,
+            'public_key_fingerprint': '',
+            'public_key_created_at': None,
+        }
+    return {
+        'public_key_id': public_key.id,
+        'public_key_fingerprint': public_key.fingerprint,
+        'public_key_created_at': public_key.created_at.isoformat() if public_key.created_at else None,
+    }
+
+
+def _partner_has_mentorship_forms(partner):
+    return (
+        PartnerMentorshipFormMentor.objects.filter(partner=partner).exists()
+        or PartnerMentorshipFormMentee.objects.filter(partner=partner).exists()
+    )
+
+
+def _require_rotation_policy_new_forms_only(request, partner):
+    policy = request.POST.get('rotation_policy', '').strip().lower()
+    if policy != KEY_ROTATION_POLICY_NEW_FORMS_ONLY:
+        messages.error(
+            request,
+            'Choose a key rotation policy before creating a public key. Existing forms are never updated automatically.',
+        )
+        return None
+
+    if _partner_has_mentorship_forms(partner):
+        messages.info(
+            request,
+            'Key rotation policy confirmed: existing forms keep their current keys. Use the new key only in newly created forms.',
+        )
+
+    return policy
 
 # A login-required decorator that ignores settings.LOGIN_URL and always
 # redirects to the portal login page.
@@ -325,14 +372,14 @@ def dashboard_mentorship(request):
 
     mentorship_forms_mentor = (
         PartnerMentorshipFormMentor.objects
-        .select_related('partner__organization')
+        .select_related('partner__organization', 'public_key')
         .filter(partner__in=mentorship_enabled_partners, partner__organization__i18n_names__language_code='en')
         .order_by('partner__organization__i18n_names__name', '-created_at')
         .distinct()
     )
     mentorship_forms_mentee = (
         PartnerMentorshipFormMentee.objects
-        .select_related('partner__organization')
+        .select_related('partner__organization', 'public_key')
         .filter(partner__in=mentorship_enabled_partners, partner__organization__i18n_names__language_code='en')
         .order_by('partner__organization__i18n_names__name', '-created_at')
         .distinct()
@@ -359,14 +406,14 @@ def dashboard_mentorship(request):
 
     mentorship_mentor_responses = (
         PartnerMentorshipFormMentorResponse.objects
-        .select_related('partner__organization', 'form', 'user')
+        .select_related('partner__organization', 'form', 'form__public_key', 'user')
         .filter(partner__in=mentorship_enabled_partners, partner__organization__i18n_names__language_code='en')
         .order_by('partner__organization__i18n_names__name', '-created_at')
         .distinct()
     )
     mentorship_mentee_responses = (
         PartnerMentorshipFormMenteeResponse.objects
-        .select_related('partner__organization', 'form', 'user')
+        .select_related('partner__organization', 'form', 'form__public_key', 'user')
         .filter(partner__in=mentorship_enabled_partners, partner__organization__i18n_names__language_code='en')
         .order_by('partner__organization__i18n_names__name', '-created_at')
         .distinct()
@@ -375,6 +422,14 @@ def dashboard_mentorship(request):
     partner_name_map = dict(
         mentorship_enabled_partners.values_list('organization_id', 'organization__i18n_names__name')
     )
+    key_meta_by_id = {
+        key.id: {
+            'public_key_id': key.id,
+            'public_key_fingerprint': key.fingerprint,
+            'public_key_created_at': key.created_at.isoformat() if key.created_at else None,
+        }
+        for key in mentorship_public_keys
+    }
 
     mentor_forms_payload = [
         {
@@ -383,6 +438,7 @@ def dashboard_mentorship(request):
             'partner_name': partner_name_map.get(form.partner.organization_id),
             'created_at': form.created_at.isoformat(),
             'json': form.json,
+            **_extract_public_key_metadata(form.public_key),
         }
         for form in mentorship_forms_mentor
     ]
@@ -393,6 +449,7 @@ def dashboard_mentorship(request):
             'partner_name': partner_name_map.get(form.partner.organization_id),
             'created_at': form.created_at.isoformat(),
             'json': form.json,
+            **_extract_public_key_metadata(form.public_key),
         }
         for form in mentorship_forms_mentee
     ]
@@ -411,6 +468,12 @@ def dashboard_mentorship(request):
             'id': response.id,
             'partner_id': response.partner.organization_id,
             'form_id': response.form_id,
+            'public_key_id': response.form.public_key_id,
+            'public_key_fingerprint': response.form.public_key.fingerprint if response.form.public_key_id and response.form.public_key else '',
+            'public_key_created_at': response.form.public_key.created_at.isoformat() if response.form.public_key_id and response.form.public_key and response.form.public_key.created_at else None,
+            'encrypted_with_public_key_id': response.encrypted_with_public_key_id_snapshot or response.form.public_key_id,
+            'encrypted_with_public_key_fingerprint': response.encrypted_with_public_key_fingerprint or (response.form.public_key.fingerprint if response.form.public_key_id and response.form.public_key else ''),
+            'encrypted_with_public_key_created_at': (key_meta_by_id.get(response.encrypted_with_public_key_id_snapshot) or key_meta_by_id.get(response.form.public_key_id) or {}).get('public_key_created_at'),
             'username': response.user.username,
             'user_profile': users_table_by_username.get(response.user.username, {}),
             'created_at': response.created_at.isoformat(),
@@ -423,6 +486,12 @@ def dashboard_mentorship(request):
             'id': response.id,
             'partner_id': response.partner.organization_id,
             'form_id': response.form_id,
+            'public_key_id': response.form.public_key_id,
+            'public_key_fingerprint': response.form.public_key.fingerprint if response.form.public_key_id and response.form.public_key else '',
+            'public_key_created_at': response.form.public_key.created_at.isoformat() if response.form.public_key_id and response.form.public_key and response.form.public_key.created_at else None,
+            'encrypted_with_public_key_id': response.encrypted_with_public_key_id_snapshot or response.form.public_key_id,
+            'encrypted_with_public_key_fingerprint': response.encrypted_with_public_key_fingerprint or (response.form.public_key.fingerprint if response.form.public_key_id and response.form.public_key else ''),
+            'encrypted_with_public_key_created_at': (key_meta_by_id.get(response.encrypted_with_public_key_id_snapshot) or key_meta_by_id.get(response.form.public_key_id) or {}).get('public_key_created_at'),
             'username': response.user.username,
             'user_profile': users_table_by_username.get(response.user.username, {}),
             'created_at': response.created_at.isoformat(),
@@ -706,7 +775,10 @@ def mentorship_form_create(request):
         messages.error(request, 'Invalid form type.')
         return redirect("portal:dashboard_mentorship")
 
-    messages.success(request, f'Mentorship {form_type} form saved for {partner.name}.')
+    messages.success(
+        request,
+        f'Mentorship {form_type} form saved for {partner.name} using public key {_format_public_key_label(public_key)}.',
+    )
     return redirect("portal:dashboard_mentorship")
 
 
@@ -801,7 +873,10 @@ def mentorship_form_update(request):
 
     form_obj.json = parsed_json
     form_obj.save(update_fields=['json'])
-    messages.success(request, f'Mentorship {form_type} form updated for {partner.name}.')
+    messages.success(
+        request,
+        f'Mentorship {form_type} form updated for {partner.name}. Public key remains {_format_public_key_label(form_obj.public_key)}.',
+    )
     return redirect("portal:dashboard_mentorship")
 
 
@@ -825,6 +900,9 @@ def mentorship_public_key_add(request):
     if scope_check:
         return scope_check
 
+    if not _require_rotation_policy_new_forms_only(request, partner):
+        return redirect("portal:dashboard_mentorship")
+
     # After this point, we have a valid partner and permissions; validate the public key before saving
 
     try:
@@ -837,8 +915,11 @@ def mentorship_public_key_add(request):
         messages.error(request, 'Only RSA public keys are supported.')
         return redirect("portal:dashboard_mentorship")
 
-    PartnerMentorshipPublicKey.objects.create(partner=partner, public_key=public_key_text)
-    messages.success(request, f'Public key saved for {partner.name}.')
+    key_record = PartnerMentorshipPublicKey.objects.create(partner=partner, public_key=public_key_text)
+    messages.success(
+        request,
+        f'Public key {_format_public_key_label(key_record)} saved for {partner.name}. Existing forms keep their current keys; use this key only in new forms.',
+    )
     return redirect("portal:dashboard_mentorship")
 
 
@@ -862,6 +943,9 @@ def mentorship_public_key_generate(request):
     scope_check = _require_partner_scope(request, partner)
     if scope_check:
         return scope_check
+
+    if not _require_rotation_policy_new_forms_only(request, partner):
+        return redirect("portal:dashboard_mentorship")
 
     # After this point, we have a valid partner and permissions; validate delivery option before generating keys
 
@@ -907,10 +991,22 @@ def mentorship_public_key_generate(request):
             return redirect("portal:dashboard_mentorship")
 
         if delivery == 'email':
-            messages.success(request, f'Private key sent to {email_to}.')
+            messages.success(
+                request,
+                f'Private key for {_format_public_key_label(key_record)} sent to {email_to}. Existing forms keep their current keys; use this key only in new forms.',
+            )
             return redirect("portal:dashboard_mentorship")
 
-        messages.success(request, f'Private key sent to {email_to}. Download will start now.')
+        messages.success(
+            request,
+            f'Private key for {_format_public_key_label(key_record)} sent to {email_to}. Download will start now. Existing forms keep their current keys.',
+        )
+
+    if delivery == 'download':
+        messages.success(
+            request,
+            f'Key pair generated for {partner.name}: {_format_public_key_label(key_record)}. Existing forms keep their current keys.',
+        )
 
     filename = f'mentorship-private-key-{key_record.id}.pem'
     response = HttpResponse(private_pem, content_type='application/x-pem-file')

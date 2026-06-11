@@ -3,7 +3,15 @@ from django.test import TestCase
 from rest_framework import status
 from rest_framework.test import APIClient
 from portal.views_api import PartnerViewSet, PartnerMentorshipFormMentorViewSet, PartnerMentorshipFormMenteeViewSet, PartnerMentorshipFormMentorResponseViewSet, PartnerMentorshipFormMenteeResponseViewSet
-from portal.models import PartnerMentorshipPublicKey, Partner, PartnerMentorshipFormMentor, PartnerMentorshipFormMentee, PartnerMentorshipSettings
+from portal.models import (
+    PartnerMentorshipPublicKey,
+    Partner,
+    PartnerMentorshipFormMentor,
+    PartnerMentorshipFormMentorResponse,
+    PartnerMentorshipFormMentee,
+    PartnerMentorshipFormMenteeResponse,
+    PartnerMentorshipSettings,
+)
 from orgs.models import Organization
 from users.models import CustomUser, Territory
 from django.contrib.auth import get_user_model
@@ -69,6 +77,8 @@ class PartnerMentorshipFormViewSetTestCase(TestCase):
         self.assertEqual(len(response.data['results']), 1)
         self.assertEqual(response.data['results'][0]['id'], self.mentor_form.id)
         self.assertEqual(response.data['results'][0]['json'], {"question": "mentor?"})
+        self.assertEqual(response.data['results'][0]['public_key_id'], self.public_key.id)
+        self.assertEqual(response.data['results'][0]['public_key_fingerprint'], self.public_key.fingerprint)
 
     def test_list_mentee_forms(self):
         response = self.client.get(f"/mentorship_form_mentee/?partner={self.organization.id}")
@@ -76,6 +86,8 @@ class PartnerMentorshipFormViewSetTestCase(TestCase):
         self.assertEqual(len(response.data['results']), 1)
         self.assertEqual(response.data['results'][0]['id'], self.mentee_form.id)
         self.assertEqual(response.data['results'][0]['json'], {"question": "mentee?"})
+        self.assertEqual(response.data['results'][0]['public_key_id'], self.public_key.id)
+        self.assertEqual(response.data['results'][0]['public_key_fingerprint'], self.public_key.fingerprint)
 
     def test_list_multiple_mentor_forms(self):
         PartnerMentorshipFormMentor.objects.create(partner=self.partner, public_key=self.public_key, json={"question": "mentor2?"})
@@ -107,6 +119,10 @@ class PartnerMentorshipFormViewSetTestCase(TestCase):
         )
         self.assertEqual(response.status_code, status.HTTP_201_CREATED)
         self.assertEqual(response.data["form"], self.mentor_form.id)
+        self.assertEqual(response.data['public_key_id'], self.public_key.id)
+        self.assertEqual(response.data['public_key_fingerprint'], self.public_key.fingerprint)
+        self.assertEqual(response.data['encrypted_with_public_key_id'], self.public_key.id)
+        self.assertEqual(response.data['encrypted_with_public_key_fingerprint'], self.public_key.fingerprint)
 
         encrypted = response.data["data"]
         if isinstance(encrypted, str):
@@ -133,6 +149,10 @@ class PartnerMentorshipFormViewSetTestCase(TestCase):
 
         self.assertEqual(decrypted_payload["answer"], "I can mentor")        
 
+        stored = PartnerMentorshipFormMentorResponse.objects.get(form=self.mentor_form, user=self.user)
+        self.assertEqual(stored.encrypted_with_public_key_id_snapshot, self.public_key.id)
+        self.assertEqual(stored.encrypted_with_public_key_fingerprint, self.public_key.fingerprint)
+
     def test_submit_mentee_response(self):
         response = self.client.post(
             "/mentorship_form_mentee_response/",
@@ -141,6 +161,10 @@ class PartnerMentorshipFormViewSetTestCase(TestCase):
         )
         self.assertEqual(response.status_code, status.HTTP_201_CREATED)
         self.assertEqual(response.data['form'], self.mentee_form.id)
+        self.assertEqual(response.data['public_key_id'], self.public_key.id)
+        self.assertEqual(response.data['public_key_fingerprint'], self.public_key.fingerprint)
+        self.assertEqual(response.data['encrypted_with_public_key_id'], self.public_key.id)
+        self.assertEqual(response.data['encrypted_with_public_key_fingerprint'], self.public_key.fingerprint)
         
         encrypted = response.data["data"]
         if isinstance(encrypted, str):
@@ -166,6 +190,10 @@ class PartnerMentorshipFormViewSetTestCase(TestCase):
         decrypted_payload = json.loads(plaintext.decode("utf-8"))
 
         self.assertEqual(decrypted_payload["answer"], "I need mentorship")        
+
+        stored = PartnerMentorshipFormMenteeResponse.objects.get(form=self.mentee_form, user=self.user)
+        self.assertEqual(stored.encrypted_with_public_key_id_snapshot, self.public_key.id)
+        self.assertEqual(stored.encrypted_with_public_key_fingerprint, self.public_key.fingerprint)
 
 
 class PartnerSettingsViewSetTestCase(TestCase):

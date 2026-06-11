@@ -63,6 +63,9 @@ class PartnerSettingsSerializer(serializers.ModelSerializer):
 class PartnerMentorshipFormMentorSerializer(serializers.ModelSerializer):
     organization = serializers.IntegerField(source='partner.organization.id', read_only=True)
     counter = serializers.SerializerMethodField()
+    public_key_id = serializers.IntegerField(source='public_key.id', read_only=True, allow_null=True)
+    public_key_fingerprint = serializers.CharField(source='public_key.fingerprint', read_only=True, allow_blank=True, allow_null=True)
+    public_key_created_at = serializers.DateTimeField(source='public_key.created_at', read_only=True, allow_null=True)
 
     class Meta:
         model = PartnerMentorshipFormMentor
@@ -70,6 +73,9 @@ class PartnerMentorshipFormMentorSerializer(serializers.ModelSerializer):
             'id',
             'organization',
             'counter',
+            'public_key_id',
+            'public_key_fingerprint',
+            'public_key_created_at',
             'json',
             'created_at',
         ]
@@ -82,6 +88,9 @@ class PartnerMentorshipFormMentorSerializer(serializers.ModelSerializer):
 class PartnerMentorshipFormMenteeSerializer(serializers.ModelSerializer):
     organization = serializers.IntegerField(source='partner.organization.id', read_only=True)
     counter = serializers.SerializerMethodField()
+    public_key_id = serializers.IntegerField(source='public_key.id', read_only=True, allow_null=True)
+    public_key_fingerprint = serializers.CharField(source='public_key.fingerprint', read_only=True, allow_blank=True, allow_null=True)
+    public_key_created_at = serializers.DateTimeField(source='public_key.created_at', read_only=True, allow_null=True)
 
     class Meta:
         model = PartnerMentorshipFormMentee
@@ -89,6 +98,9 @@ class PartnerMentorshipFormMenteeSerializer(serializers.ModelSerializer):
             'id',
             'organization',
             'counter',
+            'public_key_id',
+            'public_key_fingerprint',
+            'public_key_created_at',
             'json',
             'created_at',
         ]
@@ -101,6 +113,11 @@ class PartnerMentorshipFormMenteeSerializer(serializers.ModelSerializer):
 
 class PartnerMentorshipFormMentorResponseSerializer(serializers.ModelSerializer):
     user = serializers.HiddenField(default=serializers.CurrentUserDefault())
+    public_key_id = serializers.IntegerField(source='form.public_key_id', read_only=True, allow_null=True)
+    public_key_fingerprint = serializers.CharField(source='form.public_key.fingerprint', read_only=True, allow_blank=True, allow_null=True)
+    public_key_created_at = serializers.DateTimeField(source='form.public_key.created_at', read_only=True, allow_null=True)
+    encrypted_with_public_key_id = serializers.IntegerField(source='encrypted_with_public_key_id_snapshot', read_only=True, allow_null=True)
+    encrypted_with_public_key_fingerprint = serializers.CharField(read_only=True, allow_blank=True, allow_null=True)
 
     class Meta:
         model = PartnerMentorshipFormMentorResponse
@@ -108,11 +125,21 @@ class PartnerMentorshipFormMentorResponseSerializer(serializers.ModelSerializer)
             'form',
             'data',
             'user',
+            'public_key_id',
+            'public_key_fingerprint',
+            'public_key_created_at',
+            'encrypted_with_public_key_id',
+            'encrypted_with_public_key_fingerprint',
         ]
 
 
 class PartnerMentorshipFormMenteeResponseSerializer(serializers.ModelSerializer):
     user = serializers.HiddenField(default=serializers.CurrentUserDefault())
+    public_key_id = serializers.IntegerField(source='form.public_key_id', read_only=True, allow_null=True)
+    public_key_fingerprint = serializers.CharField(source='form.public_key.fingerprint', read_only=True, allow_blank=True, allow_null=True)
+    public_key_created_at = serializers.DateTimeField(source='form.public_key.created_at', read_only=True, allow_null=True)
+    encrypted_with_public_key_id = serializers.IntegerField(source='encrypted_with_public_key_id_snapshot', read_only=True, allow_null=True)
+    encrypted_with_public_key_fingerprint = serializers.CharField(read_only=True, allow_blank=True, allow_null=True)
 
     class Meta:
         model = PartnerMentorshipFormMenteeResponse
@@ -120,4 +147,9 @@ class PartnerMentorshipFormMenteeResponseSerializer(serializers.ModelSerializer)
             'form',
             'data',
             'user',
+            'public_key_id',
+            'public_key_fingerprint',
+            'public_key_created_at',
+            'encrypted_with_public_key_id',
+            'encrypted_with_public_key_fingerprint',
         ]
