@@ -3,8 +3,54 @@ from rest_framework.response import Response
 from rest_framework import status
 from datetime import timedelta
 from django.utils.timezone import now
+from django.conf import settings
 from drf_spectacular.utils import extend_schema
 from users.models import AuthExtraInfo
+from urllib.parse import urlparse
+
+
+def normalize_oauth_extra_host(raw_extra):
+    if not isinstance(raw_extra, str):
+        return None
+
+    value = raw_extra.strip().lower()
+    if not value:
+        return None
+
+    if '://' in value:
+        parsed = urlparse(value)
+        if parsed.scheme not in {'http', 'https'}:
+            return None
+        if parsed.path not in {'', '/'} or parsed.query or parsed.fragment or parsed.params:
+            return None
+    else:
+        if any(char in value for char in ['/', '?', '#', '@']):
+            return None
+        parsed = urlparse(f'//{value}')
+
+    try:
+        host = parsed.hostname
+        port = parsed.port
+    except ValueError:
+        return None
+
+    if not host:
+        return None
+
+    if port is not None and not (1 <= port <= 65535):
+        return None
+
+    if host in frozenset({'localhost', '127.0.0.1'}):
+        return f'{host}:{port}' if port else host
+
+    allowed_hosts = {
+        host.lower() for host in getattr(settings, 'OAUTH_EXTRA_ALLOWED_HOSTS', [])
+    }
+    if port is not None:
+        return None
+    if host in allowed_hosts:
+        return host
+    return None
     
 
 class AuthView(SocialKnoxOnlyAuthView):
@@ -17,7 +63,10 @@ class AuthView(SocialKnoxOnlyAuthView):
                 'required': True,
                 'description': 'The provider of the OAuth token. This can be only "mediawiki".'
             },
-            'extra': {'type': 'string', 'description': 'Extra information to store with the token'},
+            'extra': {
+                'type': 'string',
+                'description': 'Optional post-callback host. Must be in OAUTH_EXTRA_ALLOWED_HOSTS or localhost/127.0.0.1 (any port).',
+            },
         },
     }
 
@@ -40,12 +89,26 @@ class AuthView(SocialKnoxOnlyAuthView):
         }}
     )
     def post(self, request, *args, **kwargs):
+        normalized_extra = None
+        if request.data.get('extra'):
+            normalized_extra = normalize_oauth_extra_host(request.data['extra'])
+            if not normalized_extra:
+                return Response(
+                    {
+                        'error': (
+                            'Invalid extra host. Allowed hosts are OAUTH_EXTRA_ALLOWED_HOSTS '
+                            'plus localhost/127.0.0.1 with optional port.'
+                        )
+                    },
+                    status=status.HTTP_400_BAD_REQUEST,
+                )
+
         response = super().post(request, *args, **kwargs)
         AuthExtraInfo.objects.filter(created_at__lt=now() - timedelta(minutes=5)).delete()
-        if request.data.get('extra'):
+        if normalized_extra:
             AuthExtraInfo.objects.create(
                 token=response.data['oauth_token'],
-                extra=request.data['extra']
+                extra=normalized_extra
             )
         return response
 

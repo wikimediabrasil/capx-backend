@@ -108,6 +108,11 @@ LOGIN_REDIRECT_URL = 'homepage'
 
 SOCIAL_AUTH_URL_NAMESPACE = 'social'
 SOCIAL_AUTH_PROTECTED_USER_FIELDS=["groups"]
+OAUTH_EXTRA_ALLOWED_HOSTS = tuple(
+    host.strip().lower()
+    for host in os.environ.get('OAUTH_EXTRA_ALLOWED_HOSTS', 'capx.toolforge.org,capx-test.toolforge.org').split(',')
+    if host.strip()
+)
 
 # Password validation
 # https://docs.djangoproject.com/en/4.2/ref/settings/#auth-password-validators
@@ -170,7 +175,7 @@ REST_KNOX = {'TOKEN_TTL': timedelta(days=30)}
 SPECTACULAR_SETTINGS = {
     'TITLE': 'Capacity Exchange (CapX) API',
     'DESCRIPTION': 'The Capacity Exchange (CapX) is a platform for finding and connecting with fellow Wikimedians to exchange knowledge, skills, and services on a global level.',
-    'VERSION': '2.2.26',
+    'VERSION': '2.2.27',
     'SERVE_INCLUDE_SCHEMA': True,
     'SWAGGER_UI_DIST': 'SIDECAR',
     'SWAGGER_UI_FAVICON_HREF': 'SIDECAR',

@@ -11,6 +11,7 @@ The Capacity Exchange (CapX) is available in Toolforge at https://capx.toolforge
 - [Getting Started](#getting-started)
     - [Prerequisites](#prerequisites)
     - [Installation](#installation)
+- [API Documentation](#api-documentation)
 - [Contributing](#contributing)
 - [License](#license)
 
@@ -95,6 +96,18 @@ To create a new OAuth app and key, go to https://meta.wikimedia.org/wiki/Special
     ```
 
 You should now be able to access the project at http://127.0.0.1:8000/ in your web browser.
+
+## API Documentation
+
+The API documentation is organized in two layers:
+
+- Interactive OpenAPI reference:
+   - Swagger UI: `/`
+   - Raw schema: `/schema/`
+- Task-oriented guides inside this repository:
+   - [docs/README.md](docs/README.md)
+
+If you change API behavior, update OpenAPI annotations and the corresponding guides in the same pull request.
 
 ## Contributing
 Contributions are welcome! To contribute to the Capacity Exchange, follow these steps:
