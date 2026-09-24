@@ -1,7 +1,7 @@
 from django.test import TestCase
 from unittest.mock import patch, MagicMock
 from users.management.commands.export import Command
-from users.models import Profile, DataHash, Badge, UserBadge
+from users.models import Profile, DataHash, Badge, UserBadge, Territory, Language
 from users.serializers import ProfileSerializer
 from skills.models import Skill
 from users.models import CustomUser
@@ -27,6 +27,12 @@ class CommandTestCase(TestCase):
         profile1 = Profile.objects.get(user=testuser1)
         profile1.skills_known.set([1])
         profile1.skills_available.set([2])
+        territory1 = Territory.objects.create(territory_name='Territory 1')
+        language1 = Language.objects.create(language_name='English', language_code='en')
+        self.territory_id = territory1.id
+        self.language_id = language1.id
+        profile1.territory.set([territory1])
+        profile1.languageproficiency_set.create(language=language1, proficiency='5')
         profile1.save()
 
         profile2 = Profile.objects.get(user=testuser2)
@@ -82,8 +88,8 @@ class CommandTestCase(TestCase):
         meta_wiki_users = ['TestUser1', 'AltUser2']
         formatted_data, skills, badges_meta = self.command.process_profiles(self.profile_serializer.data, meta_wiki_users)
         self.assertEqual(formatted_data, [
-            ['TestUser1', '[1]', '[2]', f'[{self.def_badge_id}]'],
-            ['AltUser2', '[4]', '[5]', f'[{self.def_badge_id}]']
+            ['TestUser1', '[1]', '[2]', f'[{self.def_badge_id}]', f'[{self.territory_id}]', f'[{self.language_id}§5]'],
+            ['AltUser2', '[4]', '[5]', f'[{self.def_badge_id}]', '[]', '[]']
         ])
         self.assertEqual(set(skills), {1, 2, 4, 5})
         self.assertEqual(badges_meta, [[self.def_badge_id, 'Badge1', 'Open Badges - Logo.png', '']])
@@ -98,7 +104,7 @@ class CommandTestCase(TestCase):
     def test_process_profiles_partial_meta_wiki_users(self):
         meta_wiki_users = ['TestUser1']
         formatted_data, skills, badges_meta = self.command.process_profiles(self.profile_serializer.data, meta_wiki_users)
-        self.assertEqual(formatted_data, [['TestUser1', '[1]', '[2]', f'[{self.def_badge_id}]']])
+        self.assertEqual(formatted_data, [['TestUser1', '[1]', '[2]', f'[{self.def_badge_id}]', f'[{self.territory_id}]', f'[{self.language_id}§5]']])
         self.assertEqual(set(skills), {1, 2})
         self.assertEqual(badges_meta, [[self.def_badge_id, 'Badge1', 'Open Badges - Logo.png', '']])
 
@@ -139,7 +145,7 @@ class CommandTestCase(TestCase):
         self.assertEqual(result, [[1, 'Skill1', 'Description1', 'Q1'], [2, 'Skill2', 'Description2', 'Q2']])
 
     def test_create_output_users(self):
-        formatted_data = [['TestUser1', '[1]', '[2]', '[3]']]
+        formatted_data = [['TestUser1', '[1]', '[2]', '[3]', '[Territory 1]', '[1]']]
         result = self.command.create_output_users(formatted_data)
         expected_output = {
             "license": "CC0-1.0",
@@ -150,7 +156,9 @@ class CommandTestCase(TestCase):
                     {"name": "username", "type": "string"},
                     {"name": "skills_known", "type": "string"},
                     {"name": "skills_available", "type": "string"},
-                    {"name": "badges", "type": "string"}
+                    {"name": "badges", "type": "string"},
+                    {"name": "territory", "type": "string"},
+                    {"name": "languages", "type": "string"}
                 ],
             },
             "data": formatted_data,
@@ -326,7 +334,9 @@ class CommandTestCase(TestCase):
                 'TestUser1',
                 '[1]',
                 '[2]',
-                f'[{self.user_badge1.badge.id}, {badge0.badge.id}§1234, {badge1.badge.id}§example, {badge2.badge.id}]'
+                f'[{self.user_badge1.badge.id}, {badge0.badge.id}§1234, {badge1.badge.id}§example, {badge2.badge.id}]',
+                f'[{self.territory_id}]',
+                f'[{self.language_id}§5]'
             ]
         ]
         expected_badges = [
