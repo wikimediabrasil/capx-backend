@@ -1,25 +1,25 @@
 # First API Call
 
-This tutorial helps you make a first successful request and understand how to move between workflow guides and OpenAPI reference.
+This guide helps you make one successful request. It also shows how to move from this guide to Swagger and OpenAPI.
 
 ## Prerequisites
 
-- A running CapX backend instance.
-- Base URL (for production: `https://capx-backend.toolforge.org`).
+- A running CapX backend.
+- Base URL. Example: `https://capx-backend.toolforge.org`.
 
 ## Step 1: Open the API reference
 
-Open Swagger UI in your browser:
+Open Swagger UI in a browser:
 
 - `https://capx-backend.toolforge.org/`
 
-The raw schema is available at:
+The raw schema is at:
 
 - `https://capx-backend.toolforge.org/schema/`
 
 ## Step 2: Make a public GET request
 
-Start with a public endpoint that does not require authentication:
+Use a public endpoint that does not need authentication:
 
 ```bash
 curl -X GET "https://capx-backend.toolforge.org/list/skills/" \
@@ -29,11 +29,11 @@ curl -X GET "https://capx-backend.toolforge.org/list/skills/" \
 Expected result:
 
 - `200 OK`
-- A JSON object mapping skill IDs to labels.
+- A JSON object with skill IDs and labels.
 
 ## Step 3: Try a filtered discovery endpoint
 
-Use tag search to list profiles by a specific tag type and tag ID:
+Use tag search to list profiles by a tag type and tag ID:
 
 ```bash
 curl -X GET "https://capx-backend.toolforge.org/tags/wikimedia_project/1/" \
@@ -47,7 +47,7 @@ Expected result:
 
 ## Step 4: Continue with authenticated workflows
 
-For write operations (create, update, delete), continue with:
+For write actions, continue with:
 
 - [Authenticate with MediaWiki OAuth + Knox](../how-to/authenticate-with-mediawiki-oauth-knox.md)
 
@@ -55,8 +55,8 @@ For write operations (create, update, delete), continue with:
 
 - Problem: `404 Not Found`
   - Cause: wrong route or missing trailing slash.
-  - Fix: confirm the exact path in Swagger UI and keep trailing slashes.
+  - Fix: check the path in Swagger UI and keep the trailing slash.
 
 - Problem: `401 Unauthorized` or `403 Forbidden`
-  - Cause: endpoint requires authentication/permissions.
-  - Fix: follow the auth guide and include `Authorization: Token <token>`.
+  - Cause: the endpoint needs authentication or permission.
+  - Fix: follow the auth guide and send `Authorization: Token <token>`.

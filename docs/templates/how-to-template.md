@@ -1,14 +1,14 @@
 # How to <goal>
 
-## Who is this for
+## Who this guide is for
 
-Describe the audience and required role/permissions.
+Describe the audience and the role or permissions they need.
 
 ## Prerequisites
 
 - API base URL
 - Authentication method
-- Required IDs (user, org, tag, project, etc.)
+- Required IDs, such as user, org, tag, or project IDs
 
 ## Steps
 
@@ -24,7 +24,7 @@ Describe the audience and required role/permissions.
 
    Success check:
 
-   - What confirms this step worked.
+   - State what shows that this step worked.
 
 2. Step title
 
@@ -34,12 +34,12 @@ Describe the audience and required role/permissions.
 
 - Problem: describe a common issue.
   - Cause: likely reason.
-  - Fix: concrete next action.
+  - Fix: the next action.
 
 - Problem: describe another common issue.
   - Cause: likely reason.
-  - Fix: concrete next action.
+  - Fix: the next action.
 
 ## Related reference
 
-- Link to Swagger section and/or schema path.
+- Link to the relevant Swagger section or schema path.

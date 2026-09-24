@@ -1,15 +1,15 @@
 # CapX API Documentation
 
-This folder contains task-oriented API documentation that complements the OpenAPI reference.
+This folder has task-based API guides. Use these guides with the OpenAPI reference.
 
 ## Documentation Map
 
-Use this structure to keep docs useful for both new and advanced integrators:
+Use this structure:
 
-- Tutorials: step-by-step learning paths.
-- How-to guides: practical workflows and recipes.
-- Explanations: concepts and behavior details.
-- Reference: OpenAPI and endpoint-level source of truth.
+- Tutorials: step-by-step learning.
+- How-to guides: practical tasks and examples.
+- Explanations: concepts and behavior.
+- Reference: OpenAPI and endpoint details.
 
 ## Start Here
 
@@ -23,17 +23,17 @@ Use this structure to keep docs useful for both new and advanced integrators:
 
 ## OpenAPI Reference
 
-- Swagger UI (interactive): `/`
-- OpenAPI schema endpoint: `/schema/`
+- Swagger UI: /
+- OpenAPI schema: /schema/
 - Reference notes: [Reference README](reference/README.md)
 
-## Authoring Rules
+## Writing Rules
 
-- Keep guides task-oriented, not endpoint-oriented.
-- Include prerequisites, request examples, expected outcomes, and troubleshooting.
-- Link each workflow step to the relevant endpoint in Swagger/OpenAPI.
-- Prefer real, minimal payloads over large synthetic examples.
+- Write each guide for a task.
+- Include prerequisites, request examples, expected results, and troubleshooting.
+- Link each step to the relevant endpoint in Swagger/OpenAPI.
+- Use short, real examples.
 
-## Contributing a New Guide
+## Add a New Guide
 
 Use the template in [How-to Template](templates/how-to-template.md).

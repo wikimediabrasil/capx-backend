@@ -1,16 +1,16 @@
 # Report a Bug with Attachment
 
-This guide shows how to submit a bug and then upload supporting files.
+This guide shows how to send a bug report and then upload a file with it.
 
-## Who is this for
+## Who this guide is for
 
-Authenticated users and integrators building issue reporting tooling.
+Signed-in users and integrators who build issue reporting tools.
 
 ## Prerequisites
 
-- Auth token in `Authorization: Token <token>`.
-- Base URL (example: `https://capx-backend.toolforge.org`).
-- File to upload (screenshot, log, or reproduction asset).
+- An auth token in `Authorization: Token <token>`.
+- Base URL. Example: `https://capx-backend.toolforge.org`.
+- A file to upload, such as a screenshot, log, or reproduction asset.
 
 ## Step 1: Create a bug report
 
@@ -27,7 +27,7 @@ curl -X POST "https://capx-backend.toolforge.org/bugs/" \
 Expected result:
 
 - `201 Created`
-- Response includes bug ID.
+- The response includes the bug ID.
 
 ## Step 2: Upload an attachment for that bug
 
@@ -40,9 +40,9 @@ curl -X POST "https://capx-backend.toolforge.org/attachment/?bug=<bug_id>" \
 Expected result:
 
 - `201 Created`
-- Attachment linked to the selected bug.
+- The attachment is linked to the selected bug.
 
-## Step 3: Verify your reports
+## Step 3: Check your reports
 
 ```bash
 curl -X GET "https://capx-backend.toolforge.org/bugs/" \
@@ -55,14 +55,14 @@ curl -X GET "https://capx-backend.toolforge.org/attachment/" \
 Expected result:
 
 - `200 OK`
-- Non-staff users see only their own bug/attachment records.
+- Non-staff users see only their own bug and attachment records.
 
 ## Troubleshooting
 
 - Problem: `401 Unauthorized`.
-  - Cause: no token or invalid token.
-  - Fix: authenticate first and use `Authorization: Token <token>`.
+  - Cause: the token is missing or invalid.
+  - Fix: sign in first and use `Authorization: Token <token>`.
 
-- Problem: `400 Bad Request` on attachment create.
-  - Cause: missing `bug` query parameter or missing file form part.
-  - Fix: send `?bug=<id>` and `-F "file=@<path>"` in multipart request.
+- Problem: `400 Bad Request` when you create an attachment.
+  - Cause: the `bug` query parameter or file part is missing.
+  - Fix: send `?bug=<id>` and `-F "file=@<path>"` in the multipart request.

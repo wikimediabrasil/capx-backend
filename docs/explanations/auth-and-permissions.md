@@ -1,53 +1,53 @@
 # Authentication and Permissions Model
 
-This page explains how access control works in CapX so integrators can anticipate authorization outcomes.
+This page explains how access control works in CapX. It helps integrators predict when a request will be allowed.
 
-## Authentication Methods
+## Authentication methods
 
-CapX is configured with:
+CapX uses:
 
 - Knox token authentication
 - Django REST Framework session authentication
 
-Practical impact:
+This has a practical effect:
 
-- Public read access is available on many endpoints.
-- Write operations usually require authenticated users.
-- Some write operations require staff or organization-manager roles.
+- Many read endpoints are public.
+- Write actions usually need an authenticated user.
+- Some write actions need staff or organization-manager roles.
 
-## Permission Baseline
+## Permission baseline
 
-Global REST framework default permission is:
+The global REST framework default permission is:
 
 - `IsAuthenticatedOrReadOnly`
 
 This means:
 
-- `GET/HEAD/OPTIONS` are often public.
-- `POST/PUT/DELETE` usually need authentication.
+- `GET`, `HEAD`, and `OPTIONS` are often public.
+- `POST`, `PUT`, and `DELETE` usually need authentication.
 
-Some viewsets override this with stricter rules (for example bug and attachment endpoints require authentication for all operations).
+Some viewsets use stricter rules. For example, bug and attachment endpoints need authentication for all actions.
 
-## Role-Sensitive Operations
+## Role-sensitive operations
 
 Common patterns in the codebase:
 
 - Staff-only actions:
-  - Creating/deleting organization records.
-  - Updating/deleting bug reports and attachments.
+  - Create or delete organization records.
+  - Update or delete bug reports and attachments.
 
 - Manager-or-staff actions:
-  - Creating/updating/deleting projects linked to managed organizations.
-  - Managing project members and acceptances with organization constraints.
+  - Create, update, or delete projects for managed organizations.
+  - Manage project members and acceptances with organization rules.
 
-## Error Semantics
+## Error meanings
 
-- `401 Unauthorized`: authentication missing/invalid.
-- `403 Forbidden`: authenticated but not allowed for the role/resource.
-- `400 Bad Request`: payload or business-rule validation failure.
+- `401 Unauthorized`: authentication is missing or invalid.
+- `403 Forbidden`: the user is signed in, but is not allowed for this role or resource.
+- `400 Bad Request`: the payload or business rule is not valid.
 
-## Integration Tips
+## Integration tips
 
-- Treat role checks as dynamic: users may gain/lose manager/staff status.
-- Surface clear UX guidance for `403` responses (who should perform the action).
-- Keep retry logic for `401` (token refresh/re-auth) separate from `403` (permission issue).
+- Treat role checks as dynamic. Users can gain or lose manager or staff status.
+- Show clear guidance for `403` responses. Tell the user who should perform the action.
+- Keep retry logic for `401` separate from `403`. A `401` often needs a new token.

@@ -1,6 +1,6 @@
 from django.core.management.base import BaseCommand
 from users.serializers import ProfileSerializer
-from users.models import Profile, DataHash
+from users.models import Profile, DataHash, Territory, Language
 from skills.models import Skill
 from users.models import CustomUser, UserBadge
 from CapX.useragent import get_user_agent
@@ -53,14 +53,26 @@ class Command(BaseCommand):
         export_rows = []
         badge_meta_map = {}
 
+        def profile_location_data(profile):
+            territory = self.format_list([
+                territory_id for territory_id in profile.get('territory', [])
+            ])
+            languages = self.format_list([
+                f"{item['id']}§{item['proficiency']}" for item in profile.get('language', [])
+            ])
+            return territory, languages
+
         # First pass - process regular usernames
         for profile in profiles:
             username = profile['user']['username']
             if username in meta_wiki_users:
+                territory, languages = profile_location_data(profile)
                 data = [
                     username,
                     self.format_list(profile['skills_known']),
                     self.format_list(profile['skills_available']),
+                    territory,
+                    languages,
                 ]
                 export_rows.append((data, username))  # (dados, username_principal)
                 processed_usernames.add(username)
@@ -73,10 +85,13 @@ class Command(BaseCommand):
             if 'wiki_alt' in profile and profile['wiki_alt'] and profile['wiki_alt'] in meta_wiki_users:
                 alt_username = profile['wiki_alt']
                 if alt_username not in processed_usernames:
+                    territory, languages = profile_location_data(profile)
                     data = [
                         alt_username,
                         self.format_list(profile['skills_known']),
                         self.format_list(profile['skills_available']),
+                        territory,
+                        languages,
                     ]
                     export_rows.append((data, profile['user']['username']))  # (dados, username_principal)
                     processed_usernames.add(alt_username)
@@ -125,7 +140,7 @@ class Command(BaseCommand):
                 badges_for_user.pop()
                 formatted_badges = self.format_list(badges_for_user)
 
-            data.append(formatted_badges)
+            data.insert(3, formatted_badges)
             formatted_data.append(data)
         
         if self.verbosity >= 2:
@@ -266,7 +281,9 @@ class Command(BaseCommand):
                     {"name": "username", "type": "string"},
                     {"name": "skills_known", "type": "string"},
                     {"name": "skills_available", "type": "string"},
-                    {"name": "badges", "type": "string"}
+                    {"name": "badges", "type": "string"},
+                    {"name": "territory", "type": "string"},
+                    {"name": "languages", "type": "string"}
                 ],
             },
             "data": formatted_data,
@@ -274,6 +291,43 @@ class Command(BaseCommand):
         if self.verbosity >= 2:
             self.stdout.write(f"Output users: {output_users}")
         return output_users
+
+    def create_output_territories(self):
+        formatted_data = [
+            [territory.id, territory.territory_name]
+            for territory in Territory.objects.all().order_by('id')
+        ]
+        return {
+            "license": "CC0-1.0",
+            "description": {"en": "Territories available in the CapX platform"},
+            "sources": "https://capx.toolforge.org",
+            "schema": {
+                "fields": [
+                    {"name": "id", "type": "number"},
+                    {"name": "name", "type": "string"}
+                ],
+            },
+            "data": formatted_data,
+        }
+
+    def create_output_languages(self):
+        formatted_data = [
+            [language.id, language.language_code, language.language_name]
+            for language in Language.objects.all().order_by('id')
+        ]
+        return {
+            "license": "CC0-1.0",
+            "description": {"en": "Languages available in the CapX platform"},
+            "sources": "https://capx.toolforge.org",
+            "schema": {
+                "fields": [
+                    {"name": "id", "type": "number"},
+                    {"name": "code", "type": "string"},
+                    {"name": "name", "type": "string"}
+                ],
+            },
+            "data": formatted_data,
+        }
 
     def create_output_capacities(self, formatted_data):
         output_capacities = {
@@ -405,6 +459,8 @@ class Command(BaseCommand):
         # Overwrite skills with all skills in the DB instead of only those in use on Meta profiles
         skills = list(Skill.objects.values_list('id', flat=True))
         output_users = self.create_output_users(formatted_data)
+        output_territories = self.create_output_territories()
+        output_languages = self.create_output_languages()
 
         skill_dict = self.get_skill_dict(skills)
         quids = list(skill_dict.keys())
@@ -418,16 +474,22 @@ class Command(BaseCommand):
         current_users_hash = self.hash_data(output_users)
         current_capacities_hash = self.hash_data(output_capacities)
         current_badges_hash = self.hash_data(output_badges)
+        current_territories_hash = self.hash_data(output_territories)
+        current_languages_hash = self.hash_data(output_languages)
 
         # Get previous hashes from the database
         previous_users_hash = self.get_previous_hash('users')
         previous_capacities_hash = self.get_previous_hash('capacities')
         previous_badges_hash = self.get_previous_hash('badges')
+        previous_territories_hash = self.get_previous_hash('territories')
+        previous_languages_hash = self.get_previous_hash('languages')
 
         # Check if data has changed
         if (current_users_hash != previous_users_hash or
             current_capacities_hash != previous_capacities_hash or
-            current_badges_hash != previous_badges_hash):
+            current_badges_hash != previous_badges_hash or
+            current_territories_hash != previous_territories_hash or
+            current_languages_hash != previous_languages_hash):
             if dry_run:
                 # Print JSON instead of saving
                 self.stdout.write("Dry run mode enabled. Outputting JSON data:")
@@ -437,6 +499,10 @@ class Command(BaseCommand):
                 self.stdout.write(json.dumps(output_capacities, indent=4))
                 self.stdout.write("Badges JSON:")
                 self.stdout.write(json.dumps(output_badges, indent=4))
+                self.stdout.write("Territories JSON:")
+                self.stdout.write(json.dumps(output_territories, indent=4))
+                self.stdout.write("Languages JSON:")
+                self.stdout.write(json.dumps(output_languages, indent=4))
             else:
                 session = requests.Session()
                 url = "https://commons.wikimedia.org/w/api.php"
@@ -466,3 +532,19 @@ class Command(BaseCommand):
                         json.dumps(output_badges, indent=4), csrf_token
                     )
                     self.save_current_hash('badges', current_badges_hash)
+
+                if current_territories_hash != previous_territories_hash:
+                    csrf_token = self.get_csrf_token(session, url)
+                    self.edit_page(
+                        session, url, "Data:CapacityExchange/territories.tab", "Updating data",
+                        json.dumps(output_territories, indent=4), csrf_token
+                    )
+                    self.save_current_hash('territories', current_territories_hash)
+
+                if current_languages_hash != previous_languages_hash:
+                    csrf_token = self.get_csrf_token(session, url)
+                    self.edit_page(
+                        session, url, "Data:CapacityExchange/languages.tab", "Updating data",
+                        json.dumps(output_languages, indent=4), csrf_token
+                    )
+                    self.save_current_hash('languages', current_languages_hash)

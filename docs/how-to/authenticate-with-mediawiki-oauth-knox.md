@@ -1,17 +1,17 @@
 # Authenticate with MediaWiki OAuth + Knox
 
-This guide shows the expected two-step social OAuth flow and how to call protected endpoints with the returned token.
+This guide shows a two-step login flow. Use it to call protected endpoints with the token that you receive.
 
-## Who is this for
+## Who this guide is for
 
-Developers integrating user-authenticated actions (bug reports, project management, and other write operations).
+Developers who need signed-in actions, such as bug reports, project work, and other write actions.
 
 ## Prerequisites
 
-- Base URL (example: `https://capx-backend.toolforge.org`).
-- A valid social auth provider supported by your deployment (commonly `mediawiki`).
+- Base URL. Example: `https://capx-backend.toolforge.org`.
+- A supported social login provider. In many cases, this is `mediawiki`.
 
-## Step 1: Start OAuth handshake
+## Step 1: Start the OAuth handshake
 
 Request temporary OAuth credentials:
 
@@ -24,25 +24,25 @@ curl -X POST "https://capx-backend.toolforge.org/api/login/social/knox/" \
   }'
 ```
 
-The `extra` field is optional and is used as a post-callback redirect. Think of it as the app host where login should continue after the OAuth callback.
+The `extra` field is optional. It tells the app where login should continue after the OAuth callback.
 
-CapX stores this value temporarily with the OAuth request token and returns it from `/api/login/social/check/` so the callback page can continue the flow in the right app.
+CapX stores this value for the short term with the OAuth request token. It also returns it from `/api/login/social/check/` so the callback page can continue in the right app.
 
-This is a host routing mechanism for trusted apps, not a general-purpose OAuth server redirect parameter.
+This is a host-routing option for trusted apps. It is not a general OAuth redirect parameter.
 
-For security, `extra` must be either:
+For security, `extra` must be one of these:
 
-- A host in the backend allowlist (`OAUTH_EXTRA_ALLOWED_HOSTS`, for example `capx.toolforge.org` or `capx-test.toolforge.org`). It can be expanded over time for new trusted apps.
-- `localhost` / `127.0.0.1` with or without a port (`localhost:3000`, `localhost:3001`, `127.0.0.1:3002`, etc.).
+- A host in the backend allowlist. Example: `capx.toolforge.org` or `capx-test.toolforge.org`.
+- `localhost` or `127.0.0.1`, with or without a port. Example: `localhost:3000` or `127.0.0.1:3002`.
 
 Expected result:
 
 - `200 OK`
-- Response contains temporary OAuth data, including `oauth_token` and `oauth_token_secret`.
+- The response includes temporary OAuth data, such as `oauth_token` and `oauth_token_secret`.
 
 ## Step 2: Complete provider authorization
 
-Redirect the user to the provider authorization URL using the returned temporary token.
+Send the user to the provider authorization URL with the temporary token.
 
 Example URL format for MediaWiki OAuth:
 
@@ -55,9 +55,9 @@ After approval, collect:
 - `oauth_token`
 - `oauth_verifier`
 
-## Step 3: Exchange for CapX auth token
+## Step 3: Exchange the token for a CapX auth token
 
-Complete the user auth step:
+Complete the sign-in step:
 
 ```bash
 curl -X POST "https://capx-backend.toolforge.org/api/login/social/knox_user/" \
@@ -73,7 +73,7 @@ curl -X POST "https://capx-backend.toolforge.org/api/login/social/knox_user/" \
 Expected result:
 
 - `200 OK`
-- Response includes the CapX authentication token used in `Authorization` header.
+- The response includes the CapX auth token for the `Authorization` header.
 
 ## Step 4: Call a protected endpoint
 
@@ -103,10 +103,10 @@ curl -X POST "https://capx-backend.toolforge.org/api/login/social/check/" \
 
 ## Troubleshooting
 
-- Problem: `400` with missing token/verifier info.
-  - Cause: incomplete payload in `knox_user` step.
+- Problem: `400` with missing token or verifier data.
+  - Cause: the `knox_user` payload is incomplete.
   - Fix: include `provider`, `oauth_token`, `oauth_secret`, and `oauth_verifier`.
 
 - Problem: `401 Unauthorized` on protected endpoints.
-  - Cause: missing/expired token or wrong auth header format.
-  - Fix: send `Authorization: Token <capx_token>` and repeat OAuth if needed.
+  - Cause: the token is missing, expired, or in the wrong header format.
+  - Fix: send `Authorization: Token <capx_token>` and repeat the OAuth flow if needed.

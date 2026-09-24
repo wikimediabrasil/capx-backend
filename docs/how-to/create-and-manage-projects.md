@@ -1,16 +1,16 @@
 # Create and Manage Projects
 
-This guide covers the core project workflow: create project, add organization members, and process acceptance.
+This guide covers the main project workflow: create a project, add an organization member, and process acceptance.
 
-## Who is this for
+## Who this guide is for
 
-Organization managers and staff integrating project collaboration flows.
+Organization managers and staff who integrate project collaboration flows.
 
 ## Prerequisites
 
-- Auth token in `Authorization: Token <token>`.
+- An auth token in `Authorization: Token <token>`.
 - At least one valid organization ID.
-- Base URL (example: `https://capx-backend.toolforge.org`).
+- Base URL. Example: `https://capx-backend.toolforge.org`.
 
 ## Step 1: Create a project
 
@@ -30,7 +30,7 @@ Expected result:
 - `201 Created`
 - A project record is created.
 
-## Step 2: Add another organization as project member
+## Step 2: Add another organization as a project member
 
 ```bash
 curl -X POST "https://capx-backend.toolforge.org/project_members/" \
@@ -44,9 +44,9 @@ curl -X POST "https://capx-backend.toolforge.org/project_members/" \
 
 Expected result:
 
-- `201 Created` when caller is allowed.
+- `201 Created` when the caller is allowed.
 
-## Step 3: Accept project membership invitation
+## Step 3: Accept the project membership invitation
 
 ```bash
 curl -X POST "https://capx-backend.toolforge.org/project_member_acceptance/" \
@@ -60,21 +60,21 @@ curl -X POST "https://capx-backend.toolforge.org/project_member_acceptance/" \
 
 Expected result:
 
-- `201 Created` when invited organization manager accepts.
+- `201 Created` when the invited organization manager accepts.
 
-## Step 4: Update or remove project
+## Step 4: Update or remove a project
 
 - Update endpoint: `PUT /projects/{id}/`
 - Delete endpoint: `DELETE /projects/{id}/`
 
-Authorization checks apply based on staff role and organization manager membership.
+Authorization checks depend on staff role and organization manager membership.
 
 ## Troubleshooting
 
-- Problem: `403 Forbidden` during create/update/delete.
-  - Cause: caller is not staff and not manager of relevant organization(s).
-  - Fix: authenticate as authorized manager or staff user.
+- Problem: `403 Forbidden` during create, update, or delete.
+  - Cause: the caller is not staff and is not the manager of the relevant organization.
+  - Fix: sign in as an authorized manager or staff user.
 
-- Problem: `400 Bad Request` creating acceptance.
-  - Cause: acceptance record already exists for the same project member.
-  - Fix: fetch existing acceptance and avoid duplicate create.
+- Problem: `400 Bad Request` when you create an acceptance.
+  - Cause: an acceptance record already exists for the same project member.
+  - Fix: fetch the existing acceptance and avoid a duplicate create.

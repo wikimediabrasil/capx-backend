@@ -1,44 +1,44 @@
 # Versioning and Change Policy
 
-Use this policy to keep API consumers stable while the platform evolves.
+Use this policy to keep API clients stable while the platform changes.
 
-## Source of Truth
+## Source of truth
 
-- Endpoint contracts are defined by OpenAPI at `/schema/`.
+- Endpoint contracts come from OpenAPI at `/schema/`.
 - Human-readable docs in `docs/` explain workflows and integration behavior.
 
-## Suggested Compatibility Rules
+## Suggested compatibility rules
 
 1. Non-breaking changes can ship in normal releases.
 
-- Adding optional request fields.
-- Adding response fields without changing existing meanings.
-- Adding new endpoints.
+- Add optional request fields.
+- Add response fields without changing their meaning.
+- Add new endpoints.
 
-2. Breaking changes require migration guidance.
+2. Breaking changes need migration guidance.
 
-- Renaming/removing fields.
-- Changing field types/semantics.
-- Removing endpoints.
+- Rename or remove fields.
+- Change field types or meaning.
+- Remove endpoints.
 
-3. Deprecation should be explicit.
+3. Deprecation should be clear.
 
 - Mark endpoints as deprecated in OpenAPI where possible.
-- Keep deprecated behavior available for a defined transition period.
-- Provide replacement endpoint and migration steps.
+- Keep deprecated behavior for a defined transition period.
+- Provide a replacement endpoint and migration steps.
 
-## Pull Request Documentation Gate
+## Pull request documentation gate
 
-For any API behavior change, include all relevant artifacts in one pull request:
+For any API behavior change, include all relevant items in one pull request:
 
 1. Code changes.
 2. OpenAPI updates.
 3. Guide updates in `docs/how-to` or `docs/tutorials`.
-4. Changelog note (if your release process includes one).
+4. A changelog note, if your release process uses one.
 
-## Recommended Release Checklist
+## Recommended release checklist
 
-1. Regenerate schema file if tracked in-repo.
-2. Spot-check Swagger examples.
-3. Validate key guides with real requests.
-4. Announce breaking/deprecated changes with upgrade notes.
+1. Regenerate the schema file if it is tracked in the repository.
+2. Check Swagger examples.
+3. Validate the key guides with real requests.
+4. Announce breaking or deprecated changes with upgrade notes.
