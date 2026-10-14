@@ -109,3 +109,35 @@ class Events(models.Model):
 
     def __str__(self):
         return self.name
+
+class Participation(models.Model):
+    user = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.CASCADE,
+        related_name="participations",
+        verbose_name="User",
+        help_text="User participating in the event."
+    )
+    event = models.ForeignKey(
+        Events,
+        on_delete=models.CASCADE,
+        related_name="participants",
+        verbose_name="Event",
+        help_text="Event in which the user is participating."
+    )
+    created_at = models.DateTimeField(
+        auto_now_add=True,
+        verbose_name="Created At",
+        help_text="Time when the participation was created."
+    )
+    updated_at = models.DateTimeField(
+        auto_now=True,
+        verbose_name="Updated At",
+        help_text="Time when the participation was last updated."
+    )
+
+    class Meta:
+        unique_together = ("user", "event")
+
+    def __str__(self):
+        return f"{self.user.username} - {self.event.name}"

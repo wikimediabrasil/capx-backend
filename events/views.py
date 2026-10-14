@@ -1,8 +1,8 @@
 from rest_framework import viewsets, status, permissions
 from rest_framework.response import Response
 from django_filters.rest_framework import DjangoFilterBackend
-from .models import Events
-from .serializers import EventSerializer
+from .models import Events, Participation
+from .serializers import EventSerializer, ParticipationSerializer
 from drf_spectacular.utils import extend_schema, extend_schema_view
 from orgs.models import Organization
 
@@ -68,3 +68,30 @@ class EventViewSet(viewsets.ModelViewSet):
         if not is_manager:
             return Response({"detail": "You do not have permission to delete this event."}, status=status.HTTP_403_FORBIDDEN)
         return super().destroy(request, *args, **kwargs)
+
+
+class ParticipationViewSet(viewsets.ModelViewSet):
+    queryset = Participation.objects.all()
+    serializer_class = ParticipationSerializer
+    permission_classes = [permissions.IsAuthenticated]
+
+    @extend_schema(
+        summary='Create a participation.',
+        description='This endpoint creates a participation.'
+    )
+    def create(self, request, *args, **kwargs):
+        # Only the authenticated user can create a participation for themselves
+        if request.data.get('user') and request.data.get('user') != request.user.id:
+            return Response({"detail": "You can only create a participation for yourself."}, status=status.HTTP_403_FORBIDDEN)
+
+        # Check if user is already participating in the event
+        event_id = request.data.get('event')
+        if not event_id or not Events.objects.filter(id=event_id).exists():
+            return Response({"detail": "The event is blank or does not exist."}, status=status.HTTP_400_BAD_REQUEST)
+        is_participating = Participation.objects.filter(event__id=event_id, user=request.user).exists()
+        if is_participating:
+            return Response({"detail": "You are already participating in this event."}, status=status.HTTP_400_BAD_REQUEST)
+        return super().create(request, *args, **kwargs)
+
+    def perform_create(self, serializer):
+        serializer.save(user=self.request.user)
