@@ -30,7 +30,7 @@ from users.views import (
 )
 from bugs.views import BugViewSet, AttachmentViewSet
 from orgs.views import OrganizationViewSet, OrganizationTypeViewSet, TagDiffViewSet, DocumentViewSet, OrganizationNameViewSet
-from events.views import EventViewSet
+from events.views import EventViewSet, ParticipationViewSet
 from message.views import MessageViewSet
 from projects.views import ProjectViewSet, ProjectMemberViewSet, ProjectMemberAcceptanceViewSet
 from portal.views_api import (
@@ -65,6 +65,7 @@ if 'router' not in globals():
     router.register('users_by_skill', UsersBySkillViewSet, basename='users_by_skill')
     router.register('skills_by_type', SkillByTypeViewSet, basename='skills_by_type')
     router.register('events', EventViewSet)
+    router.register('participations', ParticipationViewSet)
     router.register('messages', MessageViewSet, basename='messages')
     router.register('projects', ProjectViewSet, basename='projects')
     router.register('project_members', ProjectMemberViewSet, basename='project_members')
