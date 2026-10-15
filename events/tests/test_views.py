@@ -1,7 +1,7 @@
 from django.test import TestCase
 from users.models import CustomUser
 from orgs.models import Organization
-from events.models import Events
+from events.models import Events, Participation
 from rest_framework.test import APIClient
 from rest_framework import status
 import secrets
@@ -106,3 +106,29 @@ class EventViewSetTestCase(TestCase):
         self.client.force_authenticate(other_user)
         response = self.client.delete(f'/events/{self.event.pk}/')
         self.assertEqual(response.status_code, status.HTTP_403_FORBIDDEN)
+
+
+class ParticipationViewSetTestCase(TestCase):
+    def setUp(self):
+        self.user = CustomUser.objects.create_user(username='test', password=str(secrets.randbits(16)))
+        self.organization = Organization.objects.create(acronym='TO')
+        self.organization.managers.add(self.user)
+        self.event = Events.objects.create(
+            name='Test Event',
+            organization=self.organization,
+            type_of_location='virtual',
+            time_begin='2023-10-10 10:00:00+00:00',
+            time_end='2023-10-10 12:00:00+00:00'
+        )
+        self.participation = Participation.objects.create(user=self.user, event=self.event)
+        self.client = APIClient()
+        self.client.force_authenticate(self.user)
+
+    def test_list_participations(self):
+        response = self.client.get('/participations/')
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+
+    def test_retrieve_participation(self):
+        response = self.client.get(f'/participations/{self.participation.pk}/')
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(response.data['user'], self.user.id)

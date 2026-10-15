@@ -2,7 +2,7 @@ from django.test import TestCase
 from django.core.exceptions import ValidationError
 from django.core.validators import RegexValidator
 from django.contrib.auth import get_user_model
-from events.models import Events
+from events.models import Events, Participation
 from users.models import CustomUser
 from orgs.models import Organization, OrganizationType, OrganizationName
 from skills.models import Skill
@@ -51,3 +51,44 @@ class EventsModelTest(TestCase):
         self.assertEqual(expected_type_of_location, 'virtual')
         self.assertEqual(expected_time_begin, '2021-10-10 10:00:00+00:00')
         self.assertEqual(expected_time_end, '2021-10-10 12:00:00+00:00')
+
+
+class ParticipationModelTest(TestCase):
+    def setUp(self):
+        # Create a user
+        self.test_user = CustomUser.objects.create_user(username='testuser', password=str(secrets.randbits(16)))
+        self.test_user.save()
+        
+        self.organization_type = OrganizationType.objects.create(type_name='Type 1', type_code='TYPE1')
+        self.organization = Organization.objects.create(
+            acronym='NO',
+            type=self.organization_type,
+        )
+        # Add English translation for organization name
+        OrganizationName.objects.create(
+            organization=self.organization,
+            language_code='en',
+            name='New Organization'
+        )
+
+        # Create an event
+        self.event = Events.objects.create(
+            name='Sample Event',
+            type_of_location='virtual',
+            time_begin='2021-10-10 10:00:00+00:00',
+            time_end='2021-10-10 12:00:00+00:00',
+            organization=self.organization,
+            creator=self.test_user,
+        )
+
+    def test_participation_creation(self):
+        # Create a participation
+        Participation.objects.create(
+            user=self.test_user,
+            event=self.event,
+        )
+
+        # Get the participation
+        participation = Participation.objects.get(user=self.test_user, event=self.event)
+        
+        self.assertEqual(str(participation), f'{self.test_user.username} - {self.event.name}')
