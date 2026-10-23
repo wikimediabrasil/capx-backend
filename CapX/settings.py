@@ -25,6 +25,7 @@ INSTALLED_APPS = [
     'users',
     'skills',
     'events',
+    'campaigns',
     'bugs',
     'orgs',
     'message',
