@@ -73,29 +73,44 @@ class Command(BaseCommand):
 
         created_count = 0
         updated_count = 0
+        unchanged_count = 0
 
         for campaign_data in campaigns_data:
-            campaign, created = Campaign.objects.update_or_create(
-                metabase_qid=campaign_data["qid"],
-                defaults={
-                    "min_start_date": campaign_data["min_start_date"],
-                    "max_end_date": campaign_data["max_end_date"],
-                    "org_qids": campaign_data["orgQids"],
-                    "location_qids": campaign_data["locationQids"],
-                    "language_qids": campaign_data["languageQids"],
-                    "skill_capx_ids": campaign_data["skillCapXIds"],
-                },
+            qid = campaign_data["qid"]
+            defaults = {
+                "min_start_date": campaign_data["min_start_date"],
+                "max_end_date": campaign_data["max_end_date"],
+                "org_qids": campaign_data["orgQids"],
+                "location_qids": campaign_data["locationQids"],
+                "language_qids": campaign_data["languageQids"],
+                "skill_capx_ids": campaign_data["skillCapXIds"],
+            }
+
+            campaign, created = Campaign.objects.get_or_create(
+                metabase_qid=qid,
+                defaults=defaults,
             )
             if created:
                 created_count += 1
                 self.stdout.write(f"Created: {campaign.metabase_qid}")
             else:
-                updated_count += 1
-                self.stdout.write(f"Updated: {campaign.metabase_qid}")
+                changed = False
+                for field, new_value in defaults.items():
+                    current_value = getattr(campaign, field)
+                    if current_value != new_value:
+                        setattr(campaign, field, new_value)
+                        changed = True
+                if changed:
+                    campaign.save()
+                    updated_count += 1
+                    self.stdout.write(f"Updated: {campaign.metabase_qid}")
+                else:
+                    unchanged_count += 1
+                    self.stdout.write(f"No changes: {campaign.metabase_qid}")
 
         self.stdout.write(
             self.style.SUCCESS(
-                f"Sync complete. Created: {created_count}, Updated: {updated_count}"
+                f"Sync complete. Created: {created_count}, Updated: {updated_count}, No changes: {unchanged_count}"
             )
         )
 

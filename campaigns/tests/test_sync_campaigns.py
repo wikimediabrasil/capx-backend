@@ -25,7 +25,7 @@ class TestSyncCampaignsCommand(TestCase):
                     {
                         "qid": {"value": "Q1001"},
                         "minStartDate": {"value": "2024-09-01T00:00:00Z"},
-                        "maxEndDate": {"value": "2024-09-30T23:59:59Z"},
+                        "maxEndDate": {"value": "2024-09-30T00:00:00Z"},
                         "orgQids": {"value": "Q1|Q2"},
                         "locationQids": {"value": "Q3|Q4"},
                         "languageQids": {"value": "Q5|Q6"},
@@ -34,7 +34,7 @@ class TestSyncCampaignsCommand(TestCase):
                     {
                         "qid": {"value": "Q1002"},
                         "minStartDate": {"value": "2024-05-01T00:00:00Z"},
-                        "maxEndDate": {"value": "2024-05-31T23:59:59Z"},
+                        "maxEndDate": {"value": "2024-05-31T00:00:00Z"},
                         "orgQids": {"value": "Q7"},
                         "locationQids": {"value": ""},
                         "languageQids": {"value": "Q8"},
@@ -92,7 +92,7 @@ class TestSyncCampaignsCommand(TestCase):
                     {
                         "qid": {"value": "Q1001"},
                         "minStartDate": {"value": "2024-09-01T00:00:00Z"},
-                        "maxEndDate": {"value": "2024-09-30T23:59:59Z"},
+                        "maxEndDate": {"value": "2024-09-30T00:00:00Z"},
                         "orgQids": {"value": "Q1|Q2"},
                         "locationQids": {"value": "Q3|Q4"},
                         "languageQids": {"value": "Q5|Q6"},
@@ -105,7 +105,7 @@ class TestSyncCampaignsCommand(TestCase):
         output = self.call()
 
         self.assertIn("Updated: Q1001", output)
-        self.assertIn("Sync complete. Created: 0, Updated: 1", output)
+        self.assertIn("Sync complete. Created: 0, Updated: 1, No changes: 0", output)
 
         # Verify only one campaign exists and it's updated
         self.assertEqual(Campaign.objects.count(), 1)
@@ -181,3 +181,31 @@ class TestSyncCampaignsCommand(TestCase):
             "Failed to query Metabase SPARQL endpoint",
         ):
             call_command("sync_campaigns", stdout=out)
+
+    @patch("campaigns.management.commands.sync_campaigns.requests.get")
+    def test_handle_no_changes(self, mock_get):
+        mock_response = MagicMock()
+        mock_response.status_code = 200
+        mock_response.json.return_value = {
+            "results": {
+                "bindings": [
+                    {
+                        "qid": {"value": "Q1001"},
+                        "minStartDate": {"value": "2024-09-01T00:00:00Z"},
+                        "maxEndDate": {"value": "2024-09-30T00:00:00Z"},
+                        "orgQids": {"value": "Q1|Q2"},
+                        "locationQids": {"value": "Q3|Q4"},
+                        "languageQids": {"value": "Q5|Q6"},
+                        "skillCapXIds": {"value": "123|456"},
+                    }
+                ]
+            }
+        }
+        mock_get.return_value = mock_response
+        output1 = self.call()
+        self.assertIn("Created: Q1001", output1)
+        self.assertIn("Sync complete. Created: 1, Updated: 0, No changes: 0", output1)
+        output2 = self.call()
+        self.assertIn("No changes: Q1001", output2)
+        self.assertIn("Sync complete. Created: 0, Updated: 0, No changes: 1", output2)
+        self.assertEqual(Campaign.objects.count(), 1)
