@@ -1,11 +1,56 @@
 import requests
+from datetime import datetime
 from django.core.management.base import BaseCommand, CommandError
 
 from CapX.useragent import get_user_agent
 
-USER_AGENT = get_user_agent("SyncCampaigns")
-
 METABASE_SPARQL_ENDPOINT = "https://metabase.wikibase.cloud/query/sparql"
+
+QUERY = """
+PREFIX wbt: <https://metabase.wikibase.cloud/prop/direct/>
+PREFIX wb: <https://metabase.wikibase.cloud/entity/>
+
+SELECT ?qid
+       (MIN(?startDate) AS ?minStartDate)
+       (MAX(?endDate) AS ?maxEndDate)
+       (GROUP_CONCAT(DISTINCT STRAFTER(STR(?org), STR(wb:)); SEPARATOR="|") AS ?orgQids)
+       (GROUP_CONCAT(DISTINCT STRAFTER(STR(?location), STR(wb:)); SEPARATOR="|") AS ?locationQids)
+       (GROUP_CONCAT(DISTINCT STRAFTER(STR(?language), STR(wb:)); SEPARATOR="|") AS ?languageQids)
+       (GROUP_CONCAT(DISTINCT ?skillCapXId; SEPARATOR="|") AS ?skillCapXIds)
+WHERE {
+    # campaign items
+    ?item wbt:P5 wb:Q22217.
+    BIND(STRAFTER(STR(?item), STR(wb:)) AS ?qid)
+    # date
+    OPTIONAL { ?item wbt:P6 ?startDate. }
+    OPTIONAL { ?item wbt:P7 ?endDate. }
+    OPTIONAL { ?item wbt:P23 ?pointInTime. }
+    BIND(COALESCE(?startDate, ?pointInTime) AS ?startDate)
+    BIND(COALESCE(?endDate, ?pointInTime) AS ?endDate)
+    # info
+    OPTIONAL { ?item wbt:P14 ?org. }
+    OPTIONAL { ?item wbt:P27 ?location. }
+    OPTIONAL { ?item wbt:P52 ?language. }
+    OPTIONAL {
+      # keywords of this campaign mapping to CapX skills
+      ?item wbt:P15 ?keyword.
+      ?skill wbt:P67 ?keyword;
+             wbt:P91 ?skillCapXId.
+    }
+    OPTIONAL {
+      # keywords of the group mapping to CapX skills
+      ?item wbt:P35/wbt:P15 ?keywordOfGroup.
+      ?skill wbt:P67 ?keywordOfGroup;
+             wbt:P91 ?skillCapXId.
+    }
+    # exclude campaign groups (items that have sub-campaigns)
+    MINUS {
+        ?item wbt:P35/wbt:P5 wb:Q22217.
+    }
+}
+GROUP BY ?qid
+ORDER BY ?qid
+"""
 
 
 class Command(BaseCommand):
@@ -25,51 +70,21 @@ class Command(BaseCommand):
         self.stdout.write(f"Found {len(campaigns_data)} campaigns in Metabase.")
 
         for campaign in campaigns_data:
-            self.stdout.write(
-                f"  {campaign['qid']}: {campaign['name'] or '(no label)'} "
-                f"[wikidata: {campaign['wikidata_qid'] or '(none)'}]"
-            )
+            self.stdout.write(f"{campaign['qid']} => {campaign}\n\n")
 
     def fetch_metabase_campaigns(self):
         """
-        Fetch campaigns from Metabase using SPARQL query:
-        ?item wbt:P5/wbt:P4* wb:Q22217
-
-        This finds all items that are instances of (P5) a class that is a subclass of (P4*)
-        Q22217 (campaign type).
+        Fetch campaigns from Metabase using SPARQL query.
         """
-        # SPARQL query to find all campaign items
-        # P5 = instance of
-        # P4 = subclass of
-        # Q22217 = campaign type
-        query = """
-        PREFIX wbt: <https://metabase.wikibase.cloud/prop/direct/>
-        PREFIX wb: <https://metabase.wikibase.cloud/entity/>
-        PREFIX rdfs: <http://www.w3.org/2000/01/rdf-schema#>
-        PREFIX schema: <http://schema.org/>
-
-        SELECT ?item ?itemLabel ?itemDescription ?startDate ?endDate ?image ?wikidataQid ?qid WHERE {
-            ?item wbt:P5/wbt:P4* wb:Q22217.
-            BIND(STRAFTER(STR(?item), STR(wb:)) AS ?qid)
-            OPTIONAL { ?item rdfs:label ?itemLabel. FILTER(LANG(?itemLabel) = "en") }
-            OPTIONAL { ?item schema:description ?itemDescription. FILTER(LANG(?itemDescription) = "en") }
-            OPTIONAL { ?item wbt:P8 ?startDate. }  # start date property
-            OPTIONAL { ?item wbt:P9 ?endDate. }     # end date property
-            OPTIONAL { ?item wbt:P10 ?image. }      # image property
-            OPTIONAL { ?item wbt:P1 ?wikidataQid. } # Wikidata QID property
-        }
-        ORDER BY ?itemLabel
-        """
-
         headers = {
             "Accept": "application/sparql-results+json",
-            "User-Agent": USER_AGENT,
+            "User-Agent": get_user_agent("SyncCampaigns"),
         }
 
         try:
             response = requests.get(
                 METABASE_SPARQL_ENDPOINT,
-                params={"query": query},
+                params={"query": QUERY},
                 headers=headers,
                 timeout=60,
             )
@@ -85,22 +100,31 @@ class Command(BaseCommand):
             if not qid:
                 continue
 
-            name = binding.get("itemLabel", {}).get("value", "")
-            description = binding.get("itemDescription", {}).get("value", "")
-            start_date = binding.get("startDate", {}).get("value")
-            end_date = binding.get("endDate", {}).get("value")
-            image = binding.get("image", {}).get("value")
-            wikidata_qid = binding.get("wikidataQid", {}).get("value")
+            min_start_date = binding.get("minStartDate", {}).get("value", "")
+            max_end_date = binding.get("maxEndDate", {}).get("value", "")
+            org_qids = binding.get("orgQids", {}).get("value", "")
+            location_qids = binding.get("locationQids", {}).get("value", "")
+            language_qids = binding.get("languageQids", {}).get("value", "")
+            skill_capx_ids = binding.get("skillCapXIds", {}).get("value", "")
+
+            try:
+                if min_start_date:
+                    min_start_date = datetime.fromisoformat(min_start_date).date()
+                if max_end_date:
+                    max_end_date = datetime.fromisoformat(max_end_date).date()
+            except ValueError:
+                print(f"failed to parse dates: {qid}")
+                continue
 
             campaigns.append(
                 {
                     "qid": qid,
-                    "name": name,
-                    "description": description,
-                    "start_date": start_date,
-                    "end_date": end_date,
-                    "image_url": image,
-                    "wikidata_qid": wikidata_qid,
+                    "min_start_date": min_start_date,
+                    "max_end_date": max_end_date,
+                    "orgQids": org_qids,
+                    "locationQids": location_qids,
+                    "languageQids": language_qids,
+                    "skillCapXIds": skill_capx_ids,
                 }
             )
 
