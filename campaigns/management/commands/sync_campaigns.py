@@ -1,7 +1,9 @@
-import requests
 from datetime import datetime
+
+import requests
 from django.core.management.base import BaseCommand, CommandError
 
+from campaigns.models import Campaign
 from CapX.useragent import get_user_agent
 
 METABASE_SPARQL_ENDPOINT = "https://metabase.wikibase.cloud/query/sparql"
@@ -19,7 +21,7 @@ SELECT ?qid
        (GROUP_CONCAT(DISTINCT ?skillCapXId; SEPARATOR="|") AS ?skillCapXIds)
 WHERE {
     # campaign items
-    ?item wbt:P5 wb:Q22217.
+    ?item wbt:P5/wbt:P4* wb:Q22217.
     BIND(STRAFTER(STR(?item), STR(wb:)) AS ?qid)
     # date
     OPTIONAL { ?item wbt:P6 ?startDate. }
@@ -55,7 +57,7 @@ ORDER BY ?qid
 
 class Command(BaseCommand):
     help = (
-        "Fetch campaigns from Metabase (Wikibase). "
+        "Fetch campaigns from Metabase (Wikibase) and sync to database. "
         "Queries for items matching: ?item wbt:P5/wbt:P4* wb:Q22217"
     )
 
@@ -69,8 +71,33 @@ class Command(BaseCommand):
 
         self.stdout.write(f"Found {len(campaigns_data)} campaigns in Metabase.")
 
-        for campaign in campaigns_data:
-            self.stdout.write(f"{campaign['qid']} => {campaign}\n\n")
+        created_count = 0
+        updated_count = 0
+
+        for campaign_data in campaigns_data:
+            campaign, created = Campaign.objects.update_or_create(
+                metabase_qid=campaign_data["qid"],
+                defaults={
+                    "min_start_date": campaign_data["min_start_date"],
+                    "max_end_date": campaign_data["max_end_date"],
+                    "org_qids": campaign_data["orgQids"],
+                    "location_qids": campaign_data["locationQids"],
+                    "language_qids": campaign_data["languageQids"],
+                    "skill_capx_ids": campaign_data["skillCapXIds"],
+                },
+            )
+            if created:
+                created_count += 1
+                self.stdout.write(f"Created: {campaign.metabase_qid}")
+            else:
+                updated_count += 1
+                self.stdout.write(f"Updated: {campaign.metabase_qid}")
+
+        self.stdout.write(
+            self.style.SUCCESS(
+                f"Sync complete. Created: {created_count}, Updated: {updated_count}"
+            )
+        )
 
     def fetch_metabase_campaigns(self):
         """
@@ -110,8 +137,12 @@ class Command(BaseCommand):
             try:
                 if min_start_date:
                     min_start_date = datetime.fromisoformat(min_start_date).date()
+                else:
+                    min_start_date = None
                 if max_end_date:
                     max_end_date = datetime.fromisoformat(max_end_date).date()
+                else:
+                    max_end_date = None
             except ValueError:
                 print(f"failed to parse dates: {qid}")
                 continue
