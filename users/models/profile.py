@@ -8,6 +8,7 @@ import requests
 
 from orgs.models import Organization
 from skills.models import Skill
+from campaigns.models import Campaign
 from .reference import Territory, Language, WikimediaProject, Avatar
 from .account import CustomUser
 
@@ -157,6 +158,16 @@ class Profile(models.Model):
         blank=True
     )
 
+    # CAMPAIGNS
+    campaigns = models.ManyToManyField(
+        Campaign,
+        through='ProfileCampaign',
+        related_name='profiles',
+        verbose_name="Campaigns",
+        help_text="Campaigns the user participates in.",
+        blank=True
+    )
+
     # SKILLS
     skills_known = models.ManyToManyField(
         Skill,
@@ -245,6 +256,36 @@ class LanguageProficiency(models.Model):
 
     def __str__(self):
         return f"{self.profile.user.username} - {self.language.language_name}"
+
+
+class ProfileCampaign(models.Model):
+    """
+    Through model linking Profile to Campaign.
+
+    Roles are modeled through Wikidata. The default role
+    is participant (Q56512863).
+    """
+    profile = models.ForeignKey(Profile, on_delete=models.CASCADE, related_name='profile_campaigns')
+    campaign = models.ForeignKey(Campaign, on_delete=models.CASCADE, related_name='campaign_profiles')
+    role_wikidata_qid = models.CharField(
+        verbose_name="Wikidata Qid",
+        max_length=30,
+        help_text="Wikidata Qid of the role the user has on the campaign.",
+        blank=False,
+        default="Q56512863",
+        validators=[RegexValidator(
+            regex=r'^Q[1-9]\d*$',
+            message="Invalid Wikidata Qid format. The format should be Q12345"
+        )]
+    )
+    joined_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        unique_together = ('profile', 'campaign')
+        ordering = ('-joined_at',)
+
+    def __str__(self):
+        return f"ProfileCampaign {self.profile.user.username} - {self.campaign.metabase_qid}"
 
 
 @receiver(post_save, sender=CustomUser)

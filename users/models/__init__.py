@@ -1,7 +1,7 @@
 # Re-export all models for backwards compatibility with `from users.models import ...`
 
 from .account import CustomUser, ActiveUserManager
-from .profile import Profile, LanguageProficiency, ActiveProfileManager
+from .profile import Profile, LanguageProficiency, ActiveProfileManager, ProfileCampaign
 from .social import SavedItem, LetsConnectLog
 from .badges import Badge, UserBadge
 from .reference import (
@@ -15,7 +15,7 @@ from .reference import (
 
 __all__ = [
     'CustomUser', 'ActiveUserManager',
-    'Profile', 'LanguageProficiency', 'ActiveProfileManager',
+    'Profile', 'LanguageProficiency', 'ActiveProfileManager', 'ProfileCampaign',
     'SavedItem', 'LetsConnectLog',
     'Badge', 'UserBadge',
     'Territory', 'Language', 'WikimediaProject', 'Avatar', 'AuthExtraInfo', 'DataHash',

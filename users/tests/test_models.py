@@ -3,9 +3,10 @@ from django.test import TestCase
 from django.db import IntegrityError
 from django.core.exceptions import ValidationError
 from django.db.models.signals import post_save
+from campaigns.models import Campaign
 from orgs.models import Organization, OrganizationType
 from users.models import Territory, Language, WikimediaProject, CustomUser, \
-    Profile, LanguageProficiency, Avatar, DataHash, SavedItem, Badge, UserBadge
+    Profile, LanguageProficiency, Avatar, DataHash, SavedItem, Badge, UserBadge, ProfileCampaign
 from users.models.profile import create_user_profile
 
 
@@ -380,3 +381,56 @@ class UserBadgeModelTest(TestCase):
             str(self.user_badge),
             f"{self.user.username} - {self.badge.name}"
         )
+
+
+class ProfileCampaignModelTest(TestCase):
+    @classmethod
+    def setUpTestData(cls):
+        cls.user = CustomUser.objects._create_user(
+            username="TestUser",
+            email="testuser@example.com",
+            password=str(secrets.randbits(16)),
+        )
+        cls.campaign = Campaign.objects.create(
+            metabase_qid="Q1001",
+        )
+
+    def test_profile_campaign_default_role(self):
+        """Test that the default role_wikidata_qid is Q56512863 (participant)."""
+        profile_campaign = ProfileCampaign.objects.create(
+            profile=self.user.profile,
+            campaign=self.campaign,
+        )
+        self.assertEqual(profile_campaign.role_wikidata_qid, "Q56512863")
+
+    def test_unique_profile_campaign(self):
+        """Test that a profile can only be linked to a campaign once."""
+        ProfileCampaign.objects.create(
+            profile=self.user.profile,
+            campaign=self.campaign,
+        )
+        with self.assertRaises(IntegrityError):
+            ProfileCampaign.objects.create(
+                profile=self.user.profile,
+                campaign=self.campaign,
+            )
+
+    def test_invalid_role_wikidata_qid(self):
+        """Test that invalid Wikidata Qid format raises ValidationError."""
+        profile_campaign = ProfileCampaign(
+            profile=self.user.profile,
+            campaign=self.campaign,
+            role_wikidata_qid="invalid",
+        )
+        with self.assertRaises(ValidationError):
+            profile_campaign.full_clean()
+
+    def test_invalid_role_wikidata_qid_format_q123abc(self):
+        """Test that invalid Wikidata Qid format raises ValidationError."""
+        profile_campaign = ProfileCampaign(
+            profile=self.user.profile,
+            campaign=self.campaign,
+            role_wikidata_qid="Q123abc",
+        )
+        with self.assertRaises(ValidationError):
+            profile_campaign.full_clean()
