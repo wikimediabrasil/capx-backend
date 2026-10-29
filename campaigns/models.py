@@ -47,11 +47,11 @@ class Campaign(models.Model):
         default="",
         help_text="Pipe-separated list of language QIDs from Metabase.",
     )
-    skill_capx_ids = models.TextField(
-        "Skill CapX IDs",
+    skill_wikidata_qids = models.TextField(
+        "Skill Wikidata QIDs",
         blank=True,
         default="",
-        help_text="Pipe-separated list of Skill CapX IDs.",
+        help_text="Pipe-separated list of Skill Wikidata QIDs from Metabase.",
     )
     skills = models.ManyToManyField(
         Skill,
@@ -74,28 +74,28 @@ class Campaign(models.Model):
             return []
         return [item.strip() for item in value.split("|") if item.strip()]
 
-    def sync_skills(self, skill_capx_ids: str) -> list[int]:
+    def sync_skills(self, skill_wikidata_qids: str) -> list[int]:
         """
-        Sync skills for this campaign based on skill_capx_ids.
-        skill_capx_ids is a pipe-separated string of Skill IDs.
-        Silently ignores missing or invalid skill IDs.
+        Sync skills for this campaign based on skill_wikidata_qids.
+        skill_wikidata_qids is a pipe-separated string of Skill Wikidata QIDs.
+        Silently ignores missing or invalid skill QIDs.
 
         Returns:
             List of valid skill IDs that were synced.
         """
-        if not skill_capx_ids:
+        if not skill_wikidata_qids:
             self.skills.clear()
             return []
 
-        skill_ids = [sid.strip() for sid in skill_capx_ids.split("|") if sid.strip()]
+        qids = [qid.strip() for qid in skill_wikidata_qids.split("|") if qid.strip()]
 
         valid_skill_ids = []
-        for skill_id in skill_ids:
+        for qid in qids:
             try:
-                skill = Skill.objects.get(pk=skill_id)
+                skill = Skill.objects.get(skill_wikidata_item=qid)
                 valid_skill_ids.append(skill.id)
             except (Skill.DoesNotExist, ValueError):
-                # Silently ignore missing or invalid skill IDs
+                # Silently ignore missing or invalid skill QIDs
                 pass
 
         if valid_skill_ids:

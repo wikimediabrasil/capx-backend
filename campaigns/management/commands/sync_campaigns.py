@@ -4,6 +4,7 @@ import requests
 from django.core.management.base import BaseCommand, CommandError
 
 from campaigns.models import Campaign
+from skills.models import Skill
 from CapX.useragent import get_user_agent
 
 METABASE_SPARQL_ENDPOINT = "https://metabase.wikibase.cloud/query/sparql"
@@ -18,7 +19,7 @@ SELECT ?qid
        (GROUP_CONCAT(DISTINCT STRAFTER(STR(?org), STR(wb:)); SEPARATOR="|") AS ?orgQids)
        (GROUP_CONCAT(DISTINCT STRAFTER(STR(?location), STR(wb:)); SEPARATOR="|") AS ?locationQids)
        (GROUP_CONCAT(DISTINCT STRAFTER(STR(?language), STR(wb:)); SEPARATOR="|") AS ?languageQids)
-       (GROUP_CONCAT(DISTINCT ?skillCapXId; SEPARATOR="|") AS ?skillCapXIds)
+       (GROUP_CONCAT(DISTINCT ?skillWikidataQid; SEPARATOR="|") AS ?skillWikidataQids)
 WHERE {
     # campaign items
     ?item wbt:P5/wbt:P4* wb:Q22217.
@@ -35,15 +36,15 @@ WHERE {
     OPTIONAL { ?item wbt:P52 ?language. }
     OPTIONAL {
       # keywords of this campaign mapping to CapX skills
-      ?item wbt:P15 ?keyword.
-      ?skill wbt:P67 ?keyword;
-             wbt:P91 ?skillCapXId.
+      ?item wbt:P15/wbt:P1 ?skillWikidataQid.
+      ?skill wbt:P5 wb:Q34531;
+             wbt:P67/wbt:P1 ?skillWikidataQid.
     }
     OPTIONAL {
       # keywords of the group mapping to CapX skills
-      ?item wbt:P35/wbt:P15 ?keywordOfGroup.
-      ?skill wbt:P67 ?keywordOfGroup;
-             wbt:P91 ?skillCapXId.
+      ?item wbt:P35/wbt:P15/wbt:P1 ?skillWikidataQid.
+      ?skill wbt:P5 wb:Q34531;
+             wbt:P67/wbt:P1 ?skillWikidataQid.
     }
     # exclude campaign groups (items that have sub-campaigns)
     MINUS {
@@ -77,7 +78,7 @@ class Command(BaseCommand):
 
         for campaign_data in campaigns_data:
             qid = campaign_data["qid"]
-            skill_ids = campaign_data["skillCapXIds"]
+            skill_wikidata_qids = campaign_data["skillWikidataQids"]
 
             defaults = {
                 "min_start_date": campaign_data["min_start_date"],
@@ -85,7 +86,7 @@ class Command(BaseCommand):
                 "org_qids": campaign_data["orgQids"],
                 "location_qids": campaign_data["locationQids"],
                 "language_qids": campaign_data["languageQids"],
-                "skill_capx_ids": skill_ids,
+                "skill_wikidata_qids": skill_wikidata_qids,
             }
 
             campaign, created = Campaign.objects.get_or_create(
@@ -93,15 +94,15 @@ class Command(BaseCommand):
                 defaults=defaults,
             )
 
-            # Sync skills based on skill_capx_ids using model method
-            expected_skill_ids = [
-                int(sid.strip()) for sid in skill_ids.split("|") if sid.strip().isdigit()
-            ]
-            synced_skill_ids = campaign.sync_skills(skill_ids)
+            # Sync skills based on skill_wikidata_qids using model method
+            skill_qids = [qid.strip() for qid in skill_wikidata_qids.split("|") if qid.strip()]
+            synced_skill_ids = campaign.sync_skills(skill_wikidata_qids)
 
             # Verify all expected skills were synced
-            if expected_skill_ids:
-                missing = set(expected_skill_ids) - set(synced_skill_ids)
+            if skill_qids:
+                missing = set(skill_qids) - set(
+                    Skill.objects.filter(id__in=synced_skill_ids).values_list("skill_wikidata_item", flat=True)
+                )
                 if missing:
                     self.stdout.write(
                         self.style.WARNING(
@@ -166,7 +167,7 @@ class Command(BaseCommand):
             org_qids = binding.get("orgQids", {}).get("value", "")
             location_qids = binding.get("locationQids", {}).get("value", "")
             language_qids = binding.get("languageQids", {}).get("value", "")
-            skill_capx_ids = binding.get("skillCapXIds", {}).get("value", "")
+            skill_wikidata_qids = binding.get("skillWikidataQids", {}).get("value", "")
 
             try:
                 if min_start_date:
@@ -189,7 +190,7 @@ class Command(BaseCommand):
                     "orgQids": org_qids,
                     "locationQids": location_qids,
                     "languageQids": language_qids,
-                    "skillCapXIds": skill_capx_ids,
+                    "skillWikidataQids": skill_wikidata_qids,
                 }
             )
 

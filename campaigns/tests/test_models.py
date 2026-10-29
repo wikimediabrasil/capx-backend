@@ -16,7 +16,7 @@ class TestCampaignModelMethods(TestCase):
             org_qids="Q1|Q2",
             location_qids="Q3",
             language_qids="Q4|Q5|Q6",
-            skill_capx_ids="10|20",
+            skill_wikidata_qids="Q10|Q20",
         )
 
         def array(field):
@@ -25,4 +25,4 @@ class TestCampaignModelMethods(TestCase):
         self.assertEqual(array("org_qids"), ["Q1", "Q2"])
         self.assertEqual(array("location_qids"), ["Q3"])
         self.assertEqual(array("language_qids"), ["Q4", "Q5", "Q6"])
-        self.assertEqual(array("skill_capx_ids"), ["10", "20"])
+        self.assertEqual(array("skill_wikidata_qids"), ["Q10", "Q20"])

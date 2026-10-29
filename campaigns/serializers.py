@@ -9,7 +9,7 @@ class CampaignSerializer(serializers.ModelSerializer):
     org_qids = serializers.SerializerMethodField()
     location_qids = serializers.SerializerMethodField()
     language_qids = serializers.SerializerMethodField()
-    skill_capx_ids = serializers.SerializerMethodField()
+    skill_wikidata_qids = serializers.SerializerMethodField()
 
     class Meta:
         model = Campaign
@@ -21,7 +21,7 @@ class CampaignSerializer(serializers.ModelSerializer):
             "org_qids",
             "location_qids",
             "language_qids",
-            "skill_capx_ids",
+            "skill_wikidata_qids",
             "created_at",
             "updated_at",
         )
@@ -40,8 +40,8 @@ class CampaignSerializer(serializers.ModelSerializer):
         return obj.get_pipe_separated_as_array("language_qids")
 
     @extend_schema_field(serializers.ListField(child=serializers.CharField()))
-    def get_skill_capx_ids(self, obj) -> list[str]:
-        return obj.get_pipe_separated_as_array("skill_capx_ids")
+    def get_skill_wikidata_qids(self, obj) -> list[str]:
+        return obj.get_pipe_separated_as_array("skill_wikidata_qids")
 
 
 class CampaignProfileSerializer(serializers.Serializer):

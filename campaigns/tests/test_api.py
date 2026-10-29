@@ -57,7 +57,7 @@ class CampaignAPITestCase(TestCase):
         self.assertIsInstance(response.data["org_qids"], list)
         self.assertIsInstance(response.data["location_qids"], list)
         self.assertIsInstance(response.data["language_qids"], list)
-        self.assertIsInstance(response.data["skill_capx_ids"], list)
+        self.assertIsInstance(response.data["skill_wikidata_qids"], list)
 
     def test_filter_by_metabase_qid(self):
         """Test filtering campaigns by metabase_qid."""
