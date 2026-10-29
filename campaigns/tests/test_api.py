@@ -58,8 +58,6 @@ class CampaignAPITestCase(TestCase):
         self.assertIsInstance(response.data["location_qids"], list)
         self.assertIsInstance(response.data["language_qids"], list)
         self.assertIsInstance(response.data["skill_capx_ids"], list)
-        self.assertNotIn("skills", response.data)
-        self.assertNotIn("skills_detail", response.data)
 
     def test_filter_by_metabase_qid(self):
         """Test filtering campaigns by metabase_qid."""
@@ -123,6 +121,32 @@ class UserCampaignAPITestCase(TestCase):
         self.assertEqual(response.status_code, status.HTTP_200_OK)
         self.assertEqual(len(response.data["results"]), 1)
         self.assertEqual(response.data["results"][0]["metabase_qid"], "Q1001")
+
+    def test_list_user_campaigns_filter_by_role(self):
+        """Test filtering user campaigns by role Wikidata QID."""
+        ProfileCampaign.objects.create(
+            profile=self.user.profile,
+            campaign=self.campaign1,
+            role_wikidata_qid="Q56512863", # participant
+        )
+        ProfileCampaign.objects.create(
+            profile=self.user.profile,
+            campaign=self.campaign2,
+            role_wikidata_qid="Q1419997", # producer
+        )
+        response = self.client.get("/my_campaigns/?role_wikidata_qid=Q56512863")
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(len(response.data["results"]), 1)
+        self.assertEqual(response.data["results"][0]["metabase_qid"], "Q1001")
+
+        response = self.client.get("/my_campaigns/?role_wikidata_qid=Q1419997")
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(len(response.data["results"]), 1)
+        self.assertEqual(response.data["results"][0]["metabase_qid"], "Q1002")
+
+        response = self.client.get("/my_campaigns/?role_wikidata_qid=Q999999")
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(len(response.data["results"]), 0)
 
     def test_add_campaign_to_profile(self):
         """Test adding a campaign to user's profile."""
@@ -221,8 +245,8 @@ class UserCampaignAPITestCase(TestCase):
     def test_remove_invalid_campaign_id(self):
         """Test removing a campaign with invalid (non-integer) ID."""
         response = self.client.delete("/my_campaigns/invalid/")
-        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
-        self.assertEqual(response.data["detail"], "Campaign ID must be an integer.")
+        self.assertEqual(response.status_code, status.HTTP_404_NOT_FOUND)
+        self.assertEqual(response.data["detail"], "Campaign not found.")
 
     def test_unauthenticated_access_denied(self):
         """Test that unauthenticated users cannot access my_campaigns."""

@@ -35,6 +35,20 @@ class CampaignFilter(django_filters.FilterSet):
         }
 
 
+class UserCampaignFilter(django_filters.FilterSet):
+    """Filter set for UserCampaign model."""
+
+    role_wikidata_qid = django_filters.CharFilter(
+        field_name="campaign_profiles__role_wikidata_qid",
+        lookup_expr="exact",
+        label="Filter by role Wikidata QID",
+    )
+
+    class Meta:
+        model = Campaign
+        fields = []
+
+
 @extend_schema_view(
     list=extend_schema(
         summary="List all campaigns.",
@@ -149,6 +163,8 @@ class UserCampaignViewSet(viewsets.ModelViewSet):
     lookup_field = "id"
     lookup_url_kwarg = "id"
     http_method_names = ("get", "post", "delete", "head", "options")
+    filter_backends = (DjangoFilterBackend,)
+    filterset_class = UserCampaignFilter
 
     def get_serializer_class(self):
         if self.action == "create":
@@ -166,7 +182,12 @@ class UserCampaignViewSet(viewsets.ModelViewSet):
         campaign_id = serializer.validated_data["campaign"]
         role_wikidata_qid = serializer.validated_data.get("role_wikidata_qid", "Q56512863")
 
-        campaign = Campaign.objects.get(pk=campaign_id)
+        try:
+            campaign = Campaign.objects.get(pk=campaign_id)
+        except Campaign.DoesNotExist:
+            return Response(
+                {"detail": "Campaign not found."}, status=status.HTTP_404_NOT_FOUND
+            )
 
         profile = request.user.profile
         if ProfileCampaign.objects.filter(profile=profile, campaign=campaign).exists():
@@ -185,15 +206,10 @@ class UserCampaignViewSet(viewsets.ModelViewSet):
     def destroy(self, request, *args, **kwargs):
         """Remove a campaign from the user's profile."""
         campaign_id = kwargs.get("id")
-        if not str(campaign_id).isdigit():
-            return Response(
-                {"detail": "Campaign ID must be an integer."},
-                status=status.HTTP_400_BAD_REQUEST
-            )
 
         try:
             campaign = Campaign.objects.get(pk=campaign_id)
-        except Campaign.DoesNotExist:
+        except (Campaign.DoesNotExist, ValueError):
             return Response(
                 {"detail": "Campaign not found."}, status=status.HTTP_404_NOT_FOUND
             )
