@@ -73,12 +73,3 @@ class Campaign(models.Model):
         if not value:
             return []
         return [item.strip() for item in value.split("|") if item.strip()]
-
-    def get_all_arrays(self) -> dict[str, list[str]]:
-        pipe_fields = [
-            "org_qids",
-            "location_qids",
-            "language_qids",
-            "skill_capx_ids",
-        ]
-        return {field: self.get_pipe_separated_as_array(field) for field in pipe_fields}

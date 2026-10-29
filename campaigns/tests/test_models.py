@@ -18,8 +18,11 @@ class TestCampaignModelMethods(TestCase):
             language_qids="Q4|Q5|Q6",
             skill_capx_ids="10|20",
         )
-        arrays = campaign.get_all_arrays()
-        self.assertEqual(arrays["org_qids"], ["Q1", "Q2"])
-        self.assertEqual(arrays["location_qids"], ["Q3"])
-        self.assertEqual(arrays["language_qids"], ["Q4", "Q5", "Q6"])
-        self.assertEqual(arrays["skill_capx_ids"], ["10", "20"])
+
+        def array(field):
+            return campaign.get_pipe_separated_as_array(field)
+
+        self.assertEqual(array("org_qids"), ["Q1", "Q2"])
+        self.assertEqual(array("location_qids"), ["Q3"])
+        self.assertEqual(array("language_qids"), ["Q4", "Q5", "Q6"])
+        self.assertEqual(array("skill_capx_ids"), ["10", "20"])
