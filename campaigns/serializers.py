@@ -44,17 +44,20 @@ class CampaignSerializer(serializers.ModelSerializer):
         return obj.get_pipe_separated_as_array("skill_capx_ids")
 
 
-class CampaignProfileSerializer(serializers.ModelSerializer):
+class CampaignProfileSerializer(serializers.Serializer):
     """Serializer for linking a profile to a campaign with role."""
-
+    campaign = serializers.IntegerField(help_text="ID of the campaign to add.")
     role_wikidata_qid = serializers.CharField(
         default="Q56512863",
         help_text="Wikidata Qid of the role (default: Q56512863 - participant).",
+        required=False,
     )
 
-    class Meta:
-        model = Campaign
-        fields = ("id", "metabase_qid", "role_wikidata_qid")
+    def validate_campaign(self, value):
+        """Validate that campaign exists."""
+        if not Campaign.objects.filter(pk=value).exists():
+            raise serializers.ValidationError("Campaign not found.")
+        return value
 
     def validate_role_wikidata_qid(self, value):
         """Validate Wikidata Qid format."""

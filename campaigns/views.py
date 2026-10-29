@@ -1,5 +1,3 @@
-from django.core.exceptions import ValidationError
-from django.core.validators import RegexValidator
 from django_filters import rest_framework as django_filters
 from django_filters.rest_framework import DjangoFilterBackend
 from drf_spectacular.utils import (
@@ -13,12 +11,20 @@ from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
 
 from campaigns.models import Campaign
-from campaigns.serializers import CampaignSerializer
+from campaigns.serializers import CampaignProfileSerializer, CampaignSerializer
+from skills.models import Skill
 from users.models import ProfileCampaign
 
 
 class CampaignFilter(django_filters.FilterSet):
     """Filter set for Campaign model."""
+
+    skills = django_filters.ModelMultipleChoiceFilter(
+        queryset=Skill.objects.all(),
+        field_name="skills",
+        conjoined=False,
+        label="Filter by skill IDs (comma-separated)",
+    )
 
     class Meta:
         model = Campaign
@@ -51,6 +57,12 @@ class CampaignFilter(django_filters.FilterSet):
                 description="Filter by maximum end date (format: YYYY-MM-DD).",
                 required=False,
                 type=OpenApiTypes.DATE,
+            ),
+            OpenApiParameter(
+                name="skills",
+                description="Filter by skill IDs (comma-separated).",
+                required=False,
+                type=OpenApiTypes.STR,
             ),
             OpenApiParameter(
                 name="ordering",
@@ -103,7 +115,16 @@ class CampaignViewSet(viewsets.ReadOnlyModelViewSet):
     ),
     create=extend_schema(
         summary="Add a campaign to the authenticated user's profile.",
-        description="This endpoint adds a campaign to the authenticated user's profile with a role (default: Q56512863 - participant).",
+        description=(
+            "This endpoint adds a campaign to the authenticated user's profile "
+            "with a role (default: Q56512863 - participant).\n\n"
+            "Request body:\n"
+            "- **campaign** (integer, required): ID of the campaign to add\n"
+            "- **role_wikidata_qid** (string, optional): Wikidata QID of the role "
+            "(default: Q56512863)"
+        ),
+        request=CampaignProfileSerializer,
+        responses={201: CampaignSerializer},
     ),
     destroy=extend_schema(
         summary="Remove a campaign from the authenticated user's profile.",
@@ -127,35 +148,25 @@ class UserCampaignViewSet(viewsets.ModelViewSet):
     queryset = Campaign.objects.all()
     lookup_field = "id"
     lookup_url_kwarg = "id"
+    http_method_names = ("get", "post", "delete", "head", "options")
+
+    def get_serializer_class(self):
+        if self.action == "create":
+            return CampaignProfileSerializer
+        return CampaignSerializer
 
     def get_queryset(self):
         return Campaign.objects.filter(profiles__user=self.request.user).distinct()
 
     def create(self, request, *args, **kwargs):
         """Add a campaign to the user's profile."""
-        campaign_id = request.data.get("campaign")
-        role_wikidata_qid = request.data.get("role_wikidata_qid", "Q56512863")
+        serializer = self.get_serializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
 
-        if not campaign_id:
-            return Response(
-                {"detail": "campaign field is required."},
-                status=status.HTTP_400_BAD_REQUEST,
-            )
+        campaign_id = serializer.validated_data["campaign"]
+        role_wikidata_qid = serializer.validated_data.get("role_wikidata_qid", "Q56512863")
 
-        try:
-            campaign = Campaign.objects.get(pk=campaign_id)
-        except Campaign.DoesNotExist:
-            return Response(
-                {"detail": "Campaign not found."}, status=status.HTTP_404_NOT_FOUND
-            )
-
-        validator = RegexValidator(regex=r"^Q[1-9]\d*$", message="Invalid QID")
-        try:
-            validator(role_wikidata_qid)
-        except ValidationError:
-            return Response(
-                {"detail": "Invalid QID"}, status=status.HTTP_400_BAD_REQUEST
-            )
+        campaign = Campaign.objects.get(pk=campaign_id)
 
         profile = request.user.profile
         if ProfileCampaign.objects.filter(profile=profile, campaign=campaign).exists():
@@ -168,7 +179,7 @@ class UserCampaignViewSet(viewsets.ModelViewSet):
             profile=profile, campaign=campaign, role_wikidata_qid=role_wikidata_qid
         )
 
-        serializer = self.get_serializer(campaign)
+        serializer = CampaignSerializer(campaign)
         return Response(serializer.data, status=status.HTTP_201_CREATED)
 
     def destroy(self, request, *args, **kwargs):

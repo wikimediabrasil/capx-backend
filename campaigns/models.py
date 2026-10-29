@@ -73,3 +73,34 @@ class Campaign(models.Model):
         if not value:
             return []
         return [item.strip() for item in value.split("|") if item.strip()]
+
+    def sync_skills(self, skill_capx_ids: str) -> list[int]:
+        """
+        Sync skills for this campaign based on skill_capx_ids.
+        skill_capx_ids is a pipe-separated string of Skill IDs.
+        Silently ignores missing or invalid skill IDs.
+
+        Returns:
+            List of valid skill IDs that were synced.
+        """
+        if not skill_capx_ids:
+            self.skills.clear()
+            return []
+
+        skill_ids = [sid.strip() for sid in skill_capx_ids.split("|") if sid.strip()]
+
+        valid_skill_ids = []
+        for skill_id in skill_ids:
+            try:
+                skill = Skill.objects.get(pk=skill_id)
+                valid_skill_ids.append(skill.id)
+            except (Skill.DoesNotExist, ValueError):
+                # Silently ignore missing or invalid skill IDs
+                pass
+
+        if valid_skill_ids:
+            self.skills.set(valid_skill_ids)
+        else:
+            self.skills.clear()
+
+        return valid_skill_ids

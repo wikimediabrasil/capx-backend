@@ -77,19 +77,38 @@ class Command(BaseCommand):
 
         for campaign_data in campaigns_data:
             qid = campaign_data["qid"]
+            skill_ids = campaign_data["skillCapXIds"]
+
             defaults = {
                 "min_start_date": campaign_data["min_start_date"],
                 "max_end_date": campaign_data["max_end_date"],
                 "org_qids": campaign_data["orgQids"],
                 "location_qids": campaign_data["locationQids"],
                 "language_qids": campaign_data["languageQids"],
-                "skill_capx_ids": campaign_data["skillCapXIds"],
+                "skill_capx_ids": skill_ids,
             }
 
             campaign, created = Campaign.objects.get_or_create(
                 metabase_qid=qid,
                 defaults=defaults,
             )
+
+            # Sync skills based on skill_capx_ids using model method
+            expected_skill_ids = [
+                int(sid.strip()) for sid in skill_ids.split("|") if sid.strip().isdigit()
+            ]
+            synced_skill_ids = campaign.sync_skills(skill_ids)
+
+            # Verify all expected skills were synced
+            if expected_skill_ids:
+                missing = set(expected_skill_ids) - set(synced_skill_ids)
+                if missing:
+                    self.stdout.write(
+                        self.style.WARNING(
+                            f"Campaign {campaign.metabase_qid}: {len(missing)} skill(s) not found in database: {sorted(missing)}"
+                        )
+                    )
+
             if created:
                 created_count += 1
                 self.stdout.write(f"Created: {campaign.metabase_qid}")

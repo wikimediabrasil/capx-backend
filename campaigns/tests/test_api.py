@@ -180,7 +180,8 @@ class UserCampaignAPITestCase(TestCase):
                 "campaign": 99999,
             },
         )
-        self.assertEqual(response.status_code, status.HTTP_404_NOT_FOUND)
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+        self.assertIn("Campaign not found", str(response.data))
 
     def test_add_duplicate_campaign(self):
         """Test adding the same campaign twice."""
