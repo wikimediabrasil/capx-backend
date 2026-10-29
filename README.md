@@ -87,7 +87,7 @@ This will create a SQLite file in your source directory.
    CAPX_BOT_PASSWORD="<YOUR BOT PASSWORD>"
    ```
 
-To create a new OAuth app and key, go to https://meta.wikimedia.org/wiki/Special:OAuthConsumerRegistration .  For local development, you can enable "This consumer is for use only by <your username>" and "User identify verification only".
+To create a new OAuth app and key, go to <https://meta.wikimedia.org/wiki/Special:OAuthConsumerRegistration/propose/oauth1a>. For local development, you MUST NOT enable "This consumer is for use only by <your username>". Set callback as `http://127.0.0.1:3000/oauth/` and check "User identify verification only". Put consumer token and secret as the mediawiki key and secret environment variables.
 
 10. Start the development server:
 
