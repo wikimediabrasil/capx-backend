@@ -14,6 +14,7 @@ from projects.models import Project
 from django.utils import timezone
 from users.models import Profile, CustomUser
 from message.models import Message
+from campaigns.models import Campaign
 from unittest.mock import patch
 
 class ProfileViewSetTestCase(TestCase):
@@ -36,6 +37,25 @@ class ProfileViewSetTestCase(TestCase):
         serializer = ProfileSerializer(profiles.first())
         self.assertEqual(response.status_code, status.HTTP_200_OK)
         self.assertEqual(response.data, serializer.data)
+
+    def test_profile_includes_campaigns(self):
+        """Test that campaigns are included in profile serializer."""
+        campaign1 = Campaign.objects.create(metabase_qid='Q1001')
+        campaign2 = Campaign.objects.create(metabase_qid='Q1002')
+        _campaign3 = Campaign.objects.create(metabase_qid='Q1003')
+        self.user.profile.campaigns.add(campaign1, campaign2)
+        response = self.client.get('/profile/' + str(self.user.pk) + '/')
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertIn('campaigns', response.data)
+        self.assertEqual(len(response.data['campaigns']), 2)
+        self.assertIn(campaign1.id, response.data['campaigns'])
+        self.assertIn(campaign2.id, response.data['campaigns'])
+        response = self.client.get('/users/' + str(self.user.pk) + '/')
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertIn('campaigns', response.data)
+        self.assertEqual(len(response.data['campaigns']), 2)
+        self.assertIn(campaign1.id, response.data['campaigns'])
+        self.assertIn(campaign2.id, response.data['campaigns'])
 
     def test_update_profile(self):
         url = '/profile/' + str(self.user.pk) + '/'
