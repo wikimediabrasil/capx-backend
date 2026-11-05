@@ -51,7 +51,7 @@ class CampaignAPITestCase(TestCase):
 
     def test_retrieve_campaign(self):
         """Test retrieving a single campaign."""
-        response = self.client.get(f"/campaigns/{self.campaign1.id}/")
+        response = self.client.get(f"/campaigns/{self.campaign1.metabase_qid}/")
         self.assertEqual(response.status_code, status.HTTP_200_OK)
         self.assertEqual(response.data["metabase_qid"], "Q1001")
         self.assertIsInstance(response.data["org_qids"], list)
@@ -153,7 +153,7 @@ class UserCampaignAPITestCase(TestCase):
         response = self.client.post(
             "/my_campaigns/",
             {
-                "campaign": self.campaign1.id,
+                "campaign": self.campaign1.metabase_qid,
             },
         )
         self.assertEqual(response.status_code, status.HTTP_201_CREATED)
@@ -168,7 +168,7 @@ class UserCampaignAPITestCase(TestCase):
         response = self.client.post(
             "/my_campaigns/",
             {
-                "campaign": self.campaign1.id,
+                "campaign": self.campaign1.metabase_qid,
                 "role_wikidata_qid": "Q123456",
             },
         )
@@ -184,7 +184,7 @@ class UserCampaignAPITestCase(TestCase):
         response = self.client.post(
             "/my_campaigns/",
             {
-                "campaign": self.campaign1.id,
+                "campaign": self.campaign1.metabase_qid,
                 "role_wikidata_qid": "invalid",
             },
         )
@@ -201,7 +201,7 @@ class UserCampaignAPITestCase(TestCase):
         response = self.client.post(
             "/my_campaigns/",
             {
-                "campaign": 99999,
+                "campaign": "Q99999",
             },
         )
         self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
@@ -217,7 +217,7 @@ class UserCampaignAPITestCase(TestCase):
         response = self.client.post(
             "/my_campaigns/",
             {
-                "campaign": self.campaign1.id,
+                "campaign": self.campaign1.metabase_qid,
             },
         )
         self.assertEqual(response.status_code, status.HTTP_409_CONFLICT)
@@ -229,7 +229,7 @@ class UserCampaignAPITestCase(TestCase):
             campaign=self.campaign1,
             role_wikidata_qid="Q56512863",
         )
-        response = self.client.delete(f"/my_campaigns/{self.campaign1.id}/")
+        response = self.client.delete(f"/my_campaigns/{self.campaign1.metabase_qid}/")
         self.assertEqual(response.status_code, status.HTTP_204_NO_CONTENT)
         self.assertFalse(
             ProfileCampaign.objects.filter(
@@ -239,7 +239,7 @@ class UserCampaignAPITestCase(TestCase):
 
     def test_remove_nonexistent_campaign(self):
         """Test removing a campaign not linked to user's profile."""
-        response = self.client.delete(f"/my_campaigns/{self.campaign1.id}/")
+        response = self.client.delete(f"/my_campaigns/{self.campaign1.metabase_qid}/")
         self.assertEqual(response.status_code, status.HTTP_404_NOT_FOUND)
 
     def test_remove_invalid_campaign_id(self):

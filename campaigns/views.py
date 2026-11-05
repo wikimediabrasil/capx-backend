@@ -87,8 +87,8 @@ class UserCampaignFilter(django_filters.FilterSet):
         ],
     ),
     retrieve=extend_schema(
-        summary="Retrieve a campaign by ID.",
-        description="This endpoint retrieves a campaign by its ID.",
+        summary="Retrieve a campaign by Metabase QID.",
+        description="This endpoint retrieves a campaign by its Metabase QID (e.g., Q12345).",
     ),
 )
 class CampaignViewSet(viewsets.ReadOnlyModelViewSet):
@@ -100,6 +100,8 @@ class CampaignViewSet(viewsets.ReadOnlyModelViewSet):
         filters.SearchFilter,
     )
     filterset_class = CampaignFilter
+    lookup_field = "metabase_qid"
+    lookup_url_kwarg = "metabase_qid"
     ordering_fields = (
         "metabase_qid",
         "min_start_date",
@@ -125,7 +127,7 @@ class CampaignViewSet(viewsets.ReadOnlyModelViewSet):
     ),
     retrieve=extend_schema(
         summary="Retrieve a specific campaign for the authenticated user.",
-        description="This endpoint retrieves a specific campaign for the authenticated user.",
+        description="This endpoint retrieves a specific campaign for the authenticated user by Metabase QID.",
     ),
     create=extend_schema(
         summary="Add a campaign to the authenticated user's profile.",
@@ -133,7 +135,7 @@ class CampaignViewSet(viewsets.ReadOnlyModelViewSet):
             "This endpoint adds a campaign to the authenticated user's profile "
             "with a role (default: Q56512863 - participant).\n\n"
             "Request body:\n"
-            "- **campaign** (integer, required): ID of the campaign to add\n"
+            "- **campaign** (string, required): Metabase QID of the campaign to add (e.g., Q12345)\n"
             "- **role_wikidata_qid** (string, optional): Wikidata QID of the role "
             "(default: Q56512863)"
         ),
@@ -145,10 +147,10 @@ class CampaignViewSet(viewsets.ReadOnlyModelViewSet):
         description="This endpoint removes a campaign from the authenticated user's profile.",
         parameters=[
             OpenApiParameter(
-                name="id",
-                description="ID of the campaign to remove from profile.",
+                name="metabase_qid",
+                description="Metabase QID of the campaign to remove from profile (e.g., Q12345).",
                 required=True,
-                type=OpenApiTypes.INT,
+                type=OpenApiTypes.STR,
                 location=OpenApiParameter.PATH,
             ),
         ],
@@ -160,8 +162,8 @@ class UserCampaignViewSet(viewsets.ModelViewSet):
     serializer_class = CampaignSerializer
     permission_classes = (IsAuthenticated,)
     queryset = Campaign.objects.all()
-    lookup_field = "id"
-    lookup_url_kwarg = "id"
+    lookup_field = "metabase_qid"
+    lookup_url_kwarg = "metabase_qid"
     http_method_names = ("get", "post", "delete", "head", "options")
     filter_backends = (DjangoFilterBackend,)
     filterset_class = UserCampaignFilter
@@ -179,11 +181,11 @@ class UserCampaignViewSet(viewsets.ModelViewSet):
         serializer = self.get_serializer(data=request.data)
         serializer.is_valid(raise_exception=True)
 
-        campaign_id = serializer.validated_data["campaign"]
+        campaign_qid = serializer.validated_data["campaign"]
         role_wikidata_qid = serializer.validated_data.get("role_wikidata_qid", "Q56512863")
 
         try:
-            campaign = Campaign.objects.get(pk=campaign_id)
+            campaign = Campaign.objects.get(metabase_qid=campaign_qid)
         except Campaign.DoesNotExist:
             return Response(
                 {"detail": "Campaign not found."}, status=status.HTTP_404_NOT_FOUND
@@ -205,10 +207,10 @@ class UserCampaignViewSet(viewsets.ModelViewSet):
 
     def destroy(self, request, *args, **kwargs):
         """Remove a campaign from the user's profile."""
-        campaign_id = kwargs.get("id")
+        campaign_qid = kwargs.get("metabase_qid")
 
         try:
-            campaign = Campaign.objects.get(pk=campaign_id)
+            campaign = Campaign.objects.get(metabase_qid=campaign_qid)
         except (Campaign.DoesNotExist, ValueError):
             return Response(
                 {"detail": "Campaign not found."}, status=status.HTTP_404_NOT_FOUND

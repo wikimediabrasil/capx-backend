@@ -46,7 +46,7 @@ class CampaignSerializer(serializers.ModelSerializer):
 
 class CampaignProfileSerializer(serializers.Serializer):
     """Serializer for linking a profile to a campaign with role."""
-    campaign = serializers.IntegerField(help_text="ID of the campaign to add.")
+    campaign = serializers.CharField(help_text="Metabase QID of the campaign to add (e.g., Q12345).")
     role_wikidata_qid = serializers.CharField(
         default="Q56512863",
         help_text="Wikidata Qid of the role (default: Q56512863 - participant).",
@@ -55,7 +55,7 @@ class CampaignProfileSerializer(serializers.Serializer):
 
     def validate_campaign(self, value):
         """Validate that campaign exists."""
-        if not Campaign.objects.filter(pk=value).exists():
+        if not Campaign.objects.filter(metabase_qid=value).exists():
             raise serializers.ValidationError("Campaign not found.")
         return value
 
