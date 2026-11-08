@@ -19,6 +19,7 @@ from django.conf import settings
 from django.urls import path, include, re_path
 from django.contrib.staticfiles.urls import staticfiles_urlpatterns
 from django.conf.urls.static import static
+from django.views.decorators.http import require_GET
 from rest_framework.routers import DefaultRouter
 from skills.views import SkillViewSet, SkillByTypeViewSet, HashtagViewSet
 from users.views import (
@@ -91,7 +92,7 @@ urlpatterns = [
     path('', include('social_django.urls')),
     path('tags/<str:tag_type>/<int:tag_id>/', UsersByTagViewSet.as_view({'get': 'list'}), name='tags'),
     path("schema/", SpectacularAPIView.as_view(), name="schema"),
-    path("", SpectacularSwaggerView.as_view(url_name="schema"),name="swagger-ui",),
+    path("", require_GET(SpectacularSwaggerView.as_view(url_name="schema")), name="swagger-ui"),
     re_path(r'^api/login/social/knox_user/(?:(?P<provider>[a-zA-Z0-9_-]+)/?)?$', UserAuthView.as_view(), name='login_social_knox_user'),
     re_path(r'^api/login/social/knox/(?:(?P<provider>[a-zA-Z0-9_-]+)/?)?$', AuthView.as_view(), name='login_social_knox'),
     path('api/login/social/check/', CheckView.as_view(), name='login_social_check'),
