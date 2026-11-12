@@ -1,9 +1,12 @@
+from unittest.mock import patch
+
 from django.contrib.auth import get_user_model
 from django.test import TestCase
 from rest_framework import status
 from rest_framework.test import APIClient
 
 from campaigns.models import Campaign
+from campaigns.views import UserCampaignViewSet
 from skills.models import Skill
 from users.models import ProfileCampaign
 
@@ -248,8 +251,41 @@ class UserCampaignAPITestCase(TestCase):
         self.assertEqual(response.status_code, status.HTTP_404_NOT_FOUND)
         self.assertEqual(response.data["detail"], "Campaign not found.")
 
+    def test_remove_malformed_qid_triggers_valueerror(self):
+        """Test removing a campaign with malformed QID triggers ValueError catch"""
+        # This tests the ValueError catch in destroy() when metabase_qid doesn't match Q\d+ format
+        response = self.client.delete("/my_campaigns/not-a-qid/")
+        self.assertEqual(response.status_code, status.HTTP_404_NOT_FOUND)
+        self.assertEqual(response.data["detail"], "Campaign not found.")
+
     def test_unauthenticated_access_denied(self):
         """Test that unauthenticated users cannot access my_campaigns."""
         self.client.force_authenticate(user=None)
         response = self.client.get("/my_campaigns/")
         self.assertEqual(response.status_code, status.HTTP_401_UNAUTHORIZED)
+
+    @patch("campaigns.views.Campaign.objects.get")
+    def test_remove_campaign_valueerror(self, mock_get):
+        """Test ValueError exception handler in destroy"""
+        mock_get.side_effect = ValueError("Invalid value")
+
+        response = self.client.delete("/my_campaigns/Q1001/")
+
+        self.assertEqual(response.status_code, status.HTTP_404_NOT_FOUND)
+        self.assertEqual(response.data["detail"], "Campaign not found.")
+
+    @patch("campaigns.views.Campaign.objects.get")
+    def test_create_campaign_does_not_exist(self, mock_get):
+        """Test Campaign.DoesNotExist exception handler in create"""
+        mock_get.side_effect = Campaign.DoesNotExist
+
+        with patch.object(UserCampaignViewSet, "get_serializer") as mock_serializer:
+            mock_serializer.return_value.is_valid.return_value = True
+            mock_serializer.return_value.validated_data = {
+                "campaign": "Q99999",
+                "role_wikidata_qid": "Q56512863",
+            }
+            response = self.client.post("/my_campaigns/", {"campaign": "Q99999"})
+
+        self.assertEqual(response.status_code, status.HTTP_404_NOT_FOUND)
+        self.assertEqual(response.data["detail"], "Campaign not found.")

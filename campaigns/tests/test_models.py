@@ -26,3 +26,7 @@ class TestCampaignModelMethods(TestCase):
         self.assertEqual(array("location_qids"), ["Q3"])
         self.assertEqual(array("language_qids"), ["Q4", "Q5", "Q6"])
         self.assertEqual(array("skill_wikidata_qids"), ["Q10", "Q20"])
+
+    def test_str_method(self):
+        campaign = Campaign.objects.create(metabase_qid="Q12345")
+        self.assertEqual(str(campaign), "Q12345")

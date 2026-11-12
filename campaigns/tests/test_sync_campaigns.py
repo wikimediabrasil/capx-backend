@@ -293,6 +293,75 @@ class TestSyncCampaignsCommand(TestCase):
         self.assertIn(self.skill1, campaign.skills.all())
         self.assertIn(self.skill2, campaign.skills.all())
 
+    @patch("campaigns.management.commands.sync_campaigns.requests.get")
+    def test_handle_missing_qid_in_binding(self, mock_get):
+        mock_response = MagicMock()
+        mock_response.status_code = 200
+        mock_response.json.return_value = {
+            "results": {
+                "bindings": [
+                    {
+                        "qid": {"value": "Q5001"},
+                        "skillWikidataQids": {"value": self.skill1.skill_wikidata_item},
+                    },
+                    {
+                        "skillWikidataQids": {"value": self.skill2.skill_wikidata_item},
+                    },
+                    {
+                        "qid": {"value": ""},
+                        "skillWikidataQids": {"value": self.skill3.skill_wikidata_item},
+                    },
+                ]
+            }
+        }
+        mock_get.return_value = mock_response
+        output = self.call()
+        self.assertIn("Found 1 campaigns in Metabase", output)
+        self.assertIn("Created: Q5001", output)
+        self.assertEqual(Campaign.objects.count(), 1)
+        campaign = Campaign.objects.get(metabase_qid="Q5001")
+        self.assertEqual(campaign.skills.count(), 1)
+        self.assertIn(self.skill1, campaign.skills.all())
+
+    @patch("campaigns.management.commands.sync_campaigns.requests.get")
+    def test_handle_invalid_date_format(self, mock_get):
+        """Test that misformatted dates are skipped"""
+        mock_response = MagicMock()
+        mock_response.status_code = 200
+        mock_response.json.return_value = {
+            "results": {
+                "bindings": [
+                    {
+                        "qid": {"value": "Q5002"},
+                        "minStartDate": {"value": "not-a-date"},
+                        "maxEndDate": {"value": "2024-09-30T00:00:00Z"},
+                        "skillWikidataQids": {"value": self.skill1.skill_wikidata_item},
+                    },
+                    {
+                        "qid": {"value": "Q5003"},
+                        "minStartDate": {"value": "2024-09-01T00:00:00Z"},
+                        "maxEndDate": {"value": "invalid-date"},
+                        "skillWikidataQids": {"value": self.skill2.skill_wikidata_item},
+                    },
+                    {
+                        "qid": {"value": "Q5004"},
+                        "minStartDate": {"value": "2024-09-01T00:00:00Z"},
+                        "maxEndDate": {"value": "2024-09-30T00:00:00Z"},
+                        "skillWikidataQids": {"value": self.skill3.skill_wikidata_item},
+                    },
+                ]
+            }
+        }
+        mock_get.return_value = mock_response
+        output = self.call()
+        # Should only create Q5004 (the one with valid dates)
+        self.assertIn("Found 1 campaigns in Metabase", output)
+        self.assertIn("Created: Q5004", output)
+        self.assertEqual(Campaign.objects.count(), 1)
+        campaign = Campaign.objects.get(metabase_qid="Q5004")
+        self.assertEqual(campaign.skills.count(), 1)
+        self.assertIn(self.skill3, campaign.skills.all())
+
 
 class TestCampaignModelSyncSkills(TestCase):
     """Test the sync_skills method on the Campaign model directly."""
