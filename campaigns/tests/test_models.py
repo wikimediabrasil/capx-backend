@@ -1,6 +1,9 @@
+from django.contrib.admin import site
 from django.test import TestCase
 
+from campaigns.admin import CampaignAdmin
 from campaigns.models import Campaign
+from skills.models import Skill
 
 
 class TestCampaignModelMethods(TestCase):
@@ -30,3 +33,13 @@ class TestCampaignModelMethods(TestCase):
     def test_str_method(self):
         campaign = Campaign.objects.create(metabase_qid="Q12345")
         self.assertEqual(str(campaign), "Q12345")
+
+
+class TestCampaignAdmin(TestCase):
+    def test_skills_count(self):
+        campaign = Campaign.objects.create(metabase_qid="Q9999")
+        campaign_admin = CampaignAdmin(Campaign, site)
+        self.assertEqual(campaign_admin.skills_count(campaign), 0)
+        skill = Skill.objects.create(skill_wikidata_item="Q10001")
+        campaign.skills.add(skill)
+        self.assertEqual(campaign_admin.skills_count(campaign), 1)

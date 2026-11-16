@@ -53,6 +53,8 @@ class ProfileAdmin(admin.ModelAdmin):
     def has_add_permission(self, request):
         return False
 
+    search_fields = ['user__username']
+
 
 admin.site.register(CustomUser, AccountUserAdmin)
 admin.site.register(Territory)
