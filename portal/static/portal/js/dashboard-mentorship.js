@@ -68,12 +68,21 @@
   var builderHost = document.getElementById('mentorship-form-builder');
   var outputField = document.getElementById('mentorship-form-json');
   var statusEl = document.getElementById('mentorship-form-builder-status');
+  var languageControls = document.getElementById('mentorship-form-language-controls');
+  var languagesField = document.getElementById('mentorship-form-languages');
+  var languageSearchField = document.getElementById('mentorship-form-language-search');
+  var languageChips = document.getElementById('mentorship-form-language-chips');
+  var languageSuggestions = document.getElementById('mentorship-form-language-suggestions');
+  var editorLanguageField = document.getElementById('mentorship-form-editor-language');
   var partnerField = document.getElementById('mentorship-form-partner');
   var formTypeField = document.getElementById('mentorship-form-type');
   var keyField = document.getElementById('mentorship-form-public-key');
-  if (!formElement || !updateFormElement || !builderHost || !outputField || !statusEl || !partnerField || !formTypeField || !keyField || !globalPartnerField || !updatePartnerField || !updateTypeField || !updateFormIdField || !updateJsonField || !loadBtn) return;
+  if (!formElement || !updateFormElement || !builderHost || !outputField || !statusEl || !languageControls || !languagesField || !languageSearchField || !languageChips || !languageSuggestions || !editorLanguageField || !partnerField || !formTypeField || !keyField || !globalPartnerField || !updatePartnerField || !updateTypeField || !updateFormIdField || !updateJsonField || !loadBtn) return;
 
   var isEditingExistingForm = false;
+  var languageSchemas = { en: [] };
+  var activeEditorLanguage = 'en';
+  var languageSearchOpen = false;
 
   function setEditMode(active) {
     isEditingExistingForm = !!active;
@@ -105,6 +114,337 @@
 
   var mentorForms = parseJsonScript('mentorship-forms-mentor-data');
   var menteeForms = parseJsonScript('mentorship-forms-mentee-data');
+
+  function cloneSchema(schema) {
+    return JSON.parse(JSON.stringify(Array.isArray(schema) ? schema : []));
+  }
+
+  function getTranslatedValue(translations, language, fallback) {
+    if (!Array.isArray(translations)) return fallback;
+    var match = translations.find(function(translation) {
+      return translation && String(translation.lang || '') === language;
+    });
+    return match && typeof match.value === 'string' ? match.value : fallback;
+  }
+
+  function schemaWithoutTranslations(schema) {
+    return cloneSchema(schema).map(function(field) {
+      delete field['label-translations'];
+      if (Array.isArray(field.values)) {
+        field.values = field.values.map(function(option) {
+          delete option['label-translations'];
+          return option;
+        });
+      }
+      return field;
+    });
+  }
+
+  function findSchemaField(schema, field, index) {
+    var fieldName = String(field && field.name || '').trim();
+    if (fieldName) {
+      return schema.find(function(candidate) {
+        return candidate && String(candidate.name || '').trim() === fieldName;
+      }) || null;
+    }
+    return schema[index] || null;
+  }
+
+  function findSchemaOption(options, option, index) {
+    if (option && option.value != null) {
+      return options.find(function(candidate) {
+        return candidate && candidate.value != null && String(candidate.value) === String(option.value);
+      }) || null;
+    }
+    return options[index] || null;
+  }
+
+  function schemaForLanguage(baseSchema, translatedSchema) {
+    return baseSchema.map(function(field, index) {
+      var translatedField = findSchemaField(translatedSchema, field, index);
+      var localizedField = cloneSchema([field])[0];
+      if (translatedField && typeof translatedField.label === 'string') {
+        localizedField.label = translatedField.label;
+      }
+      delete localizedField['label-translations'];
+
+      if (Array.isArray(field.values)) {
+        localizedField.values = field.values.map(function(option, optionIndex) {
+          var translatedOption = translatedField && Array.isArray(translatedField.values)
+            ? findSchemaOption(translatedField.values, option, optionIndex)
+            : null;
+          var localizedOption = Object.assign({}, option);
+          if (translatedOption && typeof translatedOption.label === 'string') {
+            localizedOption.label = translatedOption.label;
+          }
+          delete localizedOption['label-translations'];
+          return localizedOption;
+        });
+      }
+      return localizedField;
+    });
+  }
+
+  function readLanguageSchemas(schema) {
+    var baseSchema = schemaWithoutTranslations(schema);
+    var languages = ['en'];
+    function addLanguage(language) {
+      var code = String(language || '').trim();
+      if (code && languages.indexOf(code) === -1) languages.push(code);
+    }
+
+    (Array.isArray(schema) ? schema : []).forEach(function(field) {
+      (Array.isArray(field && field['label-translations']) ? field['label-translations'] : [])
+        .forEach(function(translation) { addLanguage(translation && translation.lang); });
+      (Array.isArray(field && field.values) ? field.values : []).forEach(function(option) {
+        (Array.isArray(option && option['label-translations']) ? option['label-translations'] : [])
+          .forEach(function(translation) { addLanguage(translation && translation.lang); });
+      });
+    });
+
+    var result = { en: baseSchema };
+    languages.slice(1).forEach(function(language) {
+      result[language] = baseSchema.map(function(field, index) {
+        var originalField = findSchemaField(Array.isArray(schema) ? schema : [], field, index) || {};
+        var translatedField = Object.assign({}, field);
+        translatedField.label = getTranslatedValue(
+          originalField['label-translations'],
+          language,
+          field.label
+        );
+        if (Array.isArray(field.values)) {
+          translatedField.values = field.values.map(function(option, index) {
+            var originalOption = Array.isArray(originalField.values)
+              ? findSchemaOption(originalField.values, option, index) || {}
+              : {};
+            var translatedOption = Object.assign({}, option);
+            translatedOption.label = getTranslatedValue(
+              originalOption['label-translations'],
+              language,
+              option.label
+            );
+            return translatedOption;
+          });
+        }
+        return translatedField;
+      });
+    });
+    return result;
+  }
+
+  function ensureLanguageOption(language) {
+    if (Array.from(languagesField.options).some(function(option) { return option.value === language; })) return;
+    var option = document.createElement('option');
+    option.value = language;
+    option.textContent = language;
+    languagesField.appendChild(option);
+  }
+
+  function selectedLanguages() {
+    var languages = Array.from(languagesField.selectedOptions).map(function(option) { return option.value; });
+    if (languages.indexOf('en') === -1) {
+      var englishOption = Array.from(languagesField.options).find(function(option) { return option.value === 'en'; });
+      if (englishOption) englishOption.selected = true;
+      languages.unshift('en');
+    }
+    return languages;
+  }
+
+  function selectedLanguageSet() {
+    return new Set(selectedLanguages());
+  }
+
+  function renderLanguageSuggestions() {
+    var query = String(languageSearchField.value || '').trim().toLocaleLowerCase();
+    var selected = selectedLanguageSet();
+    languageSuggestions.innerHTML = '';
+    Array.from(languagesField.options).forEach(function(option) {
+      if (selected.has(option.value)) return;
+      if (query && option.textContent.toLocaleLowerCase().indexOf(query) === -1) return;
+      var suggestion = document.createElement('button');
+      suggestion.type = 'button';
+      suggestion.setAttribute('role', 'option');
+      suggestion.setAttribute('aria-selected', 'false');
+      suggestion.textContent = option.textContent;
+      suggestion.style.display = 'block';
+      suggestion.style.width = '100%';
+      suggestion.style.padding = '8px 10px';
+      suggestion.style.border = '0';
+      suggestion.style.borderRadius = '5px';
+      suggestion.style.background = 'transparent';
+      suggestion.style.textAlign = 'left';
+      suggestion.addEventListener('mouseenter', function() {
+        suggestion.style.background = '#f1f5f9';
+      });
+      suggestion.addEventListener('mouseleave', function() {
+        suggestion.style.background = 'transparent';
+      });
+      suggestion.addEventListener('click', function() {
+        option.selected = true;
+        languagesField.dispatchEvent(new Event('change', { bubbles: true }));
+        languageSearchField.value = '';
+        languageSearchField.focus();
+      });
+      languageSuggestions.appendChild(suggestion);
+    });
+    languageSuggestions.hidden = !languageSearchOpen || languageSuggestions.children.length === 0;
+    languageSearchField.setAttribute('aria-expanded', String(!languageSuggestions.hidden));
+  }
+
+  function renderLanguageChips() {
+    var selected = selectedLanguageSet();
+    languageChips.innerHTML = '';
+    Array.from(languagesField.options).forEach(function(option) {
+      if (!selected.has(option.value)) return;
+      var chip = document.createElement('span');
+      chip.className = 'chip';
+      chip.style.margin = '0';
+      chip.appendChild(document.createTextNode(option.textContent));
+      if (option.value !== 'en') {
+        var removeButton = document.createElement('button');
+        removeButton.type = 'button';
+        removeButton.setAttribute('aria-label', 'Remove ' + option.textContent);
+        removeButton.textContent = '×';
+        removeButton.style.padding = '0';
+        removeButton.style.border = '0';
+        removeButton.style.background = 'transparent';
+        removeButton.style.color = 'inherit';
+        removeButton.style.fontSize = '16px';
+        removeButton.style.lineHeight = '12px';
+        removeButton.addEventListener('click', function() {
+          option.selected = false;
+          languagesField.dispatchEvent(new Event('change', { bubbles: true }));
+        });
+        chip.appendChild(removeButton);
+      }
+      languageChips.appendChild(chip);
+    });
+    renderLanguageSuggestions();
+  }
+
+  function updateEditorLanguageOptions(languages) {
+    editorLanguageField.innerHTML = '';
+    languages.forEach(function(language) {
+      var option = Array.from(languagesField.options).find(function(candidate) {
+        return candidate.value === language;
+      });
+      var editorOption = document.createElement('option');
+      editorOption.value = language;
+      editorOption.textContent = option ? option.textContent : language;
+      editorLanguageField.appendChild(editorOption);
+    });
+    if (languages.indexOf(activeEditorLanguage) === -1) activeEditorLanguage = 'en';
+    editorLanguageField.value = activeEditorLanguage;
+    languageControls.hidden = false;
+  }
+
+  function findTranslatedField(schema, field, index) {
+    return findSchemaField(schema, field, index);
+  }
+
+  function captureEditorSchema() {
+    try {
+      var currentSchema = JSON.parse(formBuilderInstance.actions.getData('json'));
+      if (!Array.isArray(currentSchema)) throw new Error('Form schema must be a list of fields.');
+      languageSchemas[activeEditorLanguage] = schemaWithoutTranslations(currentSchema);
+      return true;
+    } catch (error) {
+      statusEl.textContent = 'Unable to save the current language labels from the builder.';
+      return false;
+    }
+  }
+
+  function hasSameFormStructure(firstSchema, secondSchema) {
+    function nonLabelSchema(schema) {
+      return schema.map(function(field) {
+        var normalizedField = Object.assign({}, field);
+        delete normalizedField.label;
+        delete normalizedField['label-translations'];
+        if (Array.isArray(field.values)) {
+          normalizedField.values = field.values.map(function(option) {
+            var normalizedOption = Object.assign({}, option);
+            delete normalizedOption.label;
+            delete normalizedOption['label-translations'];
+            return normalizedOption;
+          });
+        }
+        return normalizedField;
+      });
+    }
+    return JSON.stringify(nonLabelSchema(firstSchema)) === JSON.stringify(nonLabelSchema(secondSchema));
+  }
+
+  function setBuilderLanguage(language) {
+    var baseSchema = languageSchemas.en || [];
+    var translatedSchema = languageSchemas[language] || baseSchema;
+    activeEditorLanguage = language;
+    formBuilderInstance.actions.setData(JSON.stringify(
+      schemaForLanguage(baseSchema, translatedSchema)
+    ));
+  }
+
+  function buildSchemaWithTranslations() {
+    if (!captureEditorSchema()) throw new Error('Unable to capture translated form labels.');
+    var languages = selectedLanguages();
+    var baseSchema = languageSchemas.en || [];
+    var reservedResponseField = '__form_language';
+    if (baseSchema.some(function(field) {
+      return String(field.name || '').trim().replace(/\[\]$/, '') === reservedResponseField;
+    })) {
+      throw new Error('The field name "__form_language" is reserved for response language metadata.');
+    }
+    if (activeEditorLanguage !== 'en' && !hasSameFormStructure(baseSchema, languageSchemas[activeEditorLanguage] || [])) {
+      throw new Error('Switch to English to change the form structure or field settings; other languages can only edit labels and option names.');
+    }
+    return baseSchema.map(function(field, index) {
+      var savedField = Object.assign({}, field);
+      delete savedField['label-translations'];
+      var translatedFields = languages.slice(1).map(function(language) {
+        var localizedField = findTranslatedField(languageSchemas[language] || [], field, index);
+        return {
+          lang: language,
+          value: localizedField && typeof localizedField.label === 'string'
+            ? localizedField.label
+            : String(field.label || ''),
+        };
+      });
+      if (translatedFields.length) savedField['label-translations'] = translatedFields;
+
+      if (Array.isArray(field.values)) {
+        savedField.values = field.values.map(function(option, optionIndex) {
+          var localizedOptions = languages.slice(1).map(function(language) {
+            var localizedField = findTranslatedField(languageSchemas[language] || [], field, index);
+            var localizedOption = localizedField && Array.isArray(localizedField.values)
+              ? findSchemaOption(localizedField.values, option, optionIndex)
+              : null;
+            return {
+              lang: language,
+              value: localizedOption && typeof localizedOption.label === 'string'
+                ? localizedOption.label
+                : String(option.label || ''),
+            };
+          });
+          var savedOption = Object.assign({}, option);
+          delete savedOption['label-translations'];
+          if (localizedOptions.length) savedOption['label-translations'] = localizedOptions;
+          return savedOption;
+        });
+      }
+      return savedField;
+    });
+  }
+
+  function restoreLanguageSchema(schema) {
+    languageSchemas = readLanguageSchemas(schema);
+    Object.keys(languageSchemas).forEach(ensureLanguageOption);
+    Array.from(languagesField.options).forEach(function(option) {
+      option.selected = Object.prototype.hasOwnProperty.call(languageSchemas, option.value);
+    });
+    activeEditorLanguage = 'en';
+    updateEditorLanguageOptions(selectedLanguages());
+    renderLanguageChips();
+    formBuilderInstance.actions.setData(JSON.stringify(languageSchemas.en || []));
+  }
 
   function filterPublicKeysByPartner() {
     var selectedPartner = String(globalPartnerField.value || '');
@@ -185,7 +525,7 @@
     try {
       var selectedOption = updateFormIdField.selectedOptions && updateFormIdField.selectedOptions[0];
       var selectedFormType = String((selectedOption && selectedOption.dataset.formType) || formTypeField.value || 'mentor');
-      formBuilderInstance.actions.setData(JSON.stringify(formDef.json || []));
+      restoreLanguageSchema(formDef.json || []);
       formTypeField.value = selectedFormType;
       updateTypeField.value = selectedFormType;
       setEditMode(true);
@@ -209,6 +549,60 @@
     showActionButtons: false,
     editOnAdd: true,
   });
+  languageControls.hidden = false;
+  updateEditorLanguageOptions(selectedLanguages());
+  renderLanguageChips();
+
+  languageSearchField.addEventListener('focus', function() {
+    languageSearchOpen = true;
+    renderLanguageSuggestions();
+  });
+  languageSearchField.addEventListener('input', function() {
+    languageSearchOpen = true;
+    renderLanguageSuggestions();
+  });
+  languageSearchField.addEventListener('keydown', function(event) {
+    if (event.key === 'Escape') {
+      languageSearchOpen = false;
+      languageSuggestions.hidden = true;
+      languageSearchField.setAttribute('aria-expanded', 'false');
+      return;
+    }
+    if (event.key === 'Enter' && !languageSuggestions.hidden) {
+      var firstSuggestion = languageSuggestions.querySelector('[role="option"]');
+      if (firstSuggestion) {
+        event.preventDefault();
+        firstSuggestion.click();
+      }
+    }
+  });
+  document.addEventListener('click', function(event) {
+    if (!document.getElementById('mentorship-form-language-picker').contains(event.target) &&
+        !languageSuggestions.contains(event.target)) {
+      languageSearchOpen = false;
+      languageSuggestions.hidden = true;
+      languageSearchField.setAttribute('aria-expanded', 'false');
+    }
+  });
+
+  languagesField.addEventListener('change', function() {
+    if (!captureEditorSchema()) return;
+    var languages = selectedLanguages();
+    renderLanguageChips();
+    languages.forEach(function(language) {
+      if (!languageSchemas[language]) languageSchemas[language] = cloneSchema(languageSchemas.en || []);
+    });
+    Object.keys(languageSchemas).forEach(function(language) {
+      if (languages.indexOf(language) === -1) delete languageSchemas[language];
+    });
+    updateEditorLanguageOptions(languages);
+    setBuilderLanguage(activeEditorLanguage);
+  });
+
+  editorLanguageField.addEventListener('change', function() {
+    if (!captureEditorSchema()) return;
+    setBuilderLanguage(String(editorLanguageField.value || 'en'));
+  });
 
   formElement.addEventListener('submit', function(event) {
     if (isEditingExistingForm) {
@@ -217,7 +611,7 @@
       return;
     }
     try {
-      var dataJson = formBuilderInstance.actions.getData('json');
+      var dataJson = JSON.stringify(buildSchemaWithTranslations());
       if (!dataJson || dataJson === '[]') {
         statusEl.textContent = 'Add at least one field to the form before saving.';
         event.preventDefault();
@@ -225,7 +619,7 @@
       }
       outputField.value = dataJson;
     } catch (error) {
-      statusEl.textContent = 'Unable to export JSON from visual builder.';
+      statusEl.textContent = error && error.message ? error.message : 'Unable to export JSON from visual builder.';
       event.preventDefault();
     }
   });
@@ -242,7 +636,7 @@
         event.preventDefault();
         return;
       }
-      var dataJson = formBuilderInstance.actions.getData('json');
+      var dataJson = JSON.stringify(buildSchemaWithTranslations());
       if (!dataJson || dataJson === '[]') {
         statusEl.textContent = 'Add at least one field to the form before saving updates.';
         event.preventDefault();
@@ -252,7 +646,7 @@
       updateTypeField.value = String(formTypeField.value || 'mentor');
       updateJsonField.value = dataJson;
     } catch (error) {
-      statusEl.textContent = 'Unable to export JSON from visual builder.';
+      statusEl.textContent = error && error.message ? error.message : 'Unable to export JSON from visual builder.';
       event.preventDefault();
     }
   });
@@ -320,6 +714,7 @@
     { key: 'badges', label: 'user_badges' },
     { key: 'automated_lets_connect', label: 'user_automated_lets_connect' },
   ];
+  var responseLanguageKey = '__form_language';
 
   function currentForms() {
     return typeSelect.value === 'mentor' ? mentorForms : menteeForms;
@@ -616,6 +1011,7 @@
 
         Object.keys(responseObject).forEach(function(rawKey) {
           var key = normalizeFieldKey(rawKey);
+          if (key === responseLanguageKey) return;
           if (!dynamicKeySet[key]) {
             dynamicKeySet[key] = true;
             dynamicKeys.push(key);
@@ -623,7 +1019,7 @@
         });
       }
 
-      var header = ['username', 'created_at', 'encrypted_with_public_key_id', 'encrypted_with_public_key_fingerprint'];
+      var header = ['username', 'created_at', 'encrypted_with_public_key_id', 'encrypted_with_public_key_fingerprint', 'response_language'];
       userProfileColumns.forEach(function(col) {
         header.push(col.label);
       });
@@ -641,6 +1037,7 @@
           escapeCSV(currentRow.created_at),
           escapeCSV(rowKeyMeta.keyId),
           escapeCSV(rowKeyMeta.fingerprint),
+          escapeCSV(currentObject[responseLanguageKey]),
         ];
 
         userProfileColumns.forEach(function(col) {

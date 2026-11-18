@@ -117,6 +117,28 @@
     <div class="muted">Visual form builder</div>
     <div id="mentorship-form-builder" class="form-builder-host" style="border: 1px solid var(--border); border-radius: 10px; background: #fff; padding: 8px; min-height: 340px;"></div>
     <div id="mentorship-form-builder-status" class="muted">Use drag and drop to build the form. The JSON payload is generated automatically.</div>
+    <fieldset id="mentorship-form-language-controls" hidden style="margin:10px 0; padding:10px; border:1px solid var(--border); border-radius:8px;">
+      <legend>Form languages</legend>
+      <label for="mentorship-form-languages">Languages available to respondents (English is the default)</label>
+      <div style="position:relative; max-width:520px;">
+        <div id="mentorship-form-language-picker" style="display:flex; flex-wrap:wrap; align-items:center; gap:6px; min-height:44px; padding:6px 8px; border:1px solid var(--border); border-radius:10px; background:#fff;">
+          <div id="mentorship-form-language-chips" style="display:contents;"></div>
+          <input id="mentorship-form-language-search" type="search" autocomplete="off" role="combobox" aria-autocomplete="list" aria-expanded="false" aria-controls="mentorship-form-language-suggestions" placeholder="Type to search languages..." style="flex:1; min-width:180px; padding:6px; border:0; box-shadow:none;" />
+        </div>
+        <div id="mentorship-form-language-suggestions" role="listbox" hidden style="position:absolute; z-index:20; top:calc(100% + 4px); left:0; right:0; max-height:220px; overflow-y:auto; padding:4px; border:1px solid var(--border); border-radius:8px; background:#fff; box-shadow:0 6px 18px rgba(2,6,23,0.12);"></div>
+      </div>
+      <select id="mentorship-form-languages" multiple hidden aria-hidden="true" tabindex="-1">
+        <option value="en" selected>English (en)</option>
+        {% for language in mentorship_available_languages %}
+          {% if language.language_code != 'en' %}
+            <option value="{{ language.language_code }}">{{ language.language_name }} ({{ language.language_code }})</option>
+          {% endif %}
+        {% endfor %}
+      </select>
+      <p class="muted" style="margin:4px 0 8px;">Build the form structure in English, then switch languages to translate labels and option names.</p>
+      <label for="mentorship-form-editor-language">Edit labels in</label>
+      <select id="mentorship-form-editor-language" style="max-width:520px;"></select>
+    </fieldset>
     <form id="mentorship-form-create" method="post" action="/portal/partner/mentorship/form/create/" aria-label="Create mentorship form" style="grid-template-columns: 1fr; max-width: 100%;">
       {% csrf_token %}
       <input id="mentorship-form-partner" name="partner_id" type="hidden" />

@@ -12,6 +12,18 @@ function renderMentorshipDom(extraHtml = '') {
       <div id="mentorship-form-builder"></div>
       <textarea id="mentorship-form-json"></textarea>
       <div id="mentorship-form-builder-status"></div>
+      <fieldset id="mentorship-form-language-controls" hidden>
+        <div id="mentorship-form-language-picker">
+          <div id="mentorship-form-language-chips"></div>
+          <input id="mentorship-form-language-search" />
+        </div>
+        <div id="mentorship-form-language-suggestions" hidden></div>
+        <select id="mentorship-form-languages" multiple>
+          <option value="en" selected>English (en)</option>
+          <option value="pt">Portuguese (pt)</option>
+        </select>
+        <select id="mentorship-form-editor-language"></select>
+      </fieldset>
       <input id="mentorship-form-partner" />
       <select id="mentorship-form-type">
         <option value="mentor" selected>mentor</option>
@@ -44,6 +56,8 @@ function renderMentorshipDom(extraHtml = '') {
   `;
 }
 
+const nativeBlob = global.Blob;
+
 describe('dashboard-mentorship.js', () => {
   beforeEach(() => {
     global.fetch = jest.fn().mockResolvedValue({
@@ -68,6 +82,8 @@ describe('dashboard-mentorship.js', () => {
     delete global.jQuery;
     delete global.fetch;
     delete window.fetch;
+    global.Blob = nativeBlob;
+    window.Blob = nativeBlob;
   });
 
   test('loads without throwing when builder libs are absent', () => {
@@ -134,8 +150,168 @@ describe('dashboard-mentorship.js', () => {
     require('../dashboard-mentorship.js');
     const form = document.getElementById('mentorship-form-create');
     const status = document.getElementById('mentorship-form-builder-status');
+    expect(document.getElementById('mentorship-form-language-controls').hidden).toBe(false);
+    expect(document.getElementById('mentorship-form-languages').value).toBe('en');
     form.dispatchEvent(new window.Event('submit', { bubbles: true, cancelable: true }));
     expect(status.textContent).toContain('Add at least one field');
+  });
+
+  test('searches and selects languages as removable chips', () => {
+    const actions = { getData: () => '[]', setData: () => {} };
+    const jq = jest.fn(() => ({ formBuilder: jest.fn(() => ({ actions })) }));
+    jq.fn = { formBuilder: true };
+    global.jQuery = jq;
+    renderMentorshipDom();
+    require('../dashboard-mentorship.js');
+
+    expect(document.getElementById('mentorship-form-language-suggestions').hidden).toBe(true);
+    const search = document.getElementById('mentorship-form-language-search');
+    search.value = 'Portuguese';
+    search.dispatchEvent(new window.Event('input', { bubbles: true }));
+    const suggestion = document.querySelector('#mentorship-form-language-suggestions [role="option"]');
+    expect(suggestion.textContent).toBe('Portuguese (pt)');
+    expect(document.getElementById('mentorship-form-language-suggestions').hidden).toBe(false);
+    suggestion.click();
+
+    expect(document.getElementById('mentorship-form-languages').options[1].selected).toBe(true);
+    const chip = Array.from(document.querySelectorAll('#mentorship-form-language-chips .chip'))
+      .find(node => node.textContent.includes('Portuguese'));
+    expect(chip).toBeDefined();
+    chip.querySelector('button').click();
+    expect(document.getElementById('mentorship-form-languages').options[1].selected).toBe(false);
+  });
+
+  test('saves translated field and option labels without changing default labels or values', () => {
+    let builderSchema = [
+      {
+        type: 'select',
+        name: 'language',
+        label: 'Preferred language',
+        values: [{ label: 'English', value: 'en' }],
+      },
+    ];
+    const actions = {
+      getData: () => JSON.stringify(builderSchema),
+      setData: (schema) => { builderSchema = JSON.parse(schema); },
+    };
+    const jq = jest.fn(() => ({ formBuilder: jest.fn(() => ({ actions })) }));
+    jq.fn = { formBuilder: true };
+    global.jQuery = jq;
+    renderMentorshipDom();
+    require('../dashboard-mentorship.js');
+
+    const languages = document.getElementById('mentorship-form-languages');
+    languages.options[1].selected = true;
+    languages.dispatchEvent(new window.Event('change', { bubbles: true }));
+
+    const editorLanguage = document.getElementById('mentorship-form-editor-language');
+    editorLanguage.value = 'pt';
+    editorLanguage.dispatchEvent(new window.Event('change', { bubbles: true }));
+    builderSchema[0].label = 'Idioma preferido';
+    builderSchema[0].values[0].label = 'Inglês';
+
+    const form = document.getElementById('mentorship-form-create');
+    form.dispatchEvent(new window.Event('submit', { bubbles: true, cancelable: true }));
+
+    const savedSchema = JSON.parse(document.getElementById('mentorship-form-json').value);
+    expect(savedSchema[0].label).toBe('Preferred language');
+    expect(savedSchema[0]['label-translations']).toEqual([
+      { lang: 'pt', value: 'Idioma preferido' },
+    ]);
+    expect(savedSchema[0].values[0]).toEqual({
+      label: 'English',
+      value: 'en',
+      'label-translations': [{ lang: 'pt', value: 'Inglês' }],
+    });
+  });
+
+  test('loads saved translations into the language-specific builder without translation metadata', () => {
+    let builderSchema = [];
+    const actions = {
+      getData: () => JSON.stringify(builderSchema),
+      setData: (schema) => { builderSchema = JSON.parse(schema); },
+    };
+    const jq = jest.fn(() => ({ formBuilder: jest.fn(() => ({ actions })) }));
+    jq.fn = { formBuilder: true };
+    global.jQuery = jq;
+    const form = {
+      id: 8,
+      partner_id: 'p1',
+      created_at: '2024-01-01',
+      json: [{
+        type: 'text',
+        name: 'name',
+        label: 'Name',
+        'label-translations': [{ lang: 'pt', value: 'Nome' }],
+      }],
+    };
+    renderMentorshipDom(`
+      <script id="mentorship-forms-mentor-data" type="application/json">${JSON.stringify([form])}</script>
+      <script id="mentorship-forms-mentee-data" type="application/json">[]</script>
+    `);
+    require('../dashboard-mentorship.js');
+
+    document.getElementById('mentorship-form-load-btn').click();
+    builderSchema.unshift({ type: 'text', name: 'age', label: 'Age' });
+    const editorLanguage = document.getElementById('mentorship-form-editor-language');
+    editorLanguage.value = 'pt';
+    editorLanguage.dispatchEvent(new window.Event('change', { bubbles: true }));
+
+    expect(builderSchema[0].label).toBe('Age');
+    expect(builderSchema[1].label).toBe('Nome');
+    expect(builderSchema[1]['label-translations']).toBeUndefined();
+  });
+
+  test('requires field structure changes to be made in the default language', () => {
+    let builderSchema = [{ type: 'text', name: 'name', label: 'Name' }];
+    const actions = {
+      getData: () => JSON.stringify(builderSchema),
+      setData: (schema) => { builderSchema = JSON.parse(schema); },
+    };
+    const jq = jest.fn(() => ({ formBuilder: jest.fn(() => ({ actions })) }));
+    jq.fn = { formBuilder: true };
+    global.jQuery = jq;
+    renderMentorshipDom();
+    require('../dashboard-mentorship.js');
+
+    const languages = document.getElementById('mentorship-form-languages');
+    languages.options[1].selected = true;
+    languages.dispatchEvent(new window.Event('change', { bubbles: true }));
+    const editorLanguage = document.getElementById('mentorship-form-editor-language');
+    editorLanguage.value = 'pt';
+    editorLanguage.dispatchEvent(new window.Event('change', { bubbles: true }));
+    builderSchema.push({ type: 'text', name: 'organization', label: 'Organization' });
+
+    const form = document.getElementById('mentorship-form-create');
+    form.dispatchEvent(new window.Event('submit', { bubbles: true, cancelable: true }));
+
+    expect(document.getElementById('mentorship-form-builder-status').textContent).toContain(
+      'Switch to English'
+    );
+    expect(document.getElementById('mentorship-form-json').value).toBe('');
+  });
+
+  test('reserves the response language field name', () => {
+    const actions = {
+      getData: () => JSON.stringify([{
+        type: 'text',
+        name: '__form_language[]',
+        label: 'Question',
+      }]),
+    };
+    const jq = jest.fn(() => ({ formBuilder: jest.fn(() => ({ actions })) }));
+    jq.fn = { formBuilder: true };
+    global.jQuery = jq;
+    renderMentorshipDom();
+    require('../dashboard-mentorship.js');
+
+    document.getElementById('mentorship-form-create').dispatchEvent(
+      new window.Event('submit', { bubbles: true, cancelable: true })
+    );
+
+    expect(document.getElementById('mentorship-form-builder-status').textContent).toContain(
+      'reserved for response language metadata'
+    );
   });
 
   test('csv download shows message when WebCrypto missing', () => {
@@ -167,8 +343,13 @@ describe('dashboard-mentorship.js', () => {
     document.getElementById('mentorship-csv-private-key').value = '-----BEGIN PRIVATE KEY-----abc-----END PRIVATE KEY-----';
     const subtle = {
       importKey: jest.fn().mockResolvedValue({}),
-      decrypt: jest.fn().mockResolvedValue(new TextEncoder().encode('{"field":"value"}')),
+      decrypt: jest.fn().mockResolvedValue(
+        new TextEncoder().encode('{"field":"value","__form_language":"pt"}')
+      ),
     };
+    const blobConstructor = jest.fn((parts) => ({ parts }));
+    global.Blob = blobConstructor;
+    window.Blob = blobConstructor;
     Object.defineProperty(window, 'crypto', { value: { subtle }, configurable: true });
     global.crypto = window.crypto;
     if (!window.URL) {
@@ -196,6 +377,10 @@ describe('dashboard-mentorship.js', () => {
     const status = document.getElementById('mentorship-csv-status');
     expect(status.textContent).toContain('response(s) decrypted');
     expect(subtle.decrypt).toHaveBeenCalled();
+    const csv = blobConstructor.mock.calls[0][0][0];
+    expect(csv).toContain('"response_language"');
+    expect(csv).toContain('"pt"');
+    expect(csv).not.toContain('"__form_language"');
   });
 
   test('csv clears private key when selected form changes', async () => {
