@@ -6,6 +6,7 @@ The public import surface remains `users.serializers`.
 from users.serializers.account_serializers import (
     UserSerializer,
     ProfileSerializer,
+    UserProfileSerializer,
     LanguageProficiencySerializer,
 )
 from users.serializers.reference_serializers import (
@@ -35,7 +36,7 @@ from users.serializers.letsconnect_serializers import LetsConnectLogSerializer
 
 __all__ = [
     # profile
-    'UserSerializer', 'ProfileSerializer', 'LanguageProficiencySerializer',
+    'UserSerializer', 'ProfileSerializer', 'UserProfileSerializer', 'LanguageProficiencySerializer',
     # reference
     'TerritorySerializer', 'LanguageSerializer', 'WikimediaProjectSerializer', 'AvatarSerializer', 'OrganizationSerializer',
     # lists

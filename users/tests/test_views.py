@@ -48,14 +48,21 @@ class ProfileViewSetTestCase(TestCase):
         self.assertEqual(response.status_code, status.HTTP_200_OK)
         self.assertIn('campaigns', response.data)
         self.assertEqual(len(response.data['campaigns']), 2)
-        self.assertIn(campaign1.id, response.data['campaigns'])
-        self.assertIn(campaign2.id, response.data['campaigns'])
+        # Check campaigns have metabase_qid and role_wikidata_qid
+        campaign_qids = {c['metabase_qid'] for c in response.data['campaigns']}
+        self.assertIn('Q1001', campaign_qids)
+        self.assertIn('Q1002', campaign_qids)
+        for c in response.data['campaigns']:
+            self.assertIn('role_wikidata_qid', c)
         response = self.client.get('/users/' + str(self.user.pk) + '/')
         self.assertEqual(response.status_code, status.HTTP_200_OK)
         self.assertIn('campaigns', response.data)
         self.assertEqual(len(response.data['campaigns']), 2)
-        self.assertIn(campaign1.id, response.data['campaigns'])
-        self.assertIn(campaign2.id, response.data['campaigns'])
+        campaign_qids = {c['metabase_qid'] for c in response.data['campaigns']}
+        self.assertIn('Q1001', campaign_qids)
+        self.assertIn('Q1002', campaign_qids)
+        for c in response.data['campaigns']:
+            self.assertIn('role_wikidata_qid', c)
 
     def test_update_profile(self):
         url = '/profile/' + str(self.user.pk) + '/'

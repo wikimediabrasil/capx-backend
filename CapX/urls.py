@@ -67,7 +67,6 @@ if 'router' not in globals():
     router.register('skills_by_type', SkillByTypeViewSet, basename='skills_by_type')
     router.register('events', EventViewSet)
     router.register('campaigns', CampaignViewSet, basename='campaigns')
-    router.register('my_campaigns', UserCampaignViewSet, basename='my_campaigns')
     router.register('messages', MessageViewSet, basename='messages')
     router.register('projects', ProjectViewSet, basename='projects')
     router.register('project_members', ProjectMemberViewSet, basename='project_members')
@@ -101,6 +100,8 @@ urlpatterns = [
     path('statistics/languages-by-territory/', LanguagesByTerritoryView.as_view(), name='languages-by-territory'),
     path('statistics/capacities-by-territory/', CapacitiesByTerritoryView.as_view(), name='capacities-by-territory'),
     path('recommendation/', RecommendationView.as_view(), name='recommendation'),
+    path('campaigns/my/', UserCampaignViewSet.as_view({'get': 'list', 'post': 'create'}), name='my_campaigns_list'),
+    path('campaigns/my/<str:metabase_qid>/', UserCampaignViewSet.as_view({'get': 'retrieve', 'delete': 'destroy'}), name='my_campaigns_detail'),
     path('', include(router.urls)),
 ]
 

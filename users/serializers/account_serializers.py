@@ -1,12 +1,18 @@
-from rest_framework import serializers
-from drf_spectacular.utils import extend_schema_field, extend_schema_serializer
-from drf_spectacular.types import OpenApiTypes
 from django.shortcuts import get_object_or_404
-
-from users.models import Profile, CustomUser, LanguageProficiency, UserBadge
-from users.models import Language
-from orgs.models import Organization
+from drf_spectacular.types import OpenApiTypes
+from drf_spectacular.utils import extend_schema_field
 from knox.models import AuthToken
+from rest_framework import serializers
+
+from campaigns.serializers import CampaignSerializer
+from orgs.models import Organization
+from users.models import (
+    CustomUser,
+    Language,
+    LanguageProficiency,
+    Profile,
+    UserBadge,
+)
 
 
 class UserSerializer(serializers.ModelSerializer):
@@ -32,11 +38,41 @@ class ProfileSerializer(serializers.ModelSerializer):
     last_login = serializers.SerializerMethodField()
     badges = serializers.SerializerMethodField()
     language = LanguageProficiencySerializer(source='languageproficiency_set', many=True)
+    campaigns = serializers.SerializerMethodField()
 
     class Meta:
         model = Profile
         read_only_fields = ['is_manager', 'badges']
         fields = "__all__"
+
+    @extend_schema_field({
+        'type': 'array',
+        'description': 'List of campaigns with full campaign data and role',
+        'items': {
+            'type': 'object',
+            'properties': {
+                'id': {'type': 'integer'},
+                'metabase_qid': {'type': 'string'},
+                'min_start_date': {'type': 'string', 'format': 'date'},
+                'max_end_date': {'type': 'string', 'format': 'date'},
+                'org_qids': {'type': 'array', 'items': {'type': 'string'}},
+                'location_qids': {'type': 'array', 'items': {'type': 'string'}},
+                'language_qids': {'type': 'array', 'items': {'type': 'string'}},
+                'skill_wikidata_qids': {'type': 'array', 'items': {'type': 'string'}},
+                'created_at': {'type': 'string', 'format': 'date-time'},
+                'updated_at': {'type': 'string', 'format': 'date-time'},
+                'role_wikidata_qid': {'type': 'string'},
+            },
+        },
+    })
+    def get_campaigns(self, obj):
+        """Return list of campaigns with full campaign data and role."""
+        campaigns_data = []
+        for pc in obj.profile_campaigns.select_related('campaign').all():
+            campaign_data = CampaignSerializer(pc.campaign).data
+            campaign_data['role_wikidata_qid'] = pc.role_wikidata_qid
+            campaigns_data.append(campaign_data)
+        return campaigns_data
 
     @extend_schema_field({
         'type': 'array', 'description': 'List of organization IDs where the user is a manager', 'items': {'type': 'integer'}
@@ -78,3 +114,9 @@ class ProfileSerializer(serializers.ModelSerializer):
             ).delete()
 
         return super().update(instance, validated_data)
+
+
+class UserProfileSerializer(ProfileSerializer):
+    """Serializer for user profiles in list/detail views."""
+    class Meta(ProfileSerializer.Meta):
+        pass
